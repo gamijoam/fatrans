@@ -79,10 +79,34 @@ fondo-ahorro-platform/
 
 ---
 
+## 📋 Proyecto GitHub - Tablero Kanban
+
+Gestión del desarrollo frontend con GitHub Projects:
+
+🔗 **https://github.com/users/gamijoam/projects/2**
+
+### Cómo usar el tablero:
+
+| Paso | Acción |
+|------|--------|
+| 1 | Ir a https://github.com/users/gamijoam/projects/2 |
+| 2 | Agregar issues al tablero arrastrándolas |
+| 3 | Cambiar estado: Por Hacer → En Progreso → Hecho |
+| 4 | Asignar Sprint y Prioridad a cada card |
+
+### Estructura del equipo:
+
+- **Columnas:** To Do | In Progress | Done
+- **Campos:** Sprint, Prioridad
+- **Vinculado a:** 40 issues organizadas por milestone
+
+---
+
 ## 📚 Documentación Importante
 
 Para entender cómo aportar al proyecto:
 
+- 👉 [CONTRIBUTING.md](./CONTRIBUTING.md) - Reglas del equipo (commits, PRs, code review)
 - 👉 [Flujo de Trabajo y Reglas Atómicas (Git Flow)](docs/DEVELOPER_WORKFLOW.md)
 - 👉 [Informe General y Funcional del Proyecto](docs/informe_general_proyecto.md)
 - 👉 [Guía de Frontend Web](docs/frontend/README.md) - Stack, setup, arquitectura
