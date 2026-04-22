@@ -13,7 +13,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             staleTime: 30_000,
             gcTime: 5 * 60_000,
             retry: 3,
-            retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30000),
+            retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
           },
           mutations: {
             retry: 1,

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { toast } from 'sonner';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -12,6 +12,8 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   const method = config.method?.toLowerCase();
   if (['post', 'put', 'delete', 'patch'].includes(method || '')) {
+    // CSRF: El backend debe enviar cookie 'csrf_token' con SameSite=Strict y HttpOnly=false
+    // para que JavaScript pueda leerla. Alternativamente usar double-submit pattern.
     const csrfToken = document.cookie
       .split('; ')
       .find((row) => row.startsWith('csrf_token='))
