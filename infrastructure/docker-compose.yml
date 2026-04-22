@@ -10,7 +10,7 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./seed_admin.sql:/docker-entrypoint-initdb.d/seed_admin.sql:ro
+      # - ./seed_admin.sql:/docker-entrypoint-initdb.d/seed_admin.sql:ro  # TEMPORALMENTE DESACTIVADO - seed corre antes de Hibernate
     ports:
       - "15432:5432"
 

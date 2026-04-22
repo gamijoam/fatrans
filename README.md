@@ -16,10 +16,17 @@ Para levantar todo el entorno localmente de forma automatizada, solo necesitas t
 
 ## 🛠️ Cómo Iniciar el Proyecto Localmente
 
-### Levantar todo el entorno (Backend + Frontend + Database)
+### 1. Crear archivo de variables de entorno
 
 ```bash
 cd infrastructure
+cp .env.example .env
+# Editar .env y completar los valores
+```
+
+### 2. Levantar todo el entorno (Backend + Frontend + Database)
+
+```bash
 docker compose up -d --build
 ```
 
@@ -30,7 +37,16 @@ Esto levanta:
 - **Backend (Spring Boot)** en puerto `8080` (local: `18080`)
 - **Frontend (Next.js)** en puerto `3000` (local: `13000`)
 
-### Verificar que funciona
+### 3. Crear usuario Admin inicial
+
+**Solo la primera vez**, después de que el backend esté corriendo:
+
+```bash
+# Ver instrucciones en:
+cat infrastructure/SEED_ADMIN.md
+```
+
+### 4. Verificar que funciona
 
 ```bash
 docker ps
@@ -52,30 +68,42 @@ docker ps
 ```
 fondo-ahorro-platform/
 ├── backend/                    # API Spring Boot (Java 21)
-│   ├── src/
-│   ├── Dockerfile
-│   └── pom.xml
 ├── frontend-web/               # Portal Web (Next.js 14+)
-│   ├── src/
-│   │   ├── app/               # App Router
-│   │   ├── components/        # Componentes UI
-│   │   ├── features/          # Módulos feature-based
-│   │   ├── lib/              # Utils (API client, money, etc.)
-│   │   ├── stores/           # Zustand stores
-│   │   └── types/            # Tipos TypeScript
-│   ├── Dockerfile
-│   └── package.json
-├── infrastructure/
-│   ├── docker-compose.yml     # Orquestación completa
-│   ├── postgres-init.sql
-│   └── seed_admin.sql
+├── infrastructure/             # Docker Compose y scripts
+│   ├── docker-compose.yml
+│   ├── .env.example           # Template de variables
+│   ├── seed_admin.sql         # Script para crear admin (manual)
+│   └── SEED_ADMIN.md           # Instrucciones del script
 ├── docs/                      # Documentación
-│   ├── frontend/              # Docs frontend
-│   ├── auditorias/
-│   └── modulos/
-├── blueprint.md               # Blueprint técnico frontend
-└── README.md
+│   ├── informacion/            # Guías de cambios y fundamentos
+│   ├── frontend/               # Docs del frontend
+│   └── auditorias/             # Auditorías de código
+└── CONTRIBUTING.md            # Reglas del equipo
 ```
+
+---
+
+## 📚 Documentación para Desarrolladores
+
+### 🚀 Guía de Inicio Rápido
+Ver sección **[Cómo Iniciar el Proyecto](#-cómo-iniciar-el-proyecto-localmente)** arriba.
+
+### 📖 Guías de Cambios y Fundamentos
+Ubicación: `docs/informacion/`
+
+| Guía | Descripción |
+|------|-------------|
+| **[GUIA_TIPOS_GENERADOS.md](docs/informacion/GUIA_TIPOS_GENERADOS.md)** | Cómo usar los 94 tipos TypeScript generados desde OpenAPI |
+
+### ⚙️ Scripts de Infrastructure
+
+| Script | Cuándo usarlo | Ubicación |
+|--------|--------------|-----------|
+| **Crear Admin Inicial** | Solo la primera vez que levantas el proyecto | [SEED_ADMIN.md](infrastructure/SEED_ADMIN.md) |
+| **Regenerar Tipos API** | Cuando el backend cambia | `npm run generate:types` (en frontend-web) |
+
+### 📋 Reglas del Equipo
+**[CONTRIBUTING.md](CONTRIBUTING.md)** - Commits, PRs, Code Review, Branch Protection
 
 ---
 
@@ -99,18 +127,6 @@ Gestión del desarrollo frontend con GitHub Projects:
 - **Columnas:** To Do | In Progress | Done
 - **Campos:** Sprint, Prioridad
 - **Vinculado a:** 40 issues organizadas por milestone
-
----
-
-## 📚 Documentación Importante
-
-Para entender cómo aportar al proyecto:
-
-- 👉 [CONTRIBUTING.md](./CONTRIBUTING.md) - Reglas del equipo (commits, PRs, code review)
-- 👉 [Flujo de Trabajo y Reglas Atómicas (Git Flow)](docs/DEVELOPER_WORKFLOW.md)
-- 👉 [Informe General y Funcional del Proyecto](docs/informe_general_proyecto.md)
-- 👉 [Guía de Frontend Web](docs/frontend/README.md) - Stack, setup, arquitectura
-- 👉 [Blueprint Técnico Frontend](blueprint.md) - Especificaciones completas
 
 ---
 
