@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 
-Decimal.set({ precision: 19, scale: 4, rounding: Decimal.ROUND_HALF_UP });
+Decimal.set({ precision: 19, rounding: Decimal.ROUND_HALF_UP });
 
 export class Money {
   private constructor(private readonly value: Decimal) {}
