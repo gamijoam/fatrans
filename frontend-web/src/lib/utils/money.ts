@@ -49,6 +49,10 @@ export class Money {
     return this.value.lessThan(other.value);
   }
 
+  equals(other: Money): boolean {
+    return this.value.equals(other.value);
+  }
+
   isZero(): boolean {
     return this.value.isZero();
   }
@@ -70,4 +74,39 @@ export function parseMoney(value: string | number): Money {
     return Money.fromNumber(value);
   }
   return Money.fromString(value.replace(/[^\d.,]/g, '').replace(',', '.'));
+}
+
+export interface MoneyValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+export function validateMoneyRange(
+  amount: Money,
+  min: number,
+  max: number
+): MoneyValidationResult {
+  if (min > max) {
+    return { valid: false, error: 'Configuración de validación inválida: min > max' };
+  }
+  if (amount.isLessThan(Money.fromNumber(min))) {
+    return { valid: false, error: `El monto debe ser mayor o igual a ${min}` };
+  }
+  if (amount.isGreaterThan(Money.fromNumber(max))) {
+    return { valid: false, error: `El monto debe ser menor o igual a ${max}` };
+  }
+  return { valid: true };
+}
+
+export function isValidMoneyInput(value: string): boolean {
+  if (/[eE]/.test(value)) return false;
+
+  const cleaned = value.replace(/[^\d.,]/g, '').replace(',', '.');
+
+  const decimalParts = cleaned.split('.');
+  if (decimalParts.length > 2) return false;
+  if (decimalParts[1] && decimalParts[1].length > 2) return false;
+
+  const num = parseFloat(cleaned);
+  return !isNaN(num) && num > 0 && isFinite(num);
 }
