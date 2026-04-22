@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: fondo-backend-test
+
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+
+  flyway:
+    enabled: false
+
+  security:
+    user:
+      name: test
+      password: test
+
+server:
+  port: 0
+
+jwt:
+  secret: test-secret-key-for-testing-purposes-only-minimum-256-bits
+  issuer: fondo-test
+  accessToken:
+    expirationMinutes: 60
+  refreshToken:
+    expirationDays: 1
+  sesion:
+    ventana-inicializacion-segundos: 60

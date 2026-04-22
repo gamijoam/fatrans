@@ -1,0 +1,28 @@
+node_modules/
+build/
+target/
+.dart_tool/
+*.log
+.env
+.env.local
+.env.*.local
+.idea/
+.vscode/
+.ai/venv/
+**/venv/
+backend/test-output/
+backend/test-resources/
+*.p12
+*.pem
+
+# Next.js / Frontend
+.next/
+out/
+build/
+standalone/
+
+# Dependencies (all projects)
+**/node_modules/
+**/.next/
+**/out/
+**/build/

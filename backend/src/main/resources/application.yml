@@ -1,0 +1,88 @@
+spring:
+  application:
+    name: fondo-backend
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/fondo}
+    username: ${DB_USER:app}
+    password: ${DB_PASS}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: false
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+
+server:
+  port: 8080
+
+jwt:
+  secret: ${JWT_SECRET}
+  issuer: ${JWT_ISSUER:fondo-ahorro-platform}
+  accessToken:
+    expirationMinutes: ${JWT_ACCESS_EXPIRATION_MINUTES:15}
+  refreshToken:
+    expirationDays: ${JWT_REFRESH_EXPIRATION_DAYS:7}
+  sesion:
+    ventana-inicializacion-segundos: ${JWT_WINDOW_SECONDS:60}
+
+clamav:
+  host: ${CLAMAV_HOST:localhost}
+  port: ${CLAMAV_PORT:3310}
+  timeout-ms: ${CLAMAV_TIMEOUT:60000}
+  enabled: ${CLAMAV_ENABLED:true}
+
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin123}
+
+storage:
+  bucket:
+    kyc: bucket-kyc
+
+# ============================================
+# MÓDULO DOCUMENTOS PDF - CONFIGURACIÓN
+# ============================================
+documentospdf:
+  # Configuración de buckets MinIO segregados
+  buckets:
+    documentos: bucket-documentos
+    contratos: bucket-contratos
+    pagares: bucket-pagares
+    creditos: bucket-creditos
+    temporal: bucket-temporal
+  # TTL de pre-signed URLs en minutos
+  presigned-url:
+    expiration-minutes: 15
+  # Duración de documentos (para expiración automática)
+  document-expiration:
+    estado-cuenta-days: 7
+    constancia-afiliacion-days: 365
+    tabla-amortizacion-days: 30
+  # Rate limiting
+  rate-limit:
+    generation-per-user-per-minute: 5
+    generation-per-ip-per-minute: 20
+    download-per-user-per-minute: 10
+  # Firma digital RSA para contratos y pagarés
+  firma-digital:
+    enabled: true
+    algoritmo: SHA256withRSA
+    keystore-path: ${DOC_FIRMA_KEYSTORE:/etc/fondo/firma-digital.p12}
+    keystore-password: ${DOC_FIRMA_PASSWORD:}
+    key-alias: ${DOC_FIRMA_KEY_ALIAS:documentos-fondo}
+    keystore-type: PKCS12

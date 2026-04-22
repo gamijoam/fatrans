@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: fondo
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${DB_PASS:?DB_PASS is required}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./seed_admin.sql:/docker-entrypoint-initdb.d/seed_admin.sql:ro
+    ports:
+      - "15432:5432"
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASS:?REDIS_PASS is required}
+    ports:
+      - "16379:6379"
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "19000:9000"
+      - "19001:9001"
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    ports:
+      - "18080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_URL: jdbc:postgresql://postgres:5432/fondo
+      DB_USER: app
+      DB_PASS: ${DB_PASS:?DB_PASS is required}
+      REDIS_HOST: redis
+      REDIS_PASS: ${REDIS_PASS:?REDIS_PASS is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
+      CORS_ORIGINS: "http://localhost:18080,http://localhost:32993,http://localhost:18081,http://localhost:3000,http://127.0.0.1:18080,http://127.0.0.1:32993,http://127.0.0.1:18081,http://127.0.0.1:3000"
+    depends_on:
+      - postgres
+      - redis
+      - minio
+
+  frontend:
+    build:
+      context: ../frontend-web
+      dockerfile: Dockerfile
+    ports:
+      - "13000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8080/api
+      NODE_ENV: production
+    depends_on:
+      - backend
+
+  minio_init:
+    image: minio/mc:latest
+    entrypoint: /bin/sh
+    command: >
+      -c "sleep 5 &&
+          mc alias set local http://minio:9000 minioadmin minioadmin123 2>/dev/null || true &&
+          mc mb local/fondodocs --ignore-existing 2>/dev/null || true &&
+          mc anonymous set public local/fondodocs 2>/dev/null || true &&
+          exit 0"
+    depends_on:
+      - minio
+
+volumes:
+  pg_data:
+  minio_data:
