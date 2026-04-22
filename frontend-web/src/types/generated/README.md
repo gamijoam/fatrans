@@ -1,51 +1,74 @@
 # Tipos Generados
 
-**Estado:** ⚠️ Tipos creados manualmente
+**Estado:** ✅ Generados automáticamente desde OpenAPI
 
-Estos tipos fueron creados **manualmente** basado en `docs/base-proyecto/API_CONTRACTS.md`.
-
-El backend no estaba corriendo para generar tipos desde OpenAPI.
+**Fecha:** 2026-04-22
+**Backend:** http://localhost:18080/v3/api-docs
 
 ---
 
-## Cómo regenerar tipos automáticamente
+## Estadísticas
 
-### 1. Iniciar backend
+| Tipo | Cantidad |
+|------|----------|
+| Models | 94 |
+| APIs | 16 |
+
+---
+
+## Modelos Principales
+
+- `CuentaAhorroResponse.ts`
+- `MovimientoResponse.ts`
+- `SolicitudCreditoResponse.ts`
+- `CuotaResponse.ts`
+- `BeneficiarioResponseDTO.ts`
+- `UsuarioResponse.ts`
+- `VerificacionKYCResponse.ts`
+
+---
+
+## APIs Generadas
+
+- `AuthApi.ts`
+- `CuentasAhorroApi.ts`
+- `CreditosApi.ts`
+- `KYCApi.ts`
+- `BeneficiariosApi.ts`
+- `DocumentosApi.ts`
+- `SociosApi.ts`
+
+---
+
+## Cómo regenerar tipos
 
 ```bash
-cd infrastructure
-docker compose up -d backend
-# Esperar ~30 segundos
-```
+# 1. Asegurarse que backend está corriendo
+cd infrastructure && docker compose up -d backend
 
-### 2. Generar tipos
+# 2. Esperar ~30 segundos
 
-```bash
+# 3. Regenerar tipos
 cd frontend-web
 npm run generate:types
 ```
 
-### 3. Verificar
-
-```bash
-ls -la src/types/generated/
-git diff src/types/generated/
-```
-
 ---
 
-## Cuándo regenerar
+## Uso
 
-| Situación | Acción |
-|-----------|--------|
-| Backend agrega nuevo endpoint | Regenerar |
-| Backend modifica schema | Regenerar |
-| Breaking changes | Actualizar código que usa los tipos |
+```typescript
+import { CuentaAhorroResponse } from '@/types/generated/models';
+import { CuentasAhorroApi } from '@/types/generated/apis';
+
+const api = new CuentasAhorroApi();
+const cuentas = await api.listarCuentasSocio(socioId);
+```
 
 ---
 
 ## Notas
 
-- Los tipos en `api.ts` son **solo lectura**
-- Regenerar sobrescribe todos los cambios manuales
+- Los tipos son **solo lectura**
+- Regenerar sobrescribe todos los cambios
 - Para tipos frontend específicos (no del backend), usar `src/types/`

@@ -51,6 +51,9 @@ La arquitectura está pensada bajo la filosofía de **"empezar ligero, validar r
 
 Documentación del nuevo frontend web basado en Next.js 14+ con arquitectura BFF:
 
+### 📚 Guías de Referencia
+- **[GUIA_TIPOS_GENERADOS.md](informacion/GUIA_TIPOS_GENERADOS.md)** - Cómo usar los tipos TypeScript generados desde OpenAPI
+
 - [FRONTEND_ROADMAP.md](base-proyecto/FRONTEND_ROADMAP.md) - Roadmap de implementación (20 semanas)
 - [ESTRUCTURA_PAGINAS.md](base-proyecto/ESTRUCTURA_PAGINAS.md) - Todas las páginas y componentes
 - [ROLES_PERMISOS.md](base-proyecto/ROLES_PERMISOS.md) - Matriz de roles y permisos
