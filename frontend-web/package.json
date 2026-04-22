@@ -10,7 +10,8 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "generate:types": "openapi-generator-cli generate -i http://localhost:18080/v3/api-docs -g typescript-fetch -o src/types/generated --additional-properties=typescriptSingleModule=true"
   },
   "dependencies": {
     "next": "14.2.0",
