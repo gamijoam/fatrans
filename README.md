@@ -16,10 +16,17 @@ Para levantar todo el entorno localmente de forma automatizada, solo necesitas t
 
 ## 🛠️ Cómo Iniciar el Proyecto Localmente
 
-### Levantar todo el entorno (Backend + Frontend + Database)
+### 1. Crear archivo de variables de entorno
 
 ```bash
 cd infrastructure
+cp .env.example .env
+# Editar .env y completar los valores
+```
+
+### 2. Levantar todo el entorno (Backend + Frontend + Database)
+
+```bash
 docker compose up -d --build
 ```
 
@@ -30,7 +37,16 @@ Esto levanta:
 - **Backend (Spring Boot)** en puerto `8080` (local: `18080`)
 - **Frontend (Next.js)** en puerto `3000` (local: `13000`)
 
-### Verificar que funciona
+### 3. Crear usuario Admin inicial
+
+**Solo la primera vez**, después de que el backend esté corriendo:
+
+```bash
+# Ver instrucciones en:
+cat infrastructure/SEED_ADMIN.md
+```
+
+### 4. Verificar que funciona
 
 ```bash
 docker ps
