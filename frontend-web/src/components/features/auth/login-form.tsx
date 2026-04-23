@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface LoginFormData {
   identificador: string;
@@ -27,6 +28,22 @@ export function LoginForm() {
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
   const router = useRouter();
   const setUser = useAuthStore((state) => state.setUser);
+
+  useEffect(() => {
+    if (lockoutRemaining > 0) {
+      const interval = setInterval(() => {
+        setLockoutRemaining((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setAttempts(0);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [lockoutRemaining]);
 
   const {
     register,
@@ -59,16 +76,6 @@ export function LoginForm() {
 
         if (newAttempts >= MAX_ATTEMPTS) {
           setLockoutRemaining(LOCKOUT_TIME);
-          const interval = setInterval(() => {
-            setLockoutRemaining((prev) => {
-              if (prev <= 1) {
-                clearInterval(interval);
-                setAttempts(0);
-                return 0;
-              }
-              return prev - 1;
-            });
-          }, 1000);
         }
 
         throw new Error(result.message || 'Credenciales inválidas');
@@ -101,7 +108,7 @@ export function LoginForm() {
 
     } catch (error) {
       console.error('Login error:', error);
-      alert(error instanceof Error ? error.message : 'Error de conexión');
+      toast.error(error instanceof Error ? error.message : 'Error de conexión');
     } finally {
       setIsLoading(false);
     }
@@ -149,9 +156,12 @@ export function LoginForm() {
               disabled={isLoading || lockoutRemaining > 0}
               {...register('identificador')}
               aria-invalid={!!errors.identificador}
+              aria-describedby={errors.identificador ? 'identificador-error' : undefined}
             />
             {errors.identificador && (
-              <p className="text-xs text-red-500">{errors.identificador.message}</p>
+              <p id="identificador-error" role="alert" className="text-xs text-red-500">
+                {errors.identificador.message}
+              </p>
             )}
           </div>
 
@@ -166,10 +176,13 @@ export function LoginForm() {
                 disabled={isLoading || lockoutRemaining > 0}
                 {...register('password')}
                 aria-invalid={!!errors.password}
+                aria-describedby={errors.password ? 'password-error' : undefined}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                aria-pressed={showPassword}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                 disabled={isLoading}
               >
@@ -181,13 +194,16 @@ export function LoginForm() {
               </button>
             </div>
             {errors.password && (
-              <p className="text-xs text-red-500">{errors.password.message}</p>
+              <p id="password-error" role="alert" className="text-xs text-red-500">
+                {errors.password.message}
+              </p>
             )}
           </div>
 
           <div className="flex items-center justify-between text-sm">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label htmlFor="remember-me" className="flex items-center gap-2 cursor-pointer">
               <input
+                id="remember-me"
                 type="checkbox"
                 className="rounded border-gray-300 text-green-600 focus:ring-green-500"
               />
