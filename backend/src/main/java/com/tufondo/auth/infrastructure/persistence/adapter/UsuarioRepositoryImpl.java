@@ -89,6 +89,7 @@ public class UsuarioRepositoryImpl implements UsuarioRepository {
         entity.setUltimaModificacion(Instant.now());
         entity.setIntentosFallidos(usuario.intentosFallidos());
         entity.setFechaBloqueo(usuario.fechaBloqueo());
+        entity.setDebeCambiarPassword(usuario.debeCambiarPassword());
         
         jpaRepository.save(entity);
     }

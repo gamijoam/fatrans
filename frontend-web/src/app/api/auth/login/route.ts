@@ -45,10 +45,46 @@ export async function POST(request: NextRequest) {
     }
 
     const setCookieHeaders = backendResponse.headers.getSetCookie();
-    const userData = {
+    
+    const token = backendResponse.headers.get('X-User-Token') || '';
+    let userData = {
       id: backendResponse.headers.get('X-User-Id'),
       rol: backendResponse.headers.get('X-User-Rol'),
+      debeCambiarPassword: false,
     };
+    
+    if (token) {
+      try {
+        const meResponse = await fetch(`${BACKEND_URL}/api/v1/auth/me`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+          credentials: 'include',
+        });
+        
+        console.log('/me response status:', meResponse.status);
+        console.log('/me content-type:', meResponse.headers.get('content-type'));
+        
+        if (meResponse.ok) {
+          const contentType = meResponse.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const meData = await meResponse.json();
+            console.log('/me data:', meData);
+            userData = {
+              id: meData.id,
+              nombreUsuario: meData.nombreUsuario,
+              correoElectronico: meData.correoElectronico,
+              nombreCompleto: meData.nombreCompleto,
+              rol: meData.rol,
+              socioId: meData.socioId,
+              debeCambiarPassword: meData.debeCambiarPassword ?? false,
+            };
+          }
+        } else {
+          console.log('/me failed, status:', meResponse.status);
+        }
+      } catch (e) {
+        console.error('Error fetching /me:', e);
+      }
+    }
 
     const response = NextResponse.json(
       { success: true, user: userData },
@@ -56,7 +92,8 @@ export async function POST(request: NextRequest) {
     );
 
     setCookieHeaders.forEach((cookie) => {
-      response.headers.append('Set-Cookie', cookie);
+      const cleanCookie = cookie.replace('; Secure', '');
+      response.headers.append('Set-Cookie', cleanCookie);
     });
 
     return response;

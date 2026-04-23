@@ -33,10 +33,8 @@ export async function POST(
         headers: {
           'Authorization': `Bearer ${accessToken.value}`,
           'Content-Type': 'application/json',
-          'X-Admin-Id': accessToken.value,
         },
         credentials: 'include',
-        body: JSON.stringify({}),
       }
     );
 

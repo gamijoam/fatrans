@@ -119,7 +119,11 @@ export const changePasswordSchema = z.object({
   nuevoPassword: z
     .string()
     .min(8, 'La nueva contraseña debe tener al menos 8 caracteres')
-    .max(128, 'La contraseña no puede exceder 128 caracteres'),
+    .max(128, 'La contraseña no puede exceder 128 caracteres')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/,
+      'Debe incluir mayúsculas, minúsculas, números y caracteres especiales'
+    ),
   confirmarPassword: z.string(),
 }).refine((data) => data.nuevoPassword === data.confirmarPassword, {
   message: 'Las contraseñas no coinciden',

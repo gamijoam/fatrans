@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
-import { sociosApi } from '@/lib/api/client';
+import { sociosApi, authApi } from '@/lib/api/client';
 import { ProfileForm } from '@/components/features/profile/profile-form';
 import { PasswordChangeDialog } from '@/components/features/profile/password-change-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -100,8 +100,7 @@ export default function PerfilPage() {
   };
 
   const handlePasswordChange = async (data: { passwordActual: string; nuevoPassword: string; confirmarPassword: string }) => {
-    console.log('Password change:', data);
-    throw new Error('No implementado');
+    await authApi.changePassword(data.passwordActual, data.nuevoPassword);
   };
 
   if (isLoading) {

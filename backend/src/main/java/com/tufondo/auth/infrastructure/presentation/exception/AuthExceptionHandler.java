@@ -112,6 +112,14 @@ public class AuthExceptionHandler {
                 .body(new ErrorResponse("PASSWORD_NO_CUMPLE_REQUISITOS", ex.getMessage()));
     }
 
+    @ExceptionHandler(PasswordReutilizadaException.class)
+    @Schema(description = "Error cuando se intenta reutilizar una contraseña anterior")
+    public ResponseEntity<ErrorResponse> manejarPasswordReutilizada(PasswordReutilizadaException ex) {
+        log.warn("Password reutilizada: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("PASSWORD_REUTILIZADA", ex.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     @Schema(description = "Error interno del servidor")
     public ResponseEntity<ErrorResponse> manejarExcepcionGeneral(Exception ex) {

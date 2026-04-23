@@ -2,6 +2,7 @@ package com.tufondo.auth.infrastructure.presentation.controller;
 
 import com.tufondo.auth.application.dto.*;
 import com.tufondo.auth.application.usecase.AuthUseCase;
+import com.tufondo.auth.application.usecase.CambiarPasswordUseCase;
 import com.tufondo.auth.application.usecase.CrearUsuarioManualUseCase;
 import com.tufondo.auth.application.usecase.ObtenerUsuarioActualUseCase;
 import com.tufondo.auth.application.usecase.RestablecerPasswordUseCase;
@@ -47,6 +48,7 @@ public class AuthController {
     private final CrearUsuarioManualUseCase crearUsuarioManualUseCase;
     private final SolicitarRecuperacionPasswordUseCase solicitarRecuperacionPasswordUseCase;
     private final RestablecerPasswordUseCase restablecerPasswordUseCase;
+    private final CambiarPasswordUseCase cambiarPasswordUseCase;
 
     @PostMapping("/login")
     @Operation(summary = "Iniciar sesión", description = "Autentica un usuario y devuelve tokens JWT")
@@ -287,6 +289,21 @@ public class AuthController {
     public ResponseEntity<MensajeResponseDTO> resetPassword(
             @Valid @RequestBody ResetPasswordRequestDTO request) {
         MensajeResponseDTO response = restablecerPasswordUseCase.ejecutar(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/cambiar-password")
+    @Operation(summary = "Cambiar contraseña",
+               description = "Permite al usuario autenticado cambiar su contraseña actual por una nueva")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Contraseña actualizada exitosamente"),
+            @ApiResponse(responseCode = "400", description = "Password no cumple requisitos"),
+            @ApiResponse(responseCode = "401", description = "Credenciales inválidas o no autorizado"),
+            @ApiResponse(responseCode = "403", description = "Cuenta bloqueada o desactivada")
+    })
+    public ResponseEntity<MensajeResponseDTO> cambiarPassword(
+            @Valid @RequestBody CambiarPasswordRequestDTO request) {
+        MensajeResponseDTO response = cambiarPasswordUseCase.ejecutar(request);
         return ResponseEntity.ok(response);
     }
 

@@ -70,7 +70,8 @@ class AuthUseCaseTest {
                 Instant.now(),
                 Instant.now(),
                 0,
-                null
+                null,
+                false
         );
 
         loginRequest = new LoginRequestDTO("admin_test", "password123");

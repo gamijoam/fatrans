@@ -56,6 +56,8 @@ export const authApi = {
   logout: () => apiClient.post('/v1/auth/logout-web'),
   refresh: () => apiClient.post('/v1/auth/refresh-web'),
   me: () => apiClient.get('/v1/auth/me'),
+  changePassword: (passwordActual: string, nuevoPassword: string) =>
+    apiClient.post('/v1/auth/cambiar-password', { passwordActual, nuevoPassword }),
 };
 
 export const sociosApi = {

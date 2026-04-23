@@ -86,7 +86,7 @@ export default function SolicitudesPage() {
       if (!response.ok) throw new Error('Error al aprobar');
 
       toast.success('Solicitud aprobada');
-      fetchSolicitudes(currentPage);
+      await fetchSolicitudes(currentPage);
     } catch {
       toast.error('Error al aprobar solicitud');
     } finally {
@@ -118,7 +118,7 @@ export default function SolicitudesPage() {
 
       toast.success('Solicitud rechazada');
       setSelectedId(null);
-      fetchSolicitudes(currentPage);
+      await fetchSolicitudes(currentPage);
     } catch {
       toast.error('Error al rechazar solicitud');
     } finally {

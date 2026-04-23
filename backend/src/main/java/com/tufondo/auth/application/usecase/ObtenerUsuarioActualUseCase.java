@@ -35,7 +35,8 @@ public class ObtenerUsuarioActualUseCase {
                 usuario.nombreUsuario(),
                 usuario.correoElectronico(),
                 usuario.nombreCompleto(),
-                usuario.rol().name()
+                usuario.rol().name(),
+                usuario.debeCambiarPassword()
         );
     }
 }
