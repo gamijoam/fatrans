@@ -24,6 +24,33 @@ export const loginErrorMessages = {
   },
 } as const;
 
+const cedulaRegex = /^(V|E)-\d{7,8}$|^\d{7,8}$/;
+const phoneRegex = /^\d{10,11}$/;
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export const registroSchema = z.object({
+  nombreCompleto: z
+    .string()
+    .min(3, 'El nombre debe tener al menos 3 caracteres')
+    .max(200, 'El nombre no puede exceder 200 caracteres')
+    .transform((val) => val.trim()),
+  cedula: z
+    .string()
+    .regex(cedulaRegex, 'Cédula inválida. Formato: V-12345678 o 12345678'),
+  correoElectronico: z
+    .string()
+    .regex(emailRegex, 'Correo electrónico inválido'),
+  telefono: z
+    .string()
+    .regex(phoneRegex, 'Teléfono inválido. Debe tener 10-11 dígitos'),
+  empresa: z
+    .string()
+    .min(2, 'El nombre de la empresa debe tener al menos 2 caracteres')
+    .max(200, 'El nombre de la empresa no puede exceder 200 caracteres'),
+});
+
+export type RegistroFormData = z.infer<typeof registroSchema>;
+
 export const moneySchema = z.object({
   monto: z.string().refine(
     (val) => {
