@@ -33,16 +33,17 @@ export function middleware(request: NextRequest) {
 
     const { allowed, remaining, resetIn } = getRateLimitInfo(ip);
 
-    const response = NextResponse.next();
-    response.headers.set('X-RateLimit-Remaining', remaining.toString());
-    response.headers.set('X-RateLimit-Reset', resetIn.toString());
-
     if (!allowed) {
       return NextResponse.json(
         { message: 'Demasiadas solicitudes. Intenta de nuevo más tarde.' },
         { status: 429 }
       );
     }
+
+    const response = NextResponse.next();
+    response.headers.set('X-RateLimit-Remaining', remaining.toString());
+    response.headers.set('X-RateLimit-Reset', resetIn.toString());
+    return response;
   }
 
   const publicRoutes = ['/', '/login', '/registro', '/recuperar-password'];
