@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { sanitizeHTML } from '@/lib/utils/cn';
 
 interface LoginFormData {
   identificador: string;
@@ -108,7 +109,8 @@ export function LoginForm() {
 
     } catch (error) {
       console.error('Login error:', error);
-      toast.error(error instanceof Error ? error.message : 'Error de conexión');
+      const message = error instanceof Error ? sanitizeHTML(error.message) : 'Error de conexión';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }

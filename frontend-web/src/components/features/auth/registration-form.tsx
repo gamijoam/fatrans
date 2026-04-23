@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { sanitizeHTML } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 
 export function RegistrationForm() {
@@ -47,7 +48,8 @@ export function RegistrationForm() {
 
     } catch (error) {
       console.error('Registro error:', error);
-      toast.error(error instanceof Error ? error.message : 'Error de conexión');
+      const message = error instanceof Error ? sanitizeHTML(error.message) : 'Error de conexión';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
