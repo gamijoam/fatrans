@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { devtools } from 'zustand/middleware';
 
-export type UserRol = 'ADMIN' | 'ADMINISTRADOR' | 'GESTOR' | 'SOCIO';
+export type UserRol = 'ADMIN' | 'ADMINISTRADOR' | 'GESTOR' | 'SOCIO' | 'SUPER_ADMIN';
 
 export interface User {
   id: string;
