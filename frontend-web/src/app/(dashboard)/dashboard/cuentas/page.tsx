@@ -18,6 +18,10 @@ interface Cuenta {
   saldo: number;
 }
 
+interface MovimientoResponse {
+  saldoPosterior: number;
+}
+
 export default function CuentasPage() {
   const user = useAuthStore((state) => state.user);
   const isLoading = useAuthStore((state) => state.isLoading);
@@ -89,16 +93,22 @@ export default function CuentasPage() {
     setLoadingOperacion(true);
     try {
       const numMonto = parseFloat(monto);
+      let nuevoSaldo: number;
       if (operacion === 'deposito') {
-        await cuentasApi.deposito(cuentaSeleccionada.numeroCuenta, numMonto);
+        const res = await cuentasApi.deposito(cuentaSeleccionada.numeroCuenta, numMonto);
+        nuevoSaldo = res.data.saldoPosterior;
         toastSuccess('Depósito realizado', `Se depositaron $${numMonto.toFixed(2)} a la cuenta ${cuentaSeleccionada.numeroCuenta}`);
       } else {
-        await cuentasApi.retiro(cuentaSeleccionada.numeroCuenta, numMonto);
+        const res = await cuentasApi.retiro(cuentaSeleccionada.numeroCuenta, numMonto);
+        nuevoSaldo = res.data.saldoPosterior;
         toastSuccess('Retiro realizado', `Se retiraron $${numMonto.toFixed(2)} de la cuenta ${cuentaSeleccionada.numeroCuenta}`);
       }
+      setCuentas((prev) =>
+        prev.map((c) =>
+          c.id === cuentaSeleccionada.id ? { ...c, saldo: nuevoSaldo } : c
+        )
+      );
       setOpenConfirm(false);
-      setCuentas([]);
-      setLoaded(false);
     } catch (err: unknown) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error en la operación';
       toastError('Operación fallida', message);
