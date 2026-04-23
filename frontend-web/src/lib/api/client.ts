@@ -64,3 +64,12 @@ export const sociosApi = {
   getById: (id: string) => apiClient.get(`/v1/socios/${id}`),
   updateProfile: (id: string, data: unknown) => apiClient.put(`/v1/socios/${id}/perfil`, data),
 };
+
+export const cuentasApi = {
+  getCuentas: (socioId: string) => apiClient.get(`/v1/cuentas?socioId=${socioId}`),
+  getCuenta: (numeroCuenta: string) => apiClient.get(`/v1/cuentas/${numeroCuenta}`),
+  deposito: (numeroCuenta: string, monto: number) =>
+    apiClient.post(`/v1/cuentas/${numeroCuenta}/depositos`, { monto }),
+  retiro: (numeroCuenta: string, monto: number) =>
+    apiClient.post(`/v1/cuentas/${numeroCuenta}/retiros`, { monto }),
+};
