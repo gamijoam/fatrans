@@ -66,8 +66,9 @@ export const sociosApi = {
 };
 
 export const cuentasApi = {
-  getCuentas: (socioId: string) => apiClient.get(`/v1/cuentas?socioId=${socioId}`),
+  getCuentas: (socioId: string) => apiClient.get(`/v1/cuentas/socio/${socioId}`),
   getCuenta: (numeroCuenta: string) => apiClient.get(`/v1/cuentas/${numeroCuenta}`),
+  getSaldo: (numeroCuenta: string) => apiClient.get(`/v1/cuentas/${numeroCuenta}/saldo`),
   deposito: (numeroCuenta: string, monto: number) =>
     apiClient.post(`/v1/cuentas/${numeroCuenta}/depositos`, { monto }),
   retiro: (numeroCuenta: string, monto: number) =>

@@ -18,6 +18,15 @@ interface Cuenta {
   saldo: number;
 }
 
+interface CuentasResponse {
+  cuentas: Array<{
+    id: string;
+    numeroCuenta: string;
+    tipoCuenta: string;
+    saldoActual: number;
+  }>;
+}
+
 interface MovimientoResponse {
   saldoPosterior: number;
 }
@@ -51,7 +60,15 @@ export default function CuentasPage() {
     setLoadingCuentas(true);
     try {
       const res = await cuentasApi.getCuentas(user.socioId);
-      setCuentas(res.data);
+      const cuentasData: CuentasResponse = res.data;
+      setCuentas(
+        cuentasData.cuentas.map((c) => ({
+          id: c.id,
+          numeroCuenta: c.numeroCuenta,
+          tipoCuenta: c.tipoCuenta,
+          saldo: Number(c.saldoActual),
+        }))
+      );
       setLoaded(true);
     } catch {
       toastError('Error al cargar cuentas');
