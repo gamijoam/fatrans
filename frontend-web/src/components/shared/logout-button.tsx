@@ -47,11 +47,11 @@ export function LogoutButton() {
           <span>Cerrar Sesión</span>
         </button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px]" aria-labelledby="logout-dialog-title">
         <DialogHeader>
           <div className="flex items-center gap-2 text-red-600">
             <AlertTriangle className="h-5 w-5" />
-            <DialogTitle>¿Cerrar Sesión?</DialogTitle>
+            <DialogTitle id="logout-dialog-title">¿Cerrar Sesión?</DialogTitle>
           </div>
           <DialogDescription>
             Tu sesión será cerrada y tendrás que volver a iniciar sesión para acceder a tu cuenta.
@@ -65,6 +65,7 @@ export function LogoutButton() {
             variant="destructive"
             onClick={handleLogout}
             disabled={isLoading}
+            aria-busy={isLoading}
           >
             {isLoading ? 'Cerrando...' : 'Cerrar Sesión'}
           </Button>
