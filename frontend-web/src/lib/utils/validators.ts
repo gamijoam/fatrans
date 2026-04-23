@@ -1,9 +1,28 @@
 import { z } from 'zod';
 
 export const loginSchema = z.object({
-  identificador: z.string().min(3, 'Mínimo 3 caracteres'),
-  password: z.string().min(8, 'Mínimo 8 caracteres'),
+  identificador: z
+    .string()
+    .min(3, 'El identificador debe tener al menos 3 caracteres')
+    .max(100, 'El identificador no puede exceder 100 caracteres')
+    .transform((val) => val.trim()),
+  password: z
+    .string()
+    .min(8, 'La contraseña debe tener al menos 8 caracteres')
+    .max(128, 'La contraseña no puede exceder 128 caracteres'),
 });
+
+export const loginErrorMessages = {
+  identificador: {
+    required: 'Por favor ingresa tu usuario o correo electrónico',
+    minLength: 'El usuario debe tener al menos 3 caracteres',
+    maxLength: 'El usuario no puede exceder 100 caracteres',
+  },
+  password: {
+    required: 'Por favor ingresa tu contraseña',
+    minLength: 'La contraseña debe tener al menos 8 caracteres',
+  },
+} as const;
 
 export const moneySchema = z.object({
   monto: z.string().refine(
