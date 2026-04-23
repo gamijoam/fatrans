@@ -3,6 +3,22 @@ import { NextRequest, NextResponse } from 'next/server';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const referer = request.headers.get('referer');
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:13000',
+    process.env.NEXT_PUBLIC_APP_URL,
+  ].filter(Boolean);
+
+  if (origin && !allowedOrigins.includes(origin)) {
+    return NextResponse.json({ message: 'Origen no permitido' }, { status: 403 });
+  }
+
+  if (referer && !referer.startsWith('http://localhost:3000') && !referer.startsWith('http://localhost:13000')) {
+    return NextResponse.json({ message: 'Referer no permitido' }, { status: 403 });
+  }
+
   try {
     const accessToken = request.cookies.get('access_token');
 
@@ -12,16 +28,19 @@ export async function POST(request: NextRequest) {
       credentials: 'include',
     });
 
-    const setCookieHeaders = backendResponse.headers.getSetCookie();
-
     const response = NextResponse.json(
       { success: true, message: 'Sesión cerrada correctamente' },
       { status: 200 }
     );
 
-    setCookieHeaders.forEach((cookie) => {
-      response.headers.append('Set-Cookie', cookie);
-    });
+    response.cookies.delete('access_token');
+
+    if (backendResponse.ok) {
+      const setCookieHeaders = backendResponse.headers.getSetCookie();
+      setCookieHeaders.forEach((cookie) => {
+        response.headers.append('Set-Cookie', cookie);
+      });
+    }
 
     return response;
 
