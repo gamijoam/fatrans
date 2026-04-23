@@ -10,7 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Loader2, AlertCircle, CheckCircle, FileText } from 'lucide-react';
 import { sanitizeHTML } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 
@@ -83,14 +85,24 @@ export function RegistrationForm() {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="space-y-1">
+        <div className="flex justify-center mb-2">
+          <div className="p-3 rounded-full bg-blue-100">
+            <FileText className="h-8 w-8 text-blue-600" />
+          </div>
+        </div>
         <CardTitle className="text-2xl text-center font-bold text-gray-900">
           Crear Cuenta
         </CardTitle>
         <CardDescription className="text-center">
           Completa el formulario para solicitar tu cuenta de socio
         </CardDescription>
+        <div className="flex justify-center">
+          <Badge variant="outline" className="text-amber-600 bg-amber-50 border-amber-200">
+            Pendiente de aprobación
+          </Badge>
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="nombreCompleto">Nombre Completo</Label>
@@ -186,6 +198,8 @@ export function RegistrationForm() {
               </p>
             )}
           </div>
+
+          <Separator className="my-4" />
 
           <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200 flex items-start gap-2">
             <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />

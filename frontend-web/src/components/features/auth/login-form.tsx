@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Loader2, Eye, EyeOff, AlertCircle, Lock, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { sanitizeHTML } from '@/lib/utils/cn';
 
@@ -121,6 +122,11 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="space-y-1">
+        <div className="flex justify-center mb-2">
+          <div className="p-3 rounded-full bg-green-100">
+            <ShieldCheck className="h-8 w-8 text-green-600" />
+          </div>
+        </div>
         <CardTitle className="text-2xl text-center font-bold text-gray-900">
           Iniciar Sesión
         </CardTitle>
@@ -128,10 +134,10 @@ export function LoginForm() {
           Ingresa tus credenciales para acceder a tu cuenta
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         {remainingAttempts < MAX_ATTEMPTS && lockoutRemaining === 0 && (
           <div className="mb-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200 flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-yellow-600" />
+            <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0" />
             <p className="text-sm text-yellow-700">
               Intentos restantes: {remainingAttempts}
             </p>
@@ -140,12 +146,14 @@ export function LoginForm() {
 
         {lockoutRemaining > 0 && (
           <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-red-600" />
+            <Lock className="h-4 w-4 text-red-600 flex-shrink-0" />
             <p className="text-sm text-red-700">
               Demasiados intentos. Espera {lockoutRemaining}s
             </p>
           </div>
         )}
+
+        <Separator />
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
