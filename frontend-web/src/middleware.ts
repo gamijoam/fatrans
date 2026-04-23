@@ -6,8 +6,9 @@ export function middleware(request: NextRequest) {
 
   const publicRoutes = ['/', '/login', '/registro', '/recuperar-password'];
   const isPublicRoute = publicRoutes.some((route) => pathname === route);
+  const isAuthApi = pathname.startsWith('/api/auth/');
 
-  if (isPublicRoute) return NextResponse.next();
+  if (isPublicRoute || isAuthApi) return NextResponse.next();
 
   const accessToken = request.cookies.get('access_token');
   if (!accessToken) {
