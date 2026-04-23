@@ -57,3 +57,8 @@ export const authApi = {
   refresh: () => apiClient.post('/v1/auth/refresh-web'),
   me: () => apiClient.get('/v1/auth/me'),
 };
+
+export const sociosApi = {
+  getById: (id: string) => apiClient.get(`/v1/socios/${id}`),
+  updateProfile: (id: string, data: unknown) => apiClient.put(`/v1/socios/${id}/perfil`, data),
+};
