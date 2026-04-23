@@ -103,9 +103,9 @@ public class AhorroController {
         UUID socioIdToken = extraerSocioId(authentication);
         boolean isAdmin = esAdmin(authentication);
         String ipOrigen = getClientIp(httpRequest);
-        String sessionId = authentication.getCredentials().toString();
+        String sessionId = UUID.randomUUID().toString();
         String requestId = UUID.randomUUID().toString();
-        
+
         MovimientoResponse response = realizarDepositoUseCase.ejecutar(
                 numeroCuenta, request, socioIdToken, isAdmin, ipOrigen, sessionId, requestId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -122,7 +122,7 @@ public class AhorroController {
         UUID socioIdToken = extraerSocioId(authentication);
         boolean isAdmin = esAdmin(authentication);
         String ipOrigen = getClientIp(httpRequest);
-        String sessionId = authentication.getCredentials().toString();
+        String sessionId = UUID.randomUUID().toString();
         String requestId = UUID.randomUUID().toString();
         
         MovimientoResponse response = realizarRetiroUseCase.ejecutar(
@@ -214,7 +214,13 @@ public class AhorroController {
 
     // Helper methods
     private UUID extraerSocioId(Authentication authentication) {
-        // Extraer socioId del authentication (del JWT token - es UUID)
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof com.tufondo.auth.infrastructure.security.AuthenticatedUser authUser) {
+            UUID socioId = authUser.getSocioId();
+            if (socioId != null) {
+                return socioId;
+            }
+        }
         return fromString(authentication.getName());
     }
 
