@@ -75,11 +75,12 @@ public class AuthController {
 
         String clientIp = extractClientIp(httpRequest);
         LoginResponseDTO login = authUseCase.login(request, clientIp);
+        boolean isSecure = isSecureCookie(httpRequest);
 
         // Crear cookie de access token (httpOnly, secure, sameSite)
         ResponseCookie accessCookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE, login.accessToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(isSecure)
                 .path("/")
                 .maxAge(ACCESS_TOKEN_MAX_AGE)
                 .sameSite("Strict")
@@ -90,7 +91,7 @@ public class AuthController {
         // Path apunta a /refresh-web que es el endpoint que usa este cookie
         ResponseCookie refreshCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE, login.refreshToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(isSecure)
                 .path("/api/v1/auth/refresh-web")
                 .maxAge(REFRESH_TOKEN_MAX_AGE)
                 .sameSite("Strict")
@@ -119,6 +120,7 @@ public class AuthController {
     })
     public ResponseEntity<Map<String, String>> logoutWeb(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         String clientIp = extractClientIp(httpRequest);
+        boolean isSecure = isSecureCookie(httpRequest);
 
         // Extraer token desde cookie o header
         String token = extractTokenFromRequest(httpRequest);
@@ -134,7 +136,7 @@ public class AuthController {
         // Limpiar cookies
         ResponseCookie accessCookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE, "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(isSecure)
                 .path("/")
                 .maxAge(0)
                 .sameSite("Strict")
@@ -143,7 +145,7 @@ public class AuthController {
 
         ResponseCookie refreshCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE, "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(isSecure)
                 .path("/api/v1/auth/refresh-web")
                 .maxAge(0)
                 .sameSite("Strict")
@@ -171,6 +173,7 @@ public class AuthController {
     })
     public ResponseEntity<LoginWebResponseDTO> refreshTokenWeb(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         String clientIp = extractClientIp(httpRequest);
+        boolean isSecure = isSecureCookie(httpRequest);
 
         // Extraer refresh token desde cookie
         String refreshToken = extractRefreshTokenFromCookie(httpRequest);
@@ -184,7 +187,7 @@ public class AuthController {
         // Actualizar cookies con nuevos tokens
         ResponseCookie accessCookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE, login.accessToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(isSecure)
                 .path("/")
                 .maxAge(ACCESS_TOKEN_MAX_AGE)
                 .sameSite("Strict")
@@ -193,7 +196,7 @@ public class AuthController {
 
         ResponseCookie refreshCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE, login.refreshToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(isSecure)
                 .path("/api/v1/auth/refresh-web")
                 .maxAge(REFRESH_TOKEN_MAX_AGE)
                 .sameSite("Strict")
@@ -323,5 +326,17 @@ public class AuthController {
             }
         }
         return null;
+    }
+
+    private boolean isSecureCookie(HttpServletRequest request) {
+        String origin = request.getHeader("Origin");
+        if (origin != null) {
+            return !origin.contains("localhost") && !origin.contains("127.0.0.1");
+        }
+        String referer = request.getHeader("Referer");
+        if (referer != null) {
+            return !referer.contains("localhost") && !referer.contains("127.0.0.1");
+        }
+        return true;
     }
 }
