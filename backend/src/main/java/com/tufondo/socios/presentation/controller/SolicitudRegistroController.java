@@ -14,6 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -81,11 +82,11 @@ public class SolicitudRegistroController {
     @Operation(summary = "Aprobar una solicitud de registro (Admin)")
     public ResponseEntity<Map<String, Object>> aprobarSolicitud(
             @PathVariable UUID id,
-            @RequestBody(required = false) AprobarSolicitudRequestDTO request,
-            @RequestHeader("X-Admin-Id") String adminId) {
-        
+            @RequestBody(required = false) AprobarSolicitudRequestDTO request) {
+
+        String adminId = SecurityContextHolder.getContext().getAuthentication().getName();
         SolicitudRegistroResponseDTO response = aprobarSolicitudUseCase.ejecutar(id, request, adminId);
-        
+
         Map<String, Object> body = new HashMap<>();
         body.put("success", true);
         body.put("message", "Solicitud aprobada exitosamente");
@@ -93,7 +94,7 @@ public class SolicitudRegistroController {
             "solicitudId", response.getId(),
             "estado", response.getEstado()
         ));
-        
+
         return ResponseEntity.ok(body);
     }
     
@@ -102,11 +103,11 @@ public class SolicitudRegistroController {
     @Operation(summary = "Rechazar una solicitud de registro (Admin)")
     public ResponseEntity<Map<String, Object>> rechazarSolicitud(
             @PathVariable UUID id,
-            @Valid @RequestBody RechazarSolicitudRequestDTO request,
-            @RequestHeader("X-Admin-Id") String adminId) {
-        
+            @Valid @RequestBody RechazarSolicitudRequestDTO request) {
+
+        String adminId = SecurityContextHolder.getContext().getAuthentication().getName();
         SolicitudRegistroResponseDTO response = rechazarSolicitudUseCase.ejecutar(id, request, adminId);
-        
+
         Map<String, Object> body = new HashMap<>();
         body.put("success", true);
         body.put("message", "Solicitud rechazada");
@@ -114,7 +115,7 @@ public class SolicitudRegistroController {
             "solicitudId", response.getId(),
             "estado", response.getEstado()
         ));
-        
+
         return ResponseEntity.ok(body);
     }
 }

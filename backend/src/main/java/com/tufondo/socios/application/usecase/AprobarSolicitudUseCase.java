@@ -56,16 +56,19 @@ public class AprobarSolicitudUseCase {
         
         Socio nuevoSocio = Socio.builder()
                 .numeroSocio(generarNumeroSocio())
-                .tipoDocumento(TipoDocumento.valueOf(solicitud.getCedula().startsWith("V") ? "V" : "E"))
+                .tipoDocumento(solicitud.getCedula().startsWith("V") ? TipoDocumento.CEDULA : TipoDocumento.PASAPORTE)
                 .numeroDocumento(solicitud.getCedula())
                 .primerNombre(primerNombre)
-                .segundoNombre(segundoNombre)
+                .segundoNombre(segundoNombre.isEmpty() ? null : segundoNombre)
                 .primerApellido(primerApellido)
-                .segundoApellido(segundoApellido)
+                .segundoApellido(segundoApellido.isEmpty() ? null : segundoApellido)
                 .correoElectronico(solicitud.getCorreoElectronico())
                 .telefonoPrincipal(solicitud.getTelefono())
                 .empresa(solicitud.getEmpresa())
                 .estado(EstadoSocio.ACTIVO)
+                .estadoCivil(com.tufondo.socios.domain.model.enums.EstadoCivil.SOLTERO)
+                .genero(com.tufondo.socios.domain.model.enums.Genero.OTRO)
+                .fechaNacimiento(LocalDate.of(1990, 1, 1))
                 .fechaIngreso(LocalDate.now())
                 .fechaRegistro(LocalDateTime.now())
                 .fechaActivacion(LocalDateTime.now())
@@ -98,6 +101,8 @@ public class AprobarSolicitudUseCase {
         
         log.info("Solicitud {} aprobada. Socio {} creado con usuario {}",
                 solicitudId, socioGuardado.getId(), nombreUsuario);
+        log.info("[DEV] Credenciales -> Email: {}, Usuario: {}, Password: {}",
+                solicitud.getCorreoElectronico(), nombreUsuario, passwordTemporal);
         
         return dtoMapper.toResponseDTO(solicitudActualizada);
     }
@@ -117,7 +122,7 @@ public class AprobarSolicitudUseCase {
         String nombre = partes[0];
         String apellido = partes.length > 1 ? partes[1].replaceAll("[^a-z]", "") : "";
         
-        String base = nombre + "." + apellido;
+        String base = apellido.isEmpty() ? nombre : nombre + "." + apellido;
         String nombreUsuario = base;
         
         int counter = 1;
@@ -130,12 +135,32 @@ public class AprobarSolicitudUseCase {
     }
     
     private String generarPasswordTemporal() {
-        String chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-        StringBuilder sb = new StringBuilder();
+        String upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        String lower = "abcdefghijkmnpqrstuvwxyz";
+        String numbers = "23456789";
+        String special = "@$!%*?&";
+        
         ThreadLocalRandom random = ThreadLocalRandom.current();
-        for (int i = 0; i < 12; i++) {
-            sb.append(chars.charAt(random.nextInt(chars.length())));
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append(upper.charAt(random.nextInt(upper.length())));
+        sb.append(lower.charAt(random.nextInt(lower.length())));
+        sb.append(numbers.charAt(random.nextInt(numbers.length())));
+        sb.append(special.charAt(random.nextInt(special.length())));
+        
+        String allChars = upper + lower + numbers + special;
+        for (int i = 0; i < 8; i++) {
+            sb.append(allChars.charAt(random.nextInt(allChars.length())));
         }
-        return sb.toString();
+        
+        char[] chars = sb.toString().toCharArray();
+        for (int i = chars.length - 1; i > 0; i--) {
+            int j = random.nextInt(i + 1);
+            char temp = chars[i];
+            chars[i] = chars[j];
+            chars[j] = temp;
+        }
+        
+        return new String(chars);
     }
 }

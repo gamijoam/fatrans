@@ -11,15 +11,39 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { user, isLoading } = useAuthStore();
+  const { user, isLoading, setUser, setLoading } = useAuthStore();
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
+  const [initAttempted, setInitAttempted] = useState(false);
 
   useEffect(() => {
-    if (!isLoading) {
+    if (isLoading && !initAttempted) {
+      setInitAttempted(true);
+      fetch('/api/auth/me', { credentials: 'include' })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data) {
+            setUser({
+              id: data.id,
+              nombreUsuario: data.nombreUsuario,
+              correoElectronico: data.correoElectronico,
+              nombreCompleto: data.nombreCompleto,
+              rol: data.rol,
+              socioId: data.socioId,
+              debeCambiarPassword: data.debeCambiarPassword,
+            });
+          }
+          setLoading(false);
+          setIsChecking(false);
+        })
+        .catch(() => {
+          setLoading(false);
+          setIsChecking(false);
+        });
+    } else if (!isLoading) {
       setIsChecking(false);
     }
-  }, [isLoading]);
+  }, [isLoading, initAttempted, setUser, setLoading]);
 
   if (isChecking || isLoading) {
     return (

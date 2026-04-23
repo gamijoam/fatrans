@@ -48,6 +48,9 @@ public class UsuarioEntity {
     @Column(name = "fecha_bloqueo")
     private Instant fechaBloqueo;
 
+    @Column(name = "debe_cambiar_password", nullable = true)
+    private Boolean debeCambiarPassword;
+
     public UsuarioEntity() {}
 
     public static UsuarioEntity desdeDominio(Usuario usuario) {
@@ -64,6 +67,7 @@ public class UsuarioEntity {
         entity.ultimaModificacion = usuario.ultimaModificacion();
         entity.intentosFallidos = usuario.intentosFallidos();
         entity.fechaBloqueo = usuario.fechaBloqueo();
+        entity.debeCambiarPassword = usuario.debeCambiarPassword();
         return entity;
     }
 
@@ -71,7 +75,7 @@ public class UsuarioEntity {
         return Usuario.desdeParametros(
             id, nombreUsuario, correoElectronico, passwordHash, nombreCompleto,
             rol, socioId, cuentaActiva, fechaCreacion, ultimaModificacion,
-            intentosFallidos, fechaBloqueo
+            intentosFallidos, fechaBloqueo, debeCambiarPassword != null ? debeCambiarPassword : false
         );
     }
 
@@ -99,4 +103,6 @@ public class UsuarioEntity {
     public void setIntentosFallidos(int intentosFallidos) { this.intentosFallidos = intentosFallidos; }
     public Instant getFechaBloqueo() { return fechaBloqueo; }
     public void setFechaBloqueo(Instant fechaBloqueo) { this.fechaBloqueo = fechaBloqueo; }
+    public Boolean getDebeCambiarPassword() { return debeCambiarPassword; }
+    public void setDebeCambiarPassword(Boolean debeCambiarPassword) { this.debeCambiarPassword = debeCambiarPassword; }
 }

@@ -30,6 +30,7 @@ export function LoginForm() {
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
   const router = useRouter();
   const setUser = useAuthStore((state) => state.setUser);
+  const setLoading = useAuthStore((state) => state.setLoading);
 
   useEffect(() => {
     if (lockoutRemaining > 0) {
@@ -96,19 +97,22 @@ export function LoginForm() {
           nombreCompleto: userData.nombreCompleto,
           rol: userData.rol,
           socioId: userData.socioId,
+          debeCambiarPassword: userData.debeCambiarPassword ?? false,
         });
+        setLoading(false);
 
         const rol = userData.rol;
         if (rol === 'SOCIO') {
           router.push('/dashboard');
         } else if (rol === 'ADMIN' || rol === 'ADMINISTRADOR' || rol === 'GESTOR' || rol === 'SUPER_ADMIN') {
-          router.push('/admin');
+          router.push('/solicitudes');
         } else {
           router.push('/dashboard');
         }
       }
 
     } catch (error) {
+      setLoading(false);
       console.error('Login error:', error);
       const message = error instanceof Error ? sanitizeHTML(error.message) : 'Error de conexión';
       toast.error(message);

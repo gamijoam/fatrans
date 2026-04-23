@@ -10,6 +10,7 @@ export interface User {
   nombreCompleto: string;
   rol: UserRol;
   socioId?: string;
+  debeCambiarPassword?: boolean;
 }
 
 interface AuthState {

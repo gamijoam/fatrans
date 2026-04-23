@@ -56,4 +56,11 @@ export const authApi = {
   logout: () => apiClient.post('/v1/auth/logout-web'),
   refresh: () => apiClient.post('/v1/auth/refresh-web'),
   me: () => apiClient.get('/v1/auth/me'),
+  changePassword: (passwordActual: string, nuevoPassword: string) =>
+    apiClient.post('/v1/auth/cambiar-password', { passwordActual, nuevoPassword }),
+};
+
+export const sociosApi = {
+  getById: (id: string) => apiClient.get(`/v1/socios/${id}`),
+  updateProfile: (id: string, data: unknown) => apiClient.put(`/v1/socios/${id}/perfil`, data),
 };
