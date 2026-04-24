@@ -100,6 +100,16 @@ export default function SimuladorPage() {
       return;
     }
 
+    if (montoNum <= 0 || plazoNum <= 0) {
+      toast.error('Monto y plazo deben ser mayores a cero');
+      return;
+    }
+
+    if (montoNum > 10000000 || plazoNum > 360) {
+      toast.error('Valores exceden límites permitidos');
+      return;
+    }
+
     if (tipoSeleccionado) {
       if (montoNum < tipoSeleccionado.montoMinimo || montoNum > tipoSeleccionado.montoMaximo) {
         toast.error(`Monto debe estar entre ${tipoSeleccionado.montoMinimo} y ${tipoSeleccionado.montoMaximo}`);
