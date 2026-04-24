@@ -66,17 +66,17 @@ export const sociosApi = {
 };
 
 export const cuentasApi = {
-  getCuentas: (socioId: string) => apiClient.get(`/v1/cuentas/socio/${socioId}`),
-  getCuenta: (numeroCuenta: string) => apiClient.get(`/v1/cuentas/${numeroCuenta}`),
-  getSaldo: (numeroCuenta: string) => apiClient.get(`/v1/cuentas/${numeroCuenta}/saldo`),
+  getCuentas: (socioId: string) => apiClient.get(`/cuentas/socio/${socioId}`),
+  getCuenta: (numeroCuenta: string) => apiClient.get(`/cuentas/${numeroCuenta}`),
+  getSaldo: (numeroCuenta: string) => apiClient.get(`/cuentas/${numeroCuenta}/saldo`),
   deposito: (numeroCuenta: string, monto: number) =>
-    apiClient.post(`/v1/cuentas/${numeroCuenta}/depositos`, {
+    apiClient.post(`/cuentas/${numeroCuenta}/depositos`, {
       monto,
       canalOrigen: 'WEB',
       descripcion: 'Depósito en línea'
     }),
   retiro: (numeroCuenta: string, monto: number) =>
-    apiClient.post(`/v1/cuentas/${numeroCuenta}/retiros`, {
+    apiClient.post(`/cuentas/${numeroCuenta}/retiros`, {
       monto,
       canalOrigen: 'WEB'
     }),
