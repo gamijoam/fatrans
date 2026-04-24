@@ -113,8 +113,8 @@ export default function AdminReportesPage() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">Rango de Fechas</label>
-              <select className="w-full border rounded-md px-3 py-2 text-sm">
+              <label htmlFor="filtro-fecha" className="text-sm font-medium text-gray-700 block mb-1">Rango de Fechas</label>
+              <select id="filtro-fecha" className="w-full border rounded-md px-3 py-2 text-sm">
                 <option>Último mes</option>
                 <option>Último trimestre</option>
                 <option>Últimos 6 meses</option>
@@ -123,8 +123,8 @@ export default function AdminReportesPage() {
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">Estado</label>
-              <select className="w-full border rounded-md px-3 py-2 text-sm">
+              <label htmlFor="filtro-estado" className="text-sm font-medium text-gray-700 block mb-1">Estado</label>
+              <select id="filtro-estado" className="w-full border rounded-md px-3 py-2 text-sm">
                 <option>Todos</option>
                 <option>Activos</option>
                 <option>Inactivos</option>
@@ -132,8 +132,8 @@ export default function AdminReportesPage() {
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">Formato</label>
-              <select className="w-full border rounded-md px-3 py-2 text-sm">
+              <label htmlFor="filtro-formato" className="text-sm font-medium text-gray-700 block mb-1">Formato</label>
+              <select id="filtro-formato" className="w-full border rounded-md px-3 py-2 text-sm">
                 <option>PDF</option>
                 <option>Excel (XLSX)</option>
                 <option>CSV</option>

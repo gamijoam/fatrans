@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateAdminAccess } from '@/lib/auth/admin-validation';
+import { validateAdminAccess, validarUUID, validarAnio, validarMes } from '@/lib/auth/admin-validation';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 
@@ -16,8 +16,20 @@ export async function GET(request: NextRequest) {
     const anio = searchParams.get('anio');
     const mes = searchParams.get('mes');
 
+    if (!socioId || !validarUUID(socioId)) {
+      return NextResponse.json({ message: 'ID de socio inválido' }, { status: 400 });
+    }
+
+    if (anio && !validarAnio(anio)) {
+      return NextResponse.json({ message: 'Año inválido' }, { status: 400 });
+    }
+
+    if (mes && !validarMes(mes)) {
+      return NextResponse.json({ message: 'Mes inválido' }, { status: 400 });
+    }
+
     const params = new URLSearchParams();
-    if (socioId) params.set('socioId', socioId);
+    params.set('socioId', socioId);
     if (anio) params.set('anio', anio);
     if (mes) params.set('mes', mes);
 

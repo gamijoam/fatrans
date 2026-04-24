@@ -90,24 +90,7 @@ const RIESGO_COLORS: Record<string, string> = {
   MUY_ALTO: 'bg-red-100 text-red-800',
 };
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('es-VE', {
-    style: 'currency',
-    currency: 'VES',
-    minimumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString('es-VE', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+import { formatDate, formatCurrency } from '@/lib/utils/format';
 
 export default function AdminCreditoDetallePage() {
   const params = useParams();

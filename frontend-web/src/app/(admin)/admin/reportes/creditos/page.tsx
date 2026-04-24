@@ -47,22 +47,7 @@ const ESTADO_COLORS: Record<string, string> = {
   DESEMBOLSADO: 'bg-purple-100 text-purple-800',
 };
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('es-VE', {
-    style: 'currency',
-    currency: 'VES',
-    minimumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString('es-VE', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { formatDate, formatCurrency } from '@/lib/utils/format';
 
 export default function AdminReporteCreditosPage() {
   const [loading, setLoading] = useState(false);
@@ -182,7 +167,9 @@ export default function AdminReporteCreditosPage() {
               Detalle de Créditos
             </CardTitle>
             <div className="flex gap-2">
+              <label htmlFor="filtro-estado" className="text-sm font-medium text-gray-700">Estado:</label>
               <select
+                id="filtro-estado"
                 className="border rounded-md px-3 py-2 text-sm"
                 value={filtroEstado}
                 onChange={(e) => { setFiltroEstado(e.target.value); setPage(0); }}

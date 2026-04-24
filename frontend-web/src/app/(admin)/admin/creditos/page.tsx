@@ -66,24 +66,9 @@ const ESTADO_ICONS: Record<string, React.ReactNode> = {
   DESEMBOLSADO: <DollarSign className="h-4 w-4" />,
 };
 
+import { formatDate, formatCurrency } from '@/lib/utils/format';
+
 const ESTADOS = ['PENDIENTE', 'EN_EVALUACION', 'APROBADA', 'RECHAZADA', 'DESEMBOLSADO', 'CANCELADA'];
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('es-VE', {
-    style: 'currency',
-    currency: 'VES',
-    minimumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString('es-VE', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 export default function AdminCreditosPage() {
   const [stats, setStats] = useState<CreditosStats>({
@@ -219,7 +204,9 @@ export default function AdminCreditosPage() {
           <div className="flex items-center justify-between">
             <CardTitle>Todas las Solicitudes</CardTitle>
             <div className="flex gap-2">
+              <label htmlFor="filtro-creditos" className="text-sm font-medium text-gray-700">Estado:</label>
               <select
+                id="filtro-creditos"
                 value={filtroEstado}
                 onChange={(e) => { setFiltroEstado(e.target.value); setPage(0); }}
                 className="px-3 py-2 border rounded-md text-sm"

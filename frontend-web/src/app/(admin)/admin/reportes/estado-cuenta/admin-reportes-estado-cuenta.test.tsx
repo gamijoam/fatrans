@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AdminEstadoCuentaPage from '@/app/(admin)/admin/reportes/estado-cuenta/page';
+import { toast } from 'sonner';
 
 vi.mock('sonner', () => ({
   toast: {
@@ -105,6 +106,63 @@ describe('AdminEstadoCuentaPage', () => {
     it('debe tener selector de mes con label Mes', () => {
       render(<AdminEstadoCuentaPage />);
       expect(screen.getByText('Mes')).toBeDefined();
+    });
+  });
+
+  describe('Errores de API', () => {
+    it('debe llamar a fetch con socioId cuando se genera reporte', async () => {
+      const user = userEvent.setup();
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(mockEstadoCuentaData),
+      });
+
+      render(<AdminEstadoCuentaPage />);
+      const input = screen.getByPlaceholderText('UUID del socio');
+      await user.type(input, '550e8400-e29b-41d4-a716-446655440000');
+
+      const generarBtn = screen.getByText('Generar');
+      await user.click(generarBtn);
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          '/api/admin/reportes/estado-cuenta?socioId=550e8400-e29b-41d4-a716-446655440000&anio=2026&mes=04',
+          expect.objectContaining({ credentials: 'include' })
+        );
+      });
+    });
+
+    it('debe mostrar error cuando fetch falla con 500', async () => {
+      const user = userEvent.setup();
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ message: 'Error interno del servidor' }),
+      });
+
+      render(<AdminEstadoCuentaPage />);
+      const input = screen.getByPlaceholderText('UUID del socio');
+      await user.type(input, '550e8400-e29b-41d4-a716-446655440000');
+
+      const generarBtn = screen.getByText('Generar');
+      await user.click(generarBtn);
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('Error al generar estado de cuenta');
+      });
+    });
+
+    it('debe mostrar error cuando ID de socio está vacío', async () => {
+      const user = userEvent.setup();
+      render(<AdminEstadoCuentaPage />);
+
+      const generarBtn = screen.getByText('Generar');
+      await user.click(generarBtn);
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('Ingrese ID de socio');
+      });
     });
   });
 });
