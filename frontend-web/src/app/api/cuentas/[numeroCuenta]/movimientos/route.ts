@@ -15,13 +15,15 @@ export async function GET(
 
     const { searchParams } = new URL(request.url);
     const page = searchParams.get('page') || '0';
-    const size = searchParams.get('size') || '20';
+    const size = searchParams.get('size') || '10';
     const fechaInicio = searchParams.get('fechaInicio') || '';
     const fechaFin = searchParams.get('fechaFin') || '';
+    const tipo = searchParams.get('tipo') || '';
 
     const queryParams = new URLSearchParams({ page, size });
     if (fechaInicio) queryParams.append('fechaInicio', fechaInicio);
     if (fechaFin) queryParams.append('fechaFin', fechaFin);
+    if (tipo) queryParams.append('tipo', tipo);
 
     const backendResponse = await fetch(
       `${BACKEND_URL}/api/v1/cuentas/${params.numeroCuenta}/movimientos?${queryParams}`,

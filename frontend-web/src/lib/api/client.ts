@@ -69,10 +69,11 @@ export const cuentasApi = {
   getCuentas: (socioId: string) => apiClient.get(`/api/cuentas/socio/${socioId}`),
   getCuenta: (numeroCuenta: string) => apiClient.get(`/api/cuentas/${numeroCuenta}`),
   getSaldo: (numeroCuenta: string) => apiClient.get(`/api/cuentas/${numeroCuenta}/saldo`),
-  getMovimientos: (numeroCuenta: string, page = 0, size = 20, fechaInicio?: string, fechaFin?: string) => {
+  getMovimientos: (numeroCuenta: string, page = 0, size = 10, fechaInicio?: string, fechaFin?: string, tipo?: string) => {
     const params = new URLSearchParams({ page: String(page), size: String(size) });
     if (fechaInicio) params.append('fechaInicio', fechaInicio);
     if (fechaFin) params.append('fechaFin', fechaFin);
+    if (tipo) params.append('tipo', tipo);
     return apiClient.get(`/api/cuentas/${numeroCuenta}/movimientos?${params}`);
   },
   deposito: (numeroCuenta: string, monto: number) =>

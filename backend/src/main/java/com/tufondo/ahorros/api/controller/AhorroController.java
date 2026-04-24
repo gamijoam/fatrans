@@ -3,6 +3,7 @@ package com.tufondo.ahorros.api.controller;
 
 import com.tufondo.ahorros.application.dto.*;
 import com.tufondo.ahorros.application.usecase.*;
+import com.tufondo.ahorros.domain.model.enums.TipoMovimiento;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -136,15 +137,16 @@ public class AhorroController {
     public ResponseEntity<MovimientosListResponse> listarMovimientos(
             @PathVariable String numeroCuenta,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin,
+            @RequestParam(required = false) TipoMovimiento tipo,
             Authentication authentication) {
         UUID socioIdToken = extraerSocioId(authentication);
         boolean isAdmin = esAdmin(authentication);
-        
+
         MovimientosListResponse response = listarMovimientosUseCase.ejecutar(
-                numeroCuenta, socioIdToken, isAdmin, page, size, fechaInicio, fechaFin, null);
+                numeroCuenta, socioIdToken, isAdmin, page, size, fechaInicio, fechaFin, tipo);
         return ResponseEntity.ok(response);
     }
 

@@ -327,6 +327,14 @@ export default function SaldoDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <div className="flex justify-center">
+        <Link href={`/dashboard/cuentas/${numeroCuenta}/movimientos`}>
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+            Ver Todos los Movimientos
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }
