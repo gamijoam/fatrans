@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { cuentasApi } from '@/lib/api/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -47,6 +47,12 @@ export default function CuentasPage() {
 
   const [errores, setErrores] = useState<{ monto?: string }>({});
 
+  useEffect(() => {
+    if (user?.socioId && !loaded && !loadingCuentas) {
+      cargarCuentas();
+    }
+  }, [user?.socioId]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -59,7 +65,9 @@ export default function CuentasPage() {
     if (!user?.socioId || loaded) return;
     setLoadingCuentas(true);
     try {
+      console.log('Cargando cuentas para socioId:', user.socioId);
       const res = await cuentasApi.getCuentas(user.socioId);
+      console.log('Response cuentas:', res.data);
       const cuentasData: CuentasResponse = res.data;
       setCuentas(
         cuentasData.cuentas.map((c) => ({
@@ -70,7 +78,8 @@ export default function CuentasPage() {
         }))
       );
       setLoaded(true);
-    } catch {
+    } catch (err) {
+      console.error('Error al cargar cuentas:', err);
       toastError('Error al cargar cuentas');
     } finally {
       setLoadingCuentas(false);

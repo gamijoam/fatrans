@@ -70,7 +70,14 @@ export const cuentasApi = {
   getCuenta: (numeroCuenta: string) => apiClient.get(`/v1/cuentas/${numeroCuenta}`),
   getSaldo: (numeroCuenta: string) => apiClient.get(`/v1/cuentas/${numeroCuenta}/saldo`),
   deposito: (numeroCuenta: string, monto: number) =>
-    apiClient.post(`/v1/cuentas/${numeroCuenta}/depositos`, { monto }),
+    apiClient.post(`/v1/cuentas/${numeroCuenta}/depositos`, {
+      monto,
+      canalOrigen: 'WEB',
+      descripcion: 'Depósito en línea'
+    }),
   retiro: (numeroCuenta: string, monto: number) =>
-    apiClient.post(`/v1/cuentas/${numeroCuenta}/retiros`, { monto }),
+    apiClient.post(`/v1/cuentas/${numeroCuenta}/retiros`, {
+      monto,
+      canalOrigen: 'WEB'
+    }),
 };
