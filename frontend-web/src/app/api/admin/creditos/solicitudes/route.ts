@@ -11,8 +11,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: authResult.message }, { status: authResult.status });
     }
 
+    const { searchParams } = new URL(request.url);
+
+    const params = new URLSearchParams();
+    const estado = searchParams.get('estado');
+    const fechaDesde = searchParams.get('fechaDesde');
+    const fechaHasta = searchParams.get('fechaHasta');
+    const montoMin = searchParams.get('montoMin');
+    const montoMax = searchParams.get('montoMax');
+    const page = searchParams.get('page') || '0';
+    const size = searchParams.get('size') || '20';
+    const sortBy = searchParams.get('sortBy') || 'createdAt';
+    const sortDir = searchParams.get('sortDir') || 'DESC';
+
+    if (estado) params.set('estado', estado);
+    if (fechaDesde) params.set('fechaDesde', fechaDesde);
+    if (fechaHasta) params.set('fechaHasta', fechaHasta);
+    if (montoMin) params.set('montoMin', montoMin);
+    if (montoMax) params.set('montoMax', montoMax);
+    params.set('page', page);
+    params.set('size', size);
+    params.set('sortBy', sortBy);
+    params.set('sortDir', sortDir);
+
     const backendResponse = await fetch(
-      `${BACKEND_URL}/api/v1/admin/dashboard/estadisticas`,
+      `${BACKEND_URL}/api/v1/admin/creditos/solicitudes?${params.toString()}`,
       {
         method: 'GET',
         headers: {
@@ -26,7 +49,7 @@ export async function GET(request: NextRequest) {
     if (!backendResponse.ok) {
       const errorData = await backendResponse.json().catch(() => ({}));
       return NextResponse.json(
-        { message: errorData.message || 'Error al obtener estadísticas' },
+        { message: errorData.message || 'Error al obtener solicitudes' },
         { status: backendResponse.status }
       );
     }
@@ -35,7 +58,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data, { status: 200 });
 
   } catch (error) {
-    console.error('Dashboard stats error:', error);
+    console.error('Admin creditos list error:', error);
     return NextResponse.json(
       { message: 'Error interno del servidor' },
       { status: 500 }
