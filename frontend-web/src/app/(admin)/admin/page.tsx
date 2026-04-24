@@ -1,54 +1,81 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Users, FileText, CreditCard, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Shield, Users, FileText, CreditCard, Clock, CheckCircle, XCircle, Loader2, Wallet, TrendingUp, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 
-interface AdminStats {
+interface DashboardStats {
   totalSocios: number;
+  sociosActivos: number;
+  sociosPendientes: number;
+  totalCuentasAhorro: number;
+  cuentasActivas: number;
+  depositosMes: number;
+  retirosMes: number;
+  prestamosActivos: number;
   solicitudesPendientes: number;
-  creditosAprobados: number;
-  creditosRechazados: number;
+  solicitudesAprobadas: number;
+  solicitudesRechazadas: number;
+  capitalDesembolsado: number;
+  carteraVencida: number;
+  cuotasVencidas: number;
+  tasaCumplimiento: number;
+  tasaMora: number;
+  actividadReciente: {
+    nuevosSociosMes: number;
+    depositosMes: number;
+    retirosMes: number;
+    prestamosAprobadosMes: number;
+    montoDepositadoMes: number;
+    montoRetiradoMes: number;
+  };
 }
 
 export default function AdminDashboardPage() {
   const user = useAuthStore((state) => state.user);
   const isLoading = useAuthStore((state) => state.isLoading);
 
-  const [stats, setStats] = useState<AdminStats>({
-    totalSocios: 0,
-    solicitudesPendientes: 0,
-    creditosAprobados: 0,
-    creditosRechazados: 0,
-  });
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
+
+  const cargarStats = useCallback(async () => {
+    setLoadingStats(true);
+    try {
+      const res = await fetch('/api/admin/dashboard/estadisticas', {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Error al cargar estadísticas');
+      const data = await res.json();
+      setStats(data);
+    } catch (err) {
+      console.error('Error cargando stats:', err);
+      toast.error('Error al cargar estadísticas del dashboard');
+    } finally {
+      setLoadingStats(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isLoading) {
       cargarStats();
     }
-  }, [isLoading]);
+  }, [isLoading, cargarStats]);
 
-  async function cargarStats() {
-    setLoadingStats(true);
-    try {
-      setStats({
-        totalSocios: 0,
-        solicitudesPendientes: 0,
-        creditosAprobados: 0,
-        creditosRechazados: 0,
-      });
-    } catch (err) {
-      console.error('Error cargando stats:', err);
-    } finally {
-      setLoadingStats(false);
+  const formatCurrency = (value: number) => {
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(1)}M`;
     }
-  }
+    if (value >= 1000) {
+      return `$${(value / 1000).toFixed(1)}K`;
+    }
+    return `$${value.toFixed(2)}`;
+  };
 
-  if (isLoading) {
+  if (isLoading || loadingStats) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-green-600" />
@@ -94,14 +121,10 @@ export default function AdminDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {loadingStats ? (
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-            ) : (
-              <>
-                <p className="text-3xl font-bold">{stats.totalSocios}</p>
-                <p className="text-xs text-gray-500 mt-1">Socios registrados</p>
-              </>
-            )}
+            <p className="text-3xl font-bold">{stats?.totalSocios || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {stats?.sociosActivos || 0} activos · {stats?.sociosPendientes || 0} pendientes
+            </p>
           </CardContent>
         </Card>
 
@@ -109,18 +132,12 @@ export default function AdminDashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              Pendientes
+              Solicitudes Pendientes
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {loadingStats ? (
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-            ) : (
-              <>
-                <p className="text-3xl font-bold">{stats.solicitudesPendientes}</p>
-                <p className="text-xs text-gray-500 mt-1">Solicitudes en cola</p>
-              </>
-            )}
+            <p className="text-3xl font-bold">{stats?.solicitudesPendientes || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">Requieren revisión</p>
           </CardContent>
         </Card>
 
@@ -132,14 +149,8 @@ export default function AdminDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {loadingStats ? (
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-            ) : (
-              <>
-                <p className="text-3xl font-bold">{stats.creditosAprobados}</p>
-                <p className="text-xs text-gray-500 mt-1">Este mes</p>
-              </>
-            )}
+            <p className="text-3xl font-bold">{stats?.solicitudesAprobadas || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">Total activos: {stats?.prestamosActivos || 0}</p>
           </CardContent>
         </Card>
 
@@ -151,14 +162,62 @@ export default function AdminDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {loadingStats ? (
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-            ) : (
-              <>
-                <p className="text-3xl font-bold">{stats.creditosRechazados}</p>
-                <p className="text-xs text-gray-500 mt-1">Este mes</p>
-              </>
-            )}
+            <p className="text-3xl font-bold">{stats?.solicitudesRechazadas || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">Total rechazados</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-l-4 border-l-purple-500">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              Capital Desembolsado
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{formatCurrency(stats?.capitalDesembolsado || 0)}</p>
+            <p className="text-xs text-gray-500 mt-1">En préstamos activos</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-orange-500">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Cartera Vencida
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{formatCurrency(stats?.carteraVencida || 0)}</p>
+            <p className="text-xs text-gray-500 mt-1">{stats?.cuotasVencidas || 0} cuotas vencidas</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-cyan-500">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Tasa Cumplimiento
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{(stats?.tasaCumplimiento || 0).toFixed(1)}%</p>
+            <p className="text-xs text-gray-500 mt-1">Tasa mora: {(stats?.tasaMora || 0).toFixed(1)}%</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-teal-500">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Cuentas Activas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{stats?.cuentasActivas || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">De {stats?.totalCuentasAhorro || 0} cuentas</p>
           </CardContent>
         </Card>
       </div>
@@ -168,7 +227,7 @@ export default function AdminDashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Actividad Reciente
+              Actividad del Mes
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -179,30 +238,30 @@ export default function AdminDashboardPage() {
                     <Users className="h-4 w-4 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Nuevo socio registrado</p>
-                    <p className="text-xs text-gray-500">Hace 5 minutos</p>
+                    <p className="text-sm font-medium">Nuevos Socios</p>
+                    <p className="text-xs text-gray-500">{stats?.actividadReciente?.nuevosSociosMes || 0} este mes</p>
                   </div>
                 </div>
               </div>
               <div className="flex items-center justify-between py-2 border-b">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-full bg-yellow-100">
-                    <Clock className="h-4 w-4 text-yellow-600" />
+                  <div className="p-2 rounded-full bg-green-100">
+                    <TrendingUp className="h-4 w-4 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Solicitud de crédito pendiente</p>
-                    <p className="text-xs text-gray-500">Hace 15 minutos</p>
+                    <p className="text-sm font-medium">Depósitos del Mes</p>
+                    <p className="text-xs text-gray-500">{formatCurrency(stats?.actividadReciente?.montoDepositadoMes || 0)}</p>
                   </div>
                 </div>
               </div>
               <div className="flex items-center justify-between py-2">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-full bg-green-100">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
+                  <div className="p-2 rounded-full bg-orange-100">
+                    <Wallet className="h-4 w-4 text-orange-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">KYC aprobado</p>
-                    <p className="text-xs text-gray-500">Hace 30 minutos</p>
+                    <p className="text-sm font-medium">Retiros del Mes</p>
+                    <p className="text-xs text-gray-500">{formatCurrency(stats?.actividadReciente?.montoRetiradoMes || 0)}</p>
                   </div>
                 </div>
               </div>
