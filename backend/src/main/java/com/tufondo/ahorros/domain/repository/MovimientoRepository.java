@@ -48,7 +48,13 @@ public interface MovimientoRepository {
      * Lista movimientos por cuenta y tipo.
      */
     Page<Movimiento> buscarPorCuentaYTipo(UUID cuentaAhorroId, TipoMovimiento tipo, Pageable pageable);
-    
+
+    /**
+     * Lista movimientos por cuenta, rango de fechas y tipo.
+     */
+    Page<Movimiento> buscarPorCuentaYRangoFechasYTipo(UUID cuentaAhorroId,
+            LocalDateTime fechaInicio, LocalDateTime fechaFin, TipoMovimiento tipo, Pageable pageable);
+
     /**
      * Lista movimientos por socio.
      */
