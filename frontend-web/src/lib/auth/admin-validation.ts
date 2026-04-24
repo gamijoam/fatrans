@@ -34,3 +34,17 @@ export function sanitizarTexto(texto: string): string {
 export function esNumeroValido(value: unknown): value is number {
   return typeof value === 'number' && !isNaN(value) && isFinite(value);
 }
+
+export function validarUUID(uuid: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid);
+}
+
+export function validarAnio(anio: string): boolean {
+  const year = parseInt(anio, 10);
+  return !isNaN(year) && year >= 2020 && year <= 2030;
+}
+
+export function validarMes(mes: string): boolean {
+  const month = parseInt(mes, 10);
+  return !isNaN(month) && month >= 1 && month <= 12;
+}

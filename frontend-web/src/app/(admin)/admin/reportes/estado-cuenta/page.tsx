@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Download, FileText, Loader2, Calendar, Users, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDate, formatCurrency } from '@/lib/utils/format';
 
 interface Movimiento {
   id: string;
@@ -68,22 +69,6 @@ export default function AdminEstadoCuentaPage() {
     }
   }, [filtros]);
 
-  const formatCurrency = (value: number): string => {
-    return new Intl.NumberFormat('es-VE', {
-      style: 'currency',
-      currency: 'VES',
-      minimumFractionDigits: 2,
-    }).format(value);
-  };
-
-  const formatDate = (dateStr: string): string => {
-    return new Date(dateStr).toLocaleDateString('es-VE', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
@@ -114,8 +99,9 @@ export default function AdminEstadoCuentaPage() {
               />
             </div>
             <div>
-              <Label>Año</Label>
+              <Label htmlFor="filtro-anio">Año</Label>
               <select
+                id="filtro-anio"
                 className="w-full border rounded-md px-3 py-2"
                 value={filtros.anio}
                 onChange={(e) => setFiltros({ ...filtros, anio: e.target.value })}
@@ -126,8 +112,9 @@ export default function AdminEstadoCuentaPage() {
               </select>
             </div>
             <div>
-              <Label>Mes</Label>
+              <Label htmlFor="filtro-mes">Mes</Label>
               <select
+                id="filtro-mes"
                 className="w-full border rounded-md px-3 py-2"
                 value={filtros.mes}
                 onChange={(e) => setFiltros({ ...filtros, mes: e.target.value })}
