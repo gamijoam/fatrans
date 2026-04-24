@@ -105,7 +105,7 @@ export function LoginForm() {
         if (rol === 'SOCIO') {
           router.push('/dashboard');
         } else if (rol === 'ADMIN' || rol === 'ADMINISTRADOR' || rol === 'GESTOR' || rol === 'SUPER_ADMIN') {
-          router.push('/solicitudes');
+          router.push('/admin');
         } else {
           router.push('/dashboard');
         }
