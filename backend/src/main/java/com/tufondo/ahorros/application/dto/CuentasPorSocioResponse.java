@@ -31,6 +31,7 @@ public class CuentasPorSocioResponse {
         private java.math.BigDecimal saldoActual;
         private String estado;
         private String tipoCuenta;
+        private String moneda;
         private java.time.LocalDateTime fechaApertura;
     }
 }

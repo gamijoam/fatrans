@@ -16,6 +16,7 @@ interface Cuenta {
   numeroCuenta: string;
   tipoCuenta: string;
   saldo: number;
+  moneda: string;
 }
 
 interface CuentasResponse {
@@ -24,6 +25,7 @@ interface CuentasResponse {
     numeroCuenta: string;
     tipoCuenta: string;
     saldoActual: number;
+    moneda: string;
   }>;
 }
 
@@ -75,6 +77,7 @@ export default function CuentasPage() {
           numeroCuenta: c.numeroCuenta,
           tipoCuenta: c.tipoCuenta,
           saldo: Number(c.saldoActual),
+          moneda: c.moneda,
         }))
       );
       setLoaded(true);
@@ -175,11 +178,13 @@ export default function CuentasPage() {
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <p className="font-semibold text-lg">{cuenta.numeroCuenta}</p>
-                    <p className="text-sm text-gray-500">{cuenta.tipoCuenta}</p>
+                    <p className="text-sm text-gray-500">{cuenta.tipoCuenta} - {cuenta.moneda === 'VES' ? 'Bolívar' : 'Dólar'}</p>
                   </div>
-                  <p className="text-2xl font-bold text-green-600">
-                    ${cuenta.saldo.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                  </p>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-green-600">
+                      {cuenta.moneda === 'VES' ? 'Bs' : '$'}{cuenta.saldo.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Dialog open={openConfirm && cuentaSeleccionada?.id === cuenta.id} onOpenChange={(open) => {
