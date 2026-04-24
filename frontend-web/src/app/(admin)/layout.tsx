@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ProtectedRoute } from '@/components/shared/protected-route';
 import { LogoutButton } from '@/components/shared/logout-button';
-import { Shield, Users, FileText, BarChart3, Settings, CreditCard, ClipboardList, Menu, X } from 'lucide-react';
+import { Shield, Users, FileText, BarChart3, Settings, CreditCard, ClipboardList, Menu, X, ShieldCheck } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 
@@ -14,6 +14,7 @@ const adminMenuItems = [
   { icon: Users, label: 'Socios', href: '/admin/socios' },
   { icon: ClipboardList, label: 'Solicitudes', href: '/admin/solicitudes' },
   { icon: CreditCard, label: 'Créditos', href: '/admin/creditos' },
+  { icon: ShieldCheck, label: 'KYC', href: '/admin/kyc' },
   { icon: FileText, label: 'Reportes', href: '/admin/reportes' },
   { icon: Settings, label: 'Configuración', href: '/admin/configuracion' },
 ];
