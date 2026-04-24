@@ -34,9 +34,10 @@ export default function DashboardPage() {
   }, [user?.socioId]);
 
   async function cargarStats() {
+    if (!user?.socioId) return;
     setLoadingStats(true);
     try {
-      const res = await cuentasApi.getCuentas(user.socioId!);
+      const res = await cuentasApi.getCuentas(user.socioId);
       const data = res.data;
       const activas = data.cuentas.filter((c: { estado: string }) => c.estado === 'ACTIVA').length;
       const saldoTotal = data.cuentas.reduce((acc: number, c: { saldoActual: number }) => acc + Number(c.saldoActual), 0);

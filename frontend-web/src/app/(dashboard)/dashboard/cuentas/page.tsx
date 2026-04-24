@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
 import { cuentasApi } from '@/lib/api/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -319,6 +320,11 @@ export default function CuentasPage() {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
+                  <Link href={`/dashboard/cuentas/${cuenta.numeroCuenta}`}>
+                    <Button variant="outline" className="border-blue-500 text-blue-500 hover:bg-blue-50">
+                      Ver Detalle
+                    </Button>
+                  </Link>
                 </div>
               </div>
             ))}

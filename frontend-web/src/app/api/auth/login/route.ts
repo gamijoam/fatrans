@@ -53,7 +53,17 @@ export async function POST(request: NextRequest) {
     const userId = backendResponse.headers.get('X-User-Id') || '';
     const userRol = backendResponse.headers.get('X-User-Rol') || '';
     
-    let userData = {
+    interface UserData {
+      id: string;
+      nombreUsuario?: string;
+      correoElectronico?: string;
+      nombreCompleto?: string;
+      rol: string;
+      socioId?: string;
+      debeCambiarPassword: boolean;
+    }
+    
+    let userData: UserData = {
       id: userId,
       rol: userRol,
       debeCambiarPassword: false,
