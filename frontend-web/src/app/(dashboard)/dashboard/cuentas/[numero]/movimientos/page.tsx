@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { cuentasApi } from '@/lib/api/client';
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 interface Movimiento {
   id: string;
@@ -44,6 +45,29 @@ interface CuentaInfo {
   moneda: string;
   saldoActual: number;
 }
+
+const formatMonto = (monto: number, moneda: string) => {
+  const simbolo = moneda === 'VES' ? 'Bs' : '$';
+  return `${simbolo} ${monto.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+};
+
+const formatFecha = (fecha: string) => {
+  return new Date(fecha).toLocaleDateString('es-VE', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const formatFechaCorta = (fecha: string) => {
+  return new Date(fecha).toLocaleDateString('es-VE', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+};
 
 export default function MovimientosPage() {
   const params = useParams();
@@ -121,6 +145,10 @@ export default function MovimientosPage() {
   }, [cargarMovimientos]);
 
   const aplicarFiltros = () => {
+    if (fechaInicio && fechaFin && fechaFin < fechaInicio) {
+      toast.error('La fecha fin debe ser mayor o igual a la fecha inicio');
+      return;
+    }
     setPage(0);
     cargarMovimientos();
   };
@@ -131,6 +159,8 @@ export default function MovimientosPage() {
     setFechaFin('');
     setPage(0);
   };
+
+  const moneda = cuenta?.moneda || 'VES';
 
   if (loading) {
     return (
@@ -155,29 +185,6 @@ export default function MovimientosPage() {
     );
   }
 
-  const formatMonto = (monto: number) => {
-    const simbolo = cuenta?.moneda === 'VES' ? 'Bs' : '$';
-    return `${simbolo} ${monto.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
-  };
-
-  const formatFecha = (fecha: string) => {
-    return new Date(fecha).toLocaleDateString('es-VE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const formatFechaCorta = (fecha: string) => {
-    return new Date(fecha).toLocaleDateString('es-VE', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -192,7 +199,7 @@ export default function MovimientosPage() {
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-500">Saldo Actual</p>
-          <p className="text-xl font-bold text-green-600">{formatMonto(Number(cuenta.saldoActual))}</p>
+          <p className="text-xl font-bold text-green-600">{formatMonto(Number(cuenta.saldoActual), moneda)}</p>
         </div>
       </div>
 
@@ -206,6 +213,7 @@ export default function MovimientosPage() {
               <Label htmlFor="tipo">Tipo de Movimiento</Label>
               <select
                 id="tipo"
+                aria-label="Filtrar por tipo de movimiento"
                 className="w-full h-10 px-3 border rounded-md bg-white"
                 value={tipoFiltro}
                 onChange={(e) => setTipoFiltro(e.target.value)}
@@ -234,8 +242,19 @@ export default function MovimientosPage() {
               />
             </div>
             <div className="flex items-end gap-2">
-              <Button onClick={aplicarFiltros} className="bg-green-600 hover:bg-green-700">
-                Aplicar
+              <Button
+                onClick={aplicarFiltros}
+                className="bg-green-600 hover:bg-green-700"
+                disabled={loadingMovimientos}
+              >
+                {loadingMovimientos ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Aplicando...
+                  </>
+                ) : (
+                  'Aplicar'
+                )}
               </Button>
               <Button variant="outline" onClick={limpiarFiltros}>
                 Limpiar
@@ -253,16 +272,16 @@ export default function MovimientosPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <p className="text-sm text-gray-500">Total Depósitos</p>
-              <p className="text-xl font-bold text-green-600">{formatMonto(totales.depositos)}</p>
+              <p className="text-xl font-bold text-green-600">{formatMonto(totales.depositos, moneda)}</p>
             </div>
             <div className="text-center p-4 bg-red-50 rounded-lg">
               <p className="text-sm text-gray-500">Total Retiros</p>
-              <p className="text-xl font-bold text-red-600">{formatMonto(totales.retiros)}</p>
+              <p className="text-xl font-bold text-red-600">{formatMonto(totales.retiros, moneda)}</p>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <p className="text-sm text-gray-500">Neto</p>
               <p className={`text-xl font-bold ${totales.depositos - totales.retiros >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatMonto(totales.depositos - totales.retiros)}
+                {formatMonto(totales.depositos - totales.retiros, moneda)}
               </p>
             </div>
             <div className="text-center p-4 bg-gray-50 rounded-lg">
@@ -295,12 +314,12 @@ export default function MovimientosPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b bg-gray-50">
-                      <th className="text-left py-3 px-3 text-sm font-medium text-gray-500">Fecha</th>
-                      <th className="text-left py-3 px-3 text-sm font-medium text-gray-500">Operación</th>
-                      <th className="text-left py-3 px-3 text-sm font-medium text-gray-500">Tipo</th>
-                      <th className="text-left py-3 px-3 text-sm font-medium text-gray-500">Descripción</th>
-                      <th className="text-right py-3 px-3 text-sm font-medium text-gray-500">Monto</th>
-                      <th className="text-right py-3 px-3 text-sm font-medium text-gray-500">Saldo</th>
+                      <th scope="col" className="text-left py-3 px-3 text-sm font-medium text-gray-500">Fecha</th>
+                      <th scope="col" className="text-left py-3 px-3 text-sm font-medium text-gray-500">Operación</th>
+                      <th scope="col" className="text-left py-3 px-3 text-sm font-medium text-gray-500">Tipo</th>
+                      <th scope="col" className="text-left py-3 px-3 text-sm font-medium text-gray-500">Descripción</th>
+                      <th scope="col" className="text-right py-3 px-3 text-sm font-medium text-gray-500">Monto</th>
+                      <th scope="col" className="text-right py-3 px-3 text-sm font-medium text-gray-500">Saldo</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -333,10 +352,10 @@ export default function MovimientosPage() {
                         <td className={`py-3 px-3 text-right font-medium ${
                           mov.tipo === 'DEPOSITO' ? 'text-green-600' : 'text-red-600'
                         }`}>
-                          {mov.tipo === 'DEPOSITO' ? '+' : '-'}{formatMonto(mov.monto)}
+                          {mov.tipo === 'DEPOSITO' ? '+' : '-'}{formatMonto(mov.monto, moneda)}
                         </td>
                         <td className="py-3 px-3 text-right text-gray-600">
-                          {formatMonto(mov.saldoPosterior)}
+                          {formatMonto(mov.saldoPosterior, moneda)}
                         </td>
                       </tr>
                     ))}

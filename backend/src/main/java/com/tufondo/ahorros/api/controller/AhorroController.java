@@ -8,6 +8,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -136,12 +138,15 @@ public class AhorroController {
     @Operation(summary = "Listar movimientos de cuenta")
     public ResponseEntity<MovimientosListResponse> listarMovimientos(
             @PathVariable String numeroCuenta,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "page debe ser >= 0") int page,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "size debe ser >= 1") @Max(value = 100, message = "size debe ser <= 100") int size,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin,
             @RequestParam(required = false) TipoMovimiento tipo,
             Authentication authentication) {
+        if (fechaInicio != null && fechaFin != null && fechaFin.isBefore(fechaInicio)) {
+            throw new IllegalArgumentException("fechaFin debe ser mayor o igual a fechaInicio");
+        }
         UUID socioIdToken = extraerSocioId(authentication);
         boolean isAdmin = esAdmin(authentication);
 
