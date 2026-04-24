@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
-import { creditosApi } from '@/lib/api/client';
+import { creditosApi, cuentasApi } from '@/lib/api/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,58 +24,64 @@ interface TipoCredito {
   frecuenciaPago: string;
 }
 
-interface SimulacionResult {
-  cuotaMensual: number;
-  totalPagar: number;
-  totalIntereses: number;
-  tasaEfectivaMensual: number;
-  planAmortizacion: Array<{
-    numeroCuota: number;
-    fechaPago: string;
-    capital: number;
-    interes: number;
-    cuota: number;
-    saldo: number;
-  }>;
+interface Cuenta {
+  id: string;
+  numeroCuenta: string;
+  tipoCuenta: string;
+  moneda: string;
+  saldo: number;
 }
 
-export default function SimuladorPage() {
+export default function SolicitarCreditoPage() {
   const user = useAuthStore((state) => state.user);
   const isLoading = useAuthStore((state) => state.isLoading);
+  const router = useRouter();
 
   const [tiposCredito, setTiposCredito] = useState<TipoCredito[]>([]);
+  const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [simulando, setSimulando] = useState(false);
+  const [enviando, setEnviando] = useState(false);
 
   const [tipoCreditoId, setTipoCreditoId] = useState<string>('');
   const [monto, setMonto] = useState<string>('');
   const [plazo, setPlazo] = useState<string>('');
-  const [resultado, setResultado] = useState<SimulacionResult | null>(null);
+  const [cuentaGarantiaId, setCuentaGarantiaId] = useState<string>('');
 
   const [tipoSeleccionado, setTipoSeleccionado] = useState<TipoCredito | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
 
-    async function cargarTipos() {
+    async function cargarDatos() {
       setLoading(true);
       try {
-        const res = await creditosApi.getTiposCredito();
-        setTiposCredito(res.data || []);
-        if (res.data?.length > 0) {
-          setTipoCreditoId(res.data[0].id);
-          setTipoSeleccionado(res.data[0]);
+        const [tiposRes, cuentasRes] = await Promise.all([
+          creditosApi.getTiposCredito(),
+          user?.socioId ? cuentasApi.getCuentas(user.socioId) : Promise.resolve({ data: [] }),
+        ]);
+
+        const tipos = tiposRes.data.tiposCredito || [];
+        setTiposCredito(tipos);
+
+        const cuentasList = cuentasRes.data.cuentas || [];
+        setCuentas(cuentasList);
+
+        if (tipos.length > 0) {
+          setTipoCreditoId(tipos[0].id);
+          setTipoSeleccionado(tipos[0]);
+          setMonto(String(tipos[0].montoMinimo));
+          setPlazo(String(tipos[0].plazoMinimoMeses));
         }
       } catch (err) {
-        console.error('Error al cargar tipos:', err);
-        toast.error('Error al cargar tipos de crédito');
+        console.error('Error al cargar datos:', err);
+        toast.error('Error al cargar datos');
       } finally {
         setLoading(false);
       }
     }
 
-    cargarTipos();
-  }, [isLoading]);
+    cargarDatos();
+  }, [isLoading, user?.socioId]);
 
   const handleTipoChange = (id: string) => {
     setTipoCreditoId(id);
@@ -86,7 +93,7 @@ export default function SimuladorPage() {
     }
   };
 
-  const handleSimular = async () => {
+  const handleSolicitar = async () => {
     if (!tipoCreditoId || !monto || !plazo) {
       toast.error('Complete todos los campos');
       return;
@@ -105,11 +112,6 @@ export default function SimuladorPage() {
       return;
     }
 
-    if (montoNum > 10000000 || plazoNum > 360) {
-      toast.error('Valores exceden límites permitidos');
-      return;
-    }
-
     if (tipoSeleccionado) {
       if (montoNum < tipoSeleccionado.montoMinimo || montoNum > tipoSeleccionado.montoMaximo) {
         toast.error(`Monto debe estar entre ${tipoSeleccionado.montoMinimo} y ${tipoSeleccionado.montoMaximo}`);
@@ -121,24 +123,30 @@ export default function SimuladorPage() {
       }
     }
 
-    setSimulando(true);
+    setEnviando(true);
     try {
-      const res = await creditosApi.simular({
+      const res = await creditosApi.crearSolicitud({
         tipoCreditoId,
-        monto: montoNum,
+        montoSolicitado: montoNum,
         plazoMeses: plazoNum,
+        cuentaGarantiaId: cuentaGarantiaId || undefined,
+        canalOrigen: 'WEB',
       });
-      setResultado(res.data);
-      toast.success('Simulación completada');
-    } catch (err) {
-      console.error('Error al simular:', err);
-      toast.error('Error al realizar simulación');
+      toast.success('Solicitud creada exitosamente');
+      router.push(`/dashboard/creditos/${res.data.numeroSolicitud}`);
+    } catch (err: unknown) {
+      console.error('Error al crear solicitud:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error al crear solicitud';
+      toast.error(errorMessage);
     } finally {
-      setSimulando(false);
+      setEnviando(false);
     }
   };
 
-  const formatMonto = (monto: number) => {
+  const formatMonto = (monto: number, moneda: string = 'USD') => {
+    if (moneda === 'VES') {
+      return `Bs ${monto.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+    }
     return `$${monto.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
   };
 
@@ -156,13 +164,22 @@ export default function SimuladorPage() {
         <Link href="/dashboard/creditos">
           <Button variant="outline">← Volver</Button>
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Simulador de Crédito</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Solicitar Crédito</h1>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      {tiposCredito.length === 0 ? (
+        <Card>
+          <CardContent className="py-8">
+            <div className="text-center text-gray-500">
+              <p className="mb-2">No hay tipos de crédito disponibles en este momento.</p>
+              <p className="text-sm">Contacte al administrador para más información.</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Parámetros del Crédito</CardTitle>
+            <CardTitle>Datos de la Solicitud</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -220,89 +237,54 @@ export default function SimuladorPage() {
               />
             </div>
 
+            {cuentas.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="garantia">Cuenta de Garantía (opcional)</Label>
+                <select
+                  id="garantia"
+                  aria-label="Seleccionar cuenta de garantía"
+                  className="w-full h-10 px-3 border rounded-md bg-white"
+                  value={cuentaGarantiaId}
+                  onChange={(e) => setCuentaGarantiaId(e.target.value)}
+                >
+                  <option value="">Sin cuenta de garantía</option>
+                  {cuentas.map((cuenta) => (
+                    <option key={cuenta.id} value={cuenta.id}>
+                      {cuenta.numeroCuenta} - {cuenta.moneda} - Saldo: {formatMonto(cuenta.saldo, cuenta.moneda)}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500">
+                  Seleccione una cuenta existente como garantía adicional para su crédito.
+                </p>
+              </div>
+            )}
+
             <Button
-              onClick={handleSimular}
-              className="w-full bg-green-600 hover:bg-green-700"
-              disabled={simulando || !tipoCreditoId || !monto || !plazo}
+              onClick={handleSolicitar}
+              className="w-full bg-green-600 hover:bg-green-700 mt-4"
+              disabled={enviando || !tipoCreditoId || !monto || !plazo}
             >
-              {simulando ? (
+              {enviando ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Simulando...
+                  Enviando Solicitud...
                 </>
               ) : (
-                'Calcular Cuota'
+                'Enviar Solicitud de Crédito'
               )}
             </Button>
           </CardContent>
         </Card>
+      )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Resultado de Simulación</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!resultado ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>Ingrese los parámetros y presione "Calcular Cuota"</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <p className="text-sm text-gray-500">Cuota Mensual</p>
-                    <p className="text-xl font-bold text-green-600">{formatMonto(resultado.cuotaMensual)}</p>
-                  </div>
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-gray-500">Total Intereses</p>
-                    <p className="text-xl font-bold text-blue-600">{formatMonto(resultado.totalIntereses)}</p>
-                  </div>
-                  <div className="text-center p-4 bg-purple-50 rounded-lg">
-                    <p className="text-sm text-gray-500">Total a Pagar</p>
-                    <p className="text-xl font-bold text-purple-600">{formatMonto(resultado.totalPagar)}</p>
-                  </div>
-                </div>
-
-                <div className="text-center text-sm text-gray-500">
-                  <p>Tasa Efectiva Mensual: {(resultado.tasaEfectivaMensual * 100).toFixed(4)}%</p>
-                </div>
-
-                {resultado.planAmortizacion && resultado.planAmortizacion.length > 0 && (
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="text-left py-2 px-3">#</th>
-                          <th className="text-right py-2 px-3">Capital</th>
-                          <th className="text-right py-2 px-3">Interés</th>
-                          <th className="text-right py-2 px-3">Cuota</th>
-                          <th className="text-right py-2 px-3">Saldo</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {resultado.planAmortizacion.slice(0, 12).map((fila) => (
-                          <tr key={fila.numeroCuota} className="border-t">
-                            <td className="py-2 px-3">{fila.numeroCuota}</td>
-                            <td className="py-2 px-3 text-right">{formatMonto(fila.capital)}</td>
-                            <td className="py-2 px-3 text-right">{formatMonto(fila.interes)}</td>
-                            <td className="py-2 px-3 text-right font-medium">{formatMonto(fila.cuota)}</td>
-                            <td className="py-2 px-3 text-right text-gray-500">{formatMonto(fila.saldo)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {resultado.planAmortizacion.length > 12 && (
-                      <div className="text-center py-2 text-sm text-gray-500 bg-gray-50">
-                        ... y {resultado.planAmortizacion.length - 12} cuotas más
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="bg-gray-50">
+        <CardContent className="py-4">
+          <p className="text-sm text-gray-600 text-center">
+            Su solicitud será revisada por un gestor. Recibirá una notificación cuando sea procesada.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }
