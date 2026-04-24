@@ -88,3 +88,24 @@ export const cuentasApi = {
       canalOrigen: 'WEB'
     }),
 };
+
+export const creditosApi = {
+  getTiposCredito: () => apiClient.get('/api/creditos/tipos-credito'),
+  getTipoCredito: (id: string) => apiClient.get(`/v1/creditos/tipos-credito/${id}`),
+  getSolicitudesPorSocio: (socioId: string) => apiClient.get(`/api/creditos/solicitudes/socio/${socioId}`),
+  getSolicitud: (numero: string) => apiClient.get(`/api/creditos/solicitudes/${numero}`),
+  crearSolicitud: (data: {
+    tipoCreditoId: string;
+    montoSolicitado: number;
+    plazoMeses: number;
+    cuentaGarantiaId?: string;
+    canalOrigen: string;
+  }) => apiClient.post('/v1/creditos/solicitudes', data),
+  getPlan: (solicitudNumero: string) => apiClient.get(`/v1/creditos/solicitudes/${solicitudNumero}/plan`),
+  getCuotas: (creditoNumero: string) => apiClient.get(`/v1/creditos/${creditoNumero}/cuotas`),
+  simular: (data: {
+    tipoCreditoId: string;
+    monto: number;
+    plazoMeses: number;
+  }) => apiClient.post('/api/creditos/simulador', data),
+};
