@@ -49,11 +49,18 @@ public class ListarMovimientosUseCase {
         Pageable pageable = PageRequest.of(page, safeSize);
 
         Page<Movimiento> movimientos;
-        if (fechaInicio != null && fechaFin != null) {
+        boolean tieneFechas = fechaInicio != null && fechaFin != null;
+        boolean tieneTipo = tipo != null;
+
+        if (tieneFechas && tieneTipo) {
+            LocalDateTime ini = fechaInicio.atStartOfDay();
+            LocalDateTime fin = fechaFin.plusDays(1).atStartOfDay();
+            movimientos = movimientoRepository.buscarPorCuentaYRangoFechasYTipo(cuenta.getId(), ini, fin, tipo, pageable);
+        } else if (tieneFechas) {
             LocalDateTime ini = fechaInicio.atStartOfDay();
             LocalDateTime fin = fechaFin.plusDays(1).atStartOfDay();
             movimientos = movimientoRepository.buscarPorCuentaYRangoFechas(cuenta.getId(), ini, fin, pageable);
-        } else if (tipo != null) {
+        } else if (tieneTipo) {
             movimientos = movimientoRepository.buscarPorCuentaYTipo(cuenta.getId(), tipo, pageable);
         } else {
             movimientos = movimientoRepository.buscarPorCuentaAhorroId(cuenta.getId(), pageable);
