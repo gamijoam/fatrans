@@ -5,10 +5,14 @@ import com.tufondo.auth.domain.exception.TokenInvalidoException;
 import com.tufondo.auth.domain.exception.UsuarioNoEncontradoException;
 import com.tufondo.auth.domain.model.Usuario;
 import com.tufondo.auth.domain.repository.UsuarioRepository;
+import com.tufondo.auth.infrastructure.security.AuthenticatedUser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -18,15 +22,26 @@ public class ObtenerUsuarioActualUseCase {
     private final UsuarioRepository usuarioRepository;
 
     public LoginResponseDTO.UsuarioDTO ejecutar() {
-        String usuarioId = SecurityContextHolder.getContext()
-                .getAuthentication()
-                .getName();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new TokenInvalidoException("No hay usuario autenticado");
+        }
+
+        Object principal = authentication.getPrincipal();
+        UUID socioId = null;
+
+        if (principal instanceof AuthenticatedUser authUser) {
+            socioId = authUser.getSocioId();
+        }
+
+        String usuarioId = authentication.getName();
 
         if (usuarioId == null || usuarioId.isBlank()) {
             throw new TokenInvalidoException("No hay usuario autenticado");
         }
 
-        Usuario usuario = usuarioRepository.buscarPorId(java.util.UUID.fromString(usuarioId))
+        Usuario usuario = usuarioRepository.buscarPorId(UUID.fromString(usuarioId))
                 .orElseThrow(() -> new UsuarioNoEncontradoException(
                         "Usuario no encontrado: " + usuarioId));
 
@@ -36,6 +51,7 @@ public class ObtenerUsuarioActualUseCase {
                 usuario.correoElectronico(),
                 usuario.nombreCompleto(),
                 usuario.rol().name(),
+                socioId != null ? socioId.toString() : (usuario.socioId() != null ? usuario.socioId().toString() : null),
                 usuario.debeCambiarPassword()
         );
     }

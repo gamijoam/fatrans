@@ -156,6 +156,7 @@ public class AuthUseCase {
                         usuario.correoElectronico(),
                         usuario.nombreCompleto(),
                         usuario.rol().name(),
+                        usuario.socioId() != null ? usuario.socioId().toString() : null,
                         usuario.debeCambiarPassword()
                 )
         );
@@ -226,6 +227,7 @@ public class AuthUseCase {
                         usuario.correoElectronico(),
                         usuario.nombreCompleto(),
                         usuario.rol().name(),
+                        usuario.socioId() != null ? usuario.socioId().toString() : null,
                         usuario.debeCambiarPassword()
                 )
         );

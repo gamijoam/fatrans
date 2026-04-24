@@ -41,6 +41,7 @@ public class ListarCuentasPorSocioUseCase {
                         .saldoActual(c.getSaldoActual())
                         .estado(c.getEstado().name())
                         .tipoCuenta(c.getTipoCuenta().name())
+                        .moneda(c.getMoneda().name())
                         .fechaApertura(c.getFechaApertura())
                         .build())
                 .toList();
