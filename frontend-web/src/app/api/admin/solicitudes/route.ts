@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 
+const ADMIN_ROLES = ['ADMIN', 'ADMINISTRADOR', 'GESTOR', 'SUPER_ADMIN'];
+
+function validateAdminRole(token: string): boolean {
+  try {
+    const payload = token.split('.')[1];
+    const decoded = Buffer.from(payload, 'base64').toString('utf-8');
+    const data = JSON.parse(decoded);
+    return ADMIN_ROLES.includes(data.rol);
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const origin = request.headers.get('origin');
   const allowedOrigins = [
@@ -18,6 +31,10 @@ export async function GET(request: NextRequest) {
     const accessToken = request.cookies.get('access_token');
     if (!accessToken) {
       return NextResponse.json({ message: 'No autenticado' }, { status: 401 });
+    }
+
+    if (!validateAdminRole(accessToken.value)) {
+      return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

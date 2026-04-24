@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -62,7 +63,7 @@ export default function AdminDashboardPage() {
           <h1 className="text-2xl font-bold text-gray-900">Dashboard Admin</h1>
           <p className="text-sm text-gray-500">Panel de administración del sistema</p>
         </div>
-        <Badge variant="outline" className="text-python">
+        <Badge variant="outline" className="text-primary">
           {user?.rol}
         </Badge>
       </div>
@@ -218,34 +219,34 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
-              <a
+              <Link
                 href="/admin/socios"
                 className="flex items-center gap-3 p-3 rounded-lg border hover:bg-gray-50 transition-colors"
               >
                 <Users className="h-5 w-5 text-gray-400" />
                 <span className="text-sm font-medium">Gestionar Socios</span>
-              </a>
-              <a
+              </Link>
+              <Link
                 href="/admin/solicitudes"
                 className="flex items-center gap-3 p-3 rounded-lg border hover:bg-gray-50 transition-colors"
               >
                 <FileText className="h-5 w-5 text-gray-400" />
                 <span className="text-sm font-medium">Ver Solicitudes</span>
-              </a>
-              <a
+              </Link>
+              <Link
                 href="/admin/creditos"
                 className="flex items-center gap-3 p-3 rounded-lg border hover:bg-gray-50 transition-colors"
               >
                 <CreditCard className="h-5 w-5 text-gray-400" />
                 <span className="text-sm font-medium">Gestionar Créditos</span>
-              </a>
-              <a
+              </Link>
+              <Link
                 href="/admin/reportes"
                 className="flex items-center gap-3 p-3 rounded-lg border hover:bg-gray-50 transition-colors"
               >
                 <FileText className="h-5 w-5 text-gray-400" />
                 <span className="text-sm font-medium">Ver Reportes</span>
-              </a>
+              </Link>
             </div>
           </CardContent>
         </Card>
