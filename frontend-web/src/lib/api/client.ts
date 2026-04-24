@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export const apiClient = axios.create({
-  baseURL: API_URL,
+  baseURL: '',
   timeout: 10_000,
   withCredentials: true,
 });
@@ -66,17 +66,17 @@ export const sociosApi = {
 };
 
 export const cuentasApi = {
-  getCuentas: (socioId: string) => apiClient.get(`/cuentas/socio/${socioId}`),
-  getCuenta: (numeroCuenta: string) => apiClient.get(`/cuentas/${numeroCuenta}`),
-  getSaldo: (numeroCuenta: string) => apiClient.get(`/cuentas/${numeroCuenta}/saldo`),
+  getCuentas: (socioId: string) => apiClient.get(`/api/cuentas/socio/${socioId}`),
+  getCuenta: (numeroCuenta: string) => apiClient.get(`/api/cuentas/${numeroCuenta}`),
+  getSaldo: (numeroCuenta: string) => apiClient.get(`/api/cuentas/${numeroCuenta}/saldo`),
   deposito: (numeroCuenta: string, monto: number) =>
-    apiClient.post(`/cuentas/${numeroCuenta}/depositos`, {
+    apiClient.post(`/api/cuentas/${numeroCuenta}/depositos`, {
       monto,
       canalOrigen: 'WEB',
       descripcion: 'Depósito en línea'
     }),
   retiro: (numeroCuenta: string, monto: number) =>
-    apiClient.post(`/cuentas/${numeroCuenta}/retiros`, {
+    apiClient.post(`/api/cuentas/${numeroCuenta}/retiros`, {
       monto,
       canalOrigen: 'WEB'
     }),
