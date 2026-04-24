@@ -57,8 +57,8 @@ export default function CreditosPage() {
           creditosApi.getSolicitudesPorSocio(socioId),
           creditosApi.getTiposCredito(),
         ]);
-        setSolicitudes(solicitudesRes.data || []);
-        setTiposCredito(tiposRes.data || []);
+        setSolicitudes(solicitudesRes.data.solicitudes || []);
+        setTiposCredito(tiposRes.data.tiposCredito || []);
       } catch (err: unknown) {
         console.error('Error al cargar créditos:', err);
         setError('Error al cargar los datos de créditos');

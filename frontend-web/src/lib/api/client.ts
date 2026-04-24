@@ -100,7 +100,7 @@ export const creditosApi = {
     plazoMeses: number;
     cuentaGarantiaId?: string;
     canalOrigen: string;
-  }) => apiClient.post('/v1/creditos/solicitudes', data),
+  }) => apiClient.post('/api/creditos/solicitudes', data),
   getPlan: (solicitudNumero: string) => apiClient.get(`/v1/creditos/solicitudes/${solicitudNumero}/plan`),
   getCuotas: (creditoNumero: string) => apiClient.get(`/v1/creditos/${creditoNumero}/cuotas`),
   simular: (data: {
