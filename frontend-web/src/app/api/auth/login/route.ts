@@ -46,17 +46,23 @@ export async function POST(request: NextRequest) {
 
     const setCookieHeaders = backendResponse.headers.getSetCookie();
     
-    const token = backendResponse.headers.get('X-User-Token') || '';
+    const accessToken = setCookieHeaders
+      .find(c => c.startsWith('access_token='))
+      ?.split(';')[0]?.replace('access_token=', '') || '';
+    
+    const userId = backendResponse.headers.get('X-User-Id') || '';
+    const userRol = backendResponse.headers.get('X-User-Rol') || '';
+    
     let userData = {
-      id: backendResponse.headers.get('X-User-Id'),
-      rol: backendResponse.headers.get('X-User-Rol'),
+      id: userId,
+      rol: userRol,
       debeCambiarPassword: false,
     };
     
-    if (token) {
+    if (accessToken) {
       try {
         const meResponse = await fetch(`${BACKEND_URL}/api/v1/auth/me`, {
-          headers: { 'Authorization': `Bearer ${token}` },
+          headers: { 'Authorization': `Bearer ${accessToken}` },
           credentials: 'include',
         });
         
