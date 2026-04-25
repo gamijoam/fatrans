@@ -383,7 +383,7 @@ export default function DashboardKYCPagina() {
                     <Shield className="h-4 w-4 text-gray-400" />
                     <div>
                       <p className="text-xs text-gray-500">ID Verificación</p>
-                      <p className="font-mono text-sm">{estadoKYC.verificacionId.slice(0, 8)}...</p>
+                      <p className="font-mono text-sm">{estadoKYC.verificacionId?.slice(0, 8) ?? '-'}...</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
