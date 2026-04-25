@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { ProtectedRoute } from '@/components/shared/protected-route';
 import { LogoutButton } from '@/components/shared/logout-button';
-import { LayoutDashboard, Wallet, ArrowLeftRight, CreditCard, FileText, User, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Wallet, ArrowLeftRight, CreditCard, FileText, User, Menu, X, Shield } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ const menuItems = [
   { icon: Wallet, label: 'Cuentas', href: '/dashboard/cuentas' },
   { icon: ArrowLeftRight, label: 'Movimientos', href: '/dashboard/movimientos' },
   { icon: CreditCard, label: 'Créditos', href: '/dashboard/creditos' },
+  { icon: Shield, label: 'Verificación KYC', href: '/dashboard/kyc' },
   { icon: FileText, label: 'Documentos', href: '/dashboard/documentos' },
   { icon: User, label: 'Mi Perfil', href: '/dashboard/perfil' },
 ];
