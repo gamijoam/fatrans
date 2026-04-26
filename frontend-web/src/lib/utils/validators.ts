@@ -33,8 +33,35 @@ export const ESTADOS_VENEZUELA = [
   'Amazonas', 'Anzoátegui', 'Apure', 'Aragua', 'Barinas', 'Bolívar',
   'Carabobo', 'Cojedes', 'Delta Amacuro', 'Distrito Capital', 'Falcón',
   'Guárico', 'Lara', 'Mérida', 'Miranda', 'Monagas', 'Nueva Esparta',
-  'Portuguesa', 'Sucre', 'Táchira', 'Trujillo', 'Vargas', 'Yaracuy', 'Zulia'
+  'Portuguesa', 'Sucre', 'Táchira', 'Trujillo', 'La Guaira', 'Yaracuy', 'Zulia'
 ] as const;
+
+export const BANCOS_VENEZUELA = [
+  { codigo: '0102', nombre: 'Banco de Venezuela' },
+  { codigo: '0104', nombre: 'Banco Provincial' },
+  { codigo: '0105', nombre: 'Banco de Guyana' },
+  { codigo: '0114', nombre: 'Banco del Caribe' },
+  { codigo: '0128', nombre: 'Banco Caroní' },
+  { codigo: '0134', nombre: 'Banco Bicentenario' },
+  { codigo: '0137', nombre: 'Banco Sofitasa' },
+  { codigo: '0138', nombre: 'Banco Plaza' },
+  { codigo: '0151', nombre: 'Banco Fondo Común' },
+  { codigo: '0156', nombre: 'Banco 100% Banco' },
+  { codigo: '0157', nombre: 'Banco Digital' },
+  { codigo: '0163', nombre: 'Banco del Tesoro' },
+  { codigo: '0166', nombre: 'Banco Agro' },
+  { codigo: '0171', nombre: 'Banco Activo' },
+  { codigo: '0174', nombre: 'Banco Bancrecer' },
+  { codigo: '0175', nombre: 'Banco Internacional de Desarrollo' },
+  { codigo: '0177', nombre: 'Banco Banplus' },
+  { codigo: '0181', nombre: 'Banco Venezuelan' },
+  { codigo: '0186', nombre: 'Banco Mi Banco' },
+  { codigo: '0190', nombre: 'Banco Nacional de Crédito' },
+  { codigo: '0601', nombre: 'Banco de la Fuerza Armada' },
+] as const;
+
+const codigoPostalRegex = /^\d{4}$/;
+const telefonoVenezuelRegex = /^(\+58)?[0-9]{10,11}$/;
 
 export const TIPOS_DOCUMENTO = ['CEDULA', 'CEDULA_EXTRANJERO', 'PASAPORTE', 'RIF'] as const;
 export const GENEROS = ['MASCULINO', 'FEMENINO', 'OTRO'] as const;
@@ -164,14 +191,14 @@ export const beneficiarioSchema = z.object({
 const direccionSchema = z.object({
   calle: z.string().max(200).optional(),
   ciudad: z.string().max(100).optional(),
-  estado: z.string().max(100).optional(),
-  codigoPostal: z.string().max(20).optional(),
+  estado: z.string().max(50).optional(),
+  codigoPostal: z.string().regex(codigoPostalRegex, 'Código postal debe ser 4 dígitos').optional().or(z.literal('')),
   pais: z.string().max(100).optional(),
 });
 
 const contactoEmergenciaSchema = z.object({
   nombre: z.string().min(2, 'Mínimo 2 caracteres').max(200),
-  telefono: z.string().regex(/^\+?[0-9]{7,15}$/, 'Teléfono inválido'),
+  telefono: z.string().regex(telefonoVenezuelRegex, 'Teléfono inválido'),
   parentesco: z.string().max(100).optional(),
 });
 
@@ -184,11 +211,12 @@ export const profileSchema = z.object({
   genero: z.enum(['MASCULINO', 'FEMENINO', 'OTRO']).optional(),
   estadoCivil: z.enum(['SOLTERO', 'CASADO', 'DIVORCIADO', 'VIUDO', 'UNION_LIBRE']).optional(),
   correoElectronico: z.string().email('Email inválido'),
-  telefonoPrincipal: z.string().regex(/^\+?[0-9]{7,15}$/, 'Teléfono inválido'),
-  telefonoSecundario: z.string().regex(/^\+?[0-9]{7,15}$/, 'Teléfono inválido').optional().or(z.literal('')),
+  telefonoPrincipal: z.string().regex(telefonoVenezuelRegex, 'Teléfono inválido (formato: 04121234567 o +584121234567)'),
+  telefonoSecundario: z.string().regex(telefonoVenezuelRegex, 'Teléfono inválido').optional().or(z.literal('')),
   direccionResidencia: direccionSchema.optional(),
   direccionLaboral: direccionSchema.optional(),
   empresa: z.string().max(200).optional().or(z.literal('')),
+  rifEmpresa: z.string().regex(/^(J|V|E|G)-\d{6,10}(-\d)?$/, 'RIF inválido').optional().or(z.literal('')),
   departamento: z.string().max(100).optional().or(z.literal('')),
   cargo: z.string().max(100).optional().or(z.literal('')),
   tipoContrato: z.enum(['CONTRATO_INDEFINIDO', 'CONTRATO_TEMPORAL', 'CONTRATO_POR_HORAS', 'SERVICIOS', 'APRENDIZ']).optional(),

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { registroSchema, ESTADOS_VENEZUELA, TIPOS_DOCUMENTO, GENEROS, ESTADOS_CIVILES } from '@/lib/utils/validators';
+import { registroSchema, profileSchema, ESTADOS_VENEZUELA, BANCOS_VENEZUELA, TIPOS_DOCUMENTO, GENEROS, ESTADOS_CIVILES } from '@/lib/utils/validators';
 
 describe('registroSchema - Validaciones Issue #99', () => {
 
@@ -593,6 +593,163 @@ describe('registroSchema - Validaciones Issue #99', () => {
       expect(ESTADOS_CIVILES.length).toBe(5);
       expect(ESTADOS_CIVILES).toContain('SOLTERO');
       expect(ESTADOS_CIVILES).toContain('CASADO');
+    });
+
+    it('BANCOS_VENEZUELA tiene bancos válidos', () => {
+      expect(BANCOS_VENEZUELA.length).toBeGreaterThan(0);
+      expect(BANCOS_VENEZUELA[0]).toHaveProperty('codigo');
+      expect(BANCOS_VENEZUELA[0]).toHaveProperty('nombre');
+      const bancoVenezuela = BANCOS_VENEZUELA.find(b => b.codigo === '0102');
+      expect(bancoVenezuela?.nombre).toBe('Banco de Venezuela');
+    });
+
+  });
+
+});
+
+describe('profileSchema - Validaciones Issue #103', () => {
+
+  describe('1. Teléfono Venezuela', () => {
+
+    it('teléfono 04121234567 válido', () => {
+      const result = profileSchema.safeParse({
+        primerNombre: 'Juan',
+        primerApellido: 'Pérez',
+        correoElectronico: 'juan@test.com',
+        telefonoPrincipal: '04121234567',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('teléfono +584121234567 válido', () => {
+      const result = profileSchema.safeParse({
+        primerNombre: 'Juan',
+        primerApellido: 'Pérez',
+        correoElectronico: 'juan@test.com',
+        telefonoPrincipal: '+584121234567',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('teléfono corto falla', () => {
+      const result = profileSchema.safeParse({
+        primerNombre: 'Juan',
+        primerApellido: 'Pérez',
+        correoElectronico: 'juan@test.com',
+        telefonoPrincipal: '123',
+      });
+      expect(result.success).toBe(false);
+    });
+
+  });
+
+  describe('2. Código Postal Venezuela', () => {
+
+    it('código postal 4 dígitos válido', () => {
+      const result = profileSchema.safeParse({
+        primerNombre: 'Juan',
+        primerApellido: 'Pérez',
+        correoElectronico: 'juan@test.com',
+        telefonoPrincipal: '04121234567',
+        direccionResidencia: { codigoPostal: '1010' },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('código postal con letras falla', () => {
+      const result = profileSchema.safeParse({
+        primerNombre: 'Juan',
+        primerApellido: 'Pérez',
+        correoElectronico: 'juan@test.com',
+        telefonoPrincipal: '04121234567',
+        direccionResidencia: { codigoPostal: '1010A' },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('código postal con más de 4 dígitos falla', () => {
+      const result = profileSchema.safeParse({
+        primerNombre: 'Juan',
+        primerApellido: 'Pérez',
+        correoElectronico: 'juan@test.com',
+        telefonoPrincipal: '04121234567',
+        direccionResidencia: { codigoPostal: '10101' },
+      });
+      expect(result.success).toBe(false);
+    });
+
+  });
+
+  describe('3. RIF Empresa', () => {
+
+    it('RIF J-12345678-9 válido', () => {
+      const result = profileSchema.safeParse({
+        primerNombre: 'Juan',
+        primerApellido: 'Pérez',
+        correoElectronico: 'juan@test.com',
+        telefonoPrincipal: '04121234567',
+        rifEmpresa: 'J-12345678-9',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('RIF V-12345678 válido', () => {
+      const result = profileSchema.safeParse({
+        primerNombre: 'Juan',
+        primerApellido: 'Pérez',
+        correoElectronico: 'juan@test.com',
+        telefonoPrincipal: '04121234567',
+        rifEmpresa: 'V-12345678',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('RIF sin prefijo falla', () => {
+      const result = profileSchema.safeParse({
+        primerNombre: 'Juan',
+        primerApellido: 'Pérez',
+        correoElectronico: 'juan@test.com',
+        telefonoPrincipal: '04121234567',
+        rifEmpresa: '12345678',
+      });
+      expect(result.success).toBe(false);
+    });
+
+  });
+
+  describe('4. Número de Cuenta', () => {
+
+    it('cuenta 10 dígitos válida', () => {
+      const result = profileSchema.safeParse({
+        primerNombre: 'Juan',
+        primerApellido: 'Pérez',
+        correoElectronico: 'juan@test.com',
+        telefonoPrincipal: '04121234567',
+        numeroCuentaNomina: '0102123456',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('cuenta 20 dígitos válida', () => {
+      const result = profileSchema.safeParse({
+        primerNombre: 'Juan',
+        primerApellido: 'Pérez',
+        correoElectronico: 'juan@test.com',
+        telefonoPrincipal: '04121234567',
+        numeroCuentaNomina: '01021234567890123456',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('cuenta con letras falla', () => {
+      const result = profileSchema.safeParse({
+        primerNombre: 'Juan',
+        primerApellido: 'Pérez',
+        correoElectronico: 'juan@test.com',
+        telefonoPrincipal: '04121234567',
+        numeroCuentaNomina: '0102ABCD123456',
+      });
+      expect(result.success).toBe(false);
     });
 
   });
