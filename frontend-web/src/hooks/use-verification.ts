@@ -11,8 +11,10 @@ interface UseVerificationOptions {
 
 interface UseVerificationReturn {
   step: VerificationStep;
+  setStep: (step: VerificationStep) => void;
   isLoading: boolean;
   error: string | null;
+  setError: (error: string | null) => void;
   token: string | null;
   verifyPassword: (password: string) => Promise<boolean>;
   sendCode: (tipo: 'EMAIL' | 'SMS', valor: string) => Promise<string>;
@@ -142,8 +144,10 @@ export function useVerification({ onSuccess, onError }: UseVerificationOptions):
 
   return {
     step,
+    setStep,
     isLoading,
     error,
+    setError,
     token,
     verifyPassword,
     sendCode,

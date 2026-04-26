@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { ProgressBar } from '@/components/ui/progress';
 import {
   Shield, Upload, FileText, CheckCircle, XCircle, Clock, AlertTriangle,
   Check, X, Loader2, Calendar, Image as ImageIcon, Send
@@ -235,9 +235,9 @@ export default function DashboardKYCPagina() {
                       {estadoKYC.documentosValidos} de {estadoKYC.documentosRequeridos} válidos
                     </span>
                   </div>
-                  <Progress
-                    value={estadoKYC.documentosRequeridos > 0 
-                      ? (estadoKYC.documentosValidos / estadoKYC.documentosRequeridos) * 100 
+                  <ProgressBar
+                    value={estadoKYC.documentosRequeridos > 0
+                      ? (estadoKYC.documentosValidos / estadoKYC.documentosRequeridos) * 100
                       : 0}
                     className="h-2"
                   />

@@ -67,4 +67,15 @@ public class EmailService {
         log.info("Este es un email mock - En producción se enviaría un email real");
         log.info("======================================================");
     }
+
+    public void enviarNotificacionSesionesInvalidadas(String destinatario, String nombreUsuario, int cantidadSesiones, String ipAdmin) {
+        log.info("========= EMAIL MOCK: SESIONES INVALIDADAS =========");
+        log.info("Para: {}", destinatario);
+        log.info("Usuario: {}", nombreUsuario);
+        log.info("Cantidad de sesiones invalidadas: {}", cantidadSesiones);
+        log.info("IP del administrador que realizó la acción: {}", ipAdmin);
+        log.info("Mensaje: Todas sus sesiones han sido invalidadas por seguridad");
+        log.info("Este es un email mock - En producción se enviaría un email real");
+        log.info("======================================================");
+    }
 }
