@@ -187,7 +187,7 @@ export default function CuentasPage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Dialog open={openConfirm && cuentaSeleccionada?.id === cuenta.id} onOpenChange={(open) => {
                     if (!open) {
                       setOpenConfirm(false);
