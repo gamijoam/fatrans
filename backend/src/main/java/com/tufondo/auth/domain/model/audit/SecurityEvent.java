@@ -96,4 +96,26 @@ public record SecurityEvent(
                 "rol=" + rol
         );
     }
+
+    public static SecurityEvent sesionesInvalidadas(UUID usuarioId, String ip, UUID invalidadoPor, int cantidad) {
+        return new SecurityEvent(
+                UUID.randomUUID(),
+                "SESSIONS_INVALIDATED",
+                usuarioId,
+                ip,
+                Instant.now(),
+                "invalidado_por=" + invalidadoPor + ", cantidad=" + cantidad
+        );
+    }
+
+    public static SecurityEvent sesionIndividualInvalidadas(UUID usuarioId, String ip, UUID invalidadoPor, String sesionId) {
+        return new SecurityEvent(
+                UUID.randomUUID(),
+                "SESSION_INVALIDATED",
+                usuarioId,
+                ip,
+                Instant.now(),
+                "invalidado_por=" + invalidadoPor + ", sesion_id=" + sesionId
+        );
+    }
 }

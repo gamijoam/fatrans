@@ -13,7 +13,7 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('@/components/ui/progress', () => ({
-  Progress: ({ value }: { value: number }) => (
+  ProgressBar: ({ value }: { value: number }) => (
     <div data-testid="progress-bar" data-value={value}>Progress</div>
   ),
 }));

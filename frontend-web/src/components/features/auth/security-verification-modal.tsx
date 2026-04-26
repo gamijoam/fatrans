@@ -26,7 +26,7 @@ export function SecurityVerificationModal({
   const [password, setPassword] = useState('');
   const [codigo, setCodigo] = useState('');
 
-  const { step, isLoading, error, verifyPassword, sendCode, confirmCode, reset } = useVerification({
+  const { step, setStep, isLoading, error, setError, verifyPassword, sendCode, confirmCode, reset } = useVerification({
     onSuccess: (token) => {
       toast.success('Verificación exitosa');
       onVerified(token);
