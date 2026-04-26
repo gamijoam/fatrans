@@ -59,4 +59,12 @@ public class EmailService {
         log.info("Este es un email mock - En producción se enviaría un email real");
         log.info("==========================================");
     }
+
+    public void enviarCodigoVerificacion(String destinatario, String codigo) {
+        log.info("========= EMAIL MOCK: CÓDIGO DE VERIFICACIÓN =========");
+        log.info("Para: {}", destinatario);
+        log.info("Código: {}", codigo);
+        log.info("Este es un email mock - En producción se enviaría un email real");
+        log.info("======================================================");
+    }
 }
