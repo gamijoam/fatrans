@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -86,5 +87,39 @@ public class SecurityAuditService {
                 event.tipoEvento(),
                 event.detalles()
         );
+    }
+
+    public void registrarIntentoVerificacion(UUID usuarioId, String tipoEvento, boolean exitoso, String ip) {
+        SecurityEvent event = SecurityEvent.builder()
+                .id(UUID.randomUUID())
+                .usuarioId(usuarioId)
+                .tipoEvento(tipoEvento)
+                .timestamp(Instant.now())
+                .ipAddress(ip)
+                .detalles(switch (tipoEvento) {
+                    case "PASSWORD_VERIFIED" -> "Verificación de password exitosa";
+                    case "CODIGO_ENVIADO_EMAIL" -> "Código de verificación enviado por email";
+                    case "CODIGO_ENVIADO_SMS" -> "Código de verificación enviado por SMS";
+                    case "CODIGO_CONFIRMED" -> "Código de verificación confirmado";
+                    default -> "Intento de verificación: " + tipoEvento;
+                })
+                .build();
+        if (exitoso) {
+            log.info("AUDIT [{}] usuario={} ip={} tipo={} detalles={}",
+                    event.timestamp(),
+                    event.usuarioId(),
+                    event.ipAddress(),
+                    event.tipoEvento(),
+                    event.detalles()
+            );
+        } else {
+            log.warn("AUDIT [{}] usuario={} ip={} tipo={} detalles={}",
+                    event.timestamp(),
+                    event.usuarioId(),
+                    event.ipAddress(),
+                    event.tipoEvento(),
+                    event.detalles()
+            );
+        }
     }
 }
