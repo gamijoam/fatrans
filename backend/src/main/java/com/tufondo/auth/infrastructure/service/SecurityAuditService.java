@@ -122,4 +122,26 @@ public class SecurityAuditService {
             );
         }
     }
+
+    public void logSesionesInvalidadas(UUID usuarioId, String ip, UUID invalidadoPor, int cantidad) {
+        SecurityEvent event = SecurityEvent.sesionesInvalidadas(usuarioId, ip, invalidadoPor, cantidad);
+        log.warn("AUDIT [{}] usuario={} ip={} tipo={} detalles={}",
+                event.timestamp(),
+                event.usuarioId(),
+                event.ipAddress(),
+                event.tipoEvento(),
+                event.detalles()
+        );
+    }
+
+    public void logSesionIndividualInvalidadas(UUID usuarioId, String ip, UUID invalidadoPor, String sesionId) {
+        SecurityEvent event = SecurityEvent.sesionIndividualInvalidadas(usuarioId, ip, invalidadoPor, sesionId);
+        log.warn("AUDIT [{}] usuario={} ip={} tipo={} detalles={}",
+                event.timestamp(),
+                event.usuarioId(),
+                event.ipAddress(),
+                event.tipoEvento(),
+                event.detalles()
+        );
+    }
 }
