@@ -7,6 +7,13 @@ spring:
     username: ${DB_USER:app}
     password: ${DB_PASS}
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -86,3 +93,35 @@ documentospdf:
     keystore-password: ${DOC_FIRMA_PASSWORD:}
     key-alias: ${DOC_FIRMA_KEY_ALIAS:documentos-fondo}
     keystore-type: PKCS12
+
+# ============================================
+# RATE LIMITING CENTRALIZADO (REDIS)
+# ============================================
+rate-limiting:
+  enabled: true
+  redis-backed: true
+  endpoints:
+    - path: /api/v1/auth/login
+      limit: 5
+      window: MINUTES
+    - path: /api/v1/auth/registro
+      limit: 3
+      window: MINUTES
+    - path: /api/v1/admin/**
+      limit: 30
+      window: MINUTES
+    - path: /api/v1/socios/**
+      limit: 60
+      window: MINUTES
+    - path: /api/v1/cuentas/**
+      limit: 30
+      window: MINUTES
+    - path: /api/v1/creditos/simular
+      limit: 10
+      window: MINUTES
+    - path: /api/v1/creditos/**
+      limit: 30
+      window: MINUTES
+    - path: /api/v1/documentos/**
+      limit: 20
+      window: MINUTES
