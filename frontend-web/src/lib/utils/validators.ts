@@ -24,9 +24,21 @@ export const loginErrorMessages = {
   },
 } as const;
 
-const cedulaRegex = /^(V|E)-\d{7,8}$|^\d{7,8}$/;
+const cedulaRegex = /^(V|E)-\d{7,8}$/;
+const rifRegex = /^(J|V|E|G)-\d{6,10}(-\d)?$/;
 const phoneRegex = /^\d{10,11}$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export const ESTADOS_VENEZUELA = [
+  'Amazonas', 'Anzoátegui', 'Apure', 'Aragua', 'Barinas', 'Bolívar',
+  'Carabobo', 'Cojedes', 'Delta Amacuro', 'Distrito Capital', 'Falcón',
+  'Guárico', 'Lara', 'Mérida', 'Miranda', 'Monagas', 'Nueva Esparta',
+  'Portuguesa', 'Sucre', 'Táchira', 'Trujillo', 'Vargas', 'Yaracuy', 'Zulia'
+] as const;
+
+export const TIPOS_DOCUMENTO = ['CEDULA', 'CEDULA_EXTRANJERO', 'PASAPORTE', 'RIF'] as const;
+export const GENEROS = ['MASCULINO', 'FEMENINO', 'OTRO'] as const;
+export const ESTADOS_CIVILES = ['SOLTERO', 'CASADO', 'DIVORCIADO', 'VIUDO', 'UNION_LIBRE'] as const;
 
 export const registroSchema = z.object({
   nombreCompleto: z
@@ -34,9 +46,20 @@ export const registroSchema = z.object({
     .min(3, 'El nombre debe tener al menos 3 caracteres')
     .max(200, 'El nombre no puede exceder 200 caracteres')
     .transform((val) => val.trim()),
+  tipoDocumento: z.enum(TIPOS_DOCUMENTO, { required_error: 'El tipo de documento es obligatorio' }),
   cedula: z
     .string()
-    .regex(cedulaRegex, 'Cédula inválida. Formato: V-12345678 o 12345678'),
+    .regex(cedulaRegex, 'Cédula inválida. Formato: V-12345678 o E-12345678'),
+  fechaNacimiento: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida. Formato: YYYY-MM-DD')
+    .refine((val) => {
+      const date = new Date(val);
+      const now = new Date();
+      return date < now;
+    }, 'La fecha de nacimiento debe ser pasada'),
+  genero: z.enum(GENEROS, { required_error: 'El género es obligatorio' }),
+  estadoCivil: z.enum(ESTADOS_CIVILES, { required_error: 'El estado civil es obligatorio' }),
   correoElectronico: z
     .string()
     .regex(emailRegex, 'Correo electrónico inválido'),
@@ -47,6 +70,68 @@ export const registroSchema = z.object({
     .string()
     .min(2, 'El nombre de la empresa debe tener al menos 2 caracteres')
     .max(200, 'El nombre de la empresa no puede exceder 200 caracteres'),
+  rifEmpresa: z
+    .string()
+    .max(20, 'El RIF no puede exceder 20 caracteres')
+    .optional()
+    .or(z.literal('')),
+  departamento: z
+    .string()
+    .max(100, 'El departamento no puede exceder 100 caracteres')
+    .optional()
+    .or(z.literal('')),
+  cargo: z
+    .string()
+    .max(100, 'El cargo no puede exceder 100 caracteres')
+    .optional()
+    .or(z.literal('')),
+  salario: z
+    .string()
+    .regex(/^\d+([.,]\d{1,2})?$/, 'Salario inválido')
+    .optional()
+    .or(z.literal('')),
+  direccionEstado: z
+    .string()
+    .max(100, 'El estado no puede exceder 100 caracteres')
+    .optional()
+    .or(z.literal('')),
+  direccionCiudad: z
+    .string()
+    .max(100, 'La ciudad no puede exceder 100 caracteres')
+    .optional()
+    .or(z.literal('')),
+  direccionMunicipio: z
+    .string()
+    .max(100, 'El municipio no puede exceder 100 caracteres')
+    .optional()
+    .or(z.literal('')),
+  direccionCalle: z
+    .string()
+    .max(255, 'La calle no puede exceder 255 caracteres')
+    .optional()
+    .or(z.literal('')),
+  emergenciaNombre: z
+    .string()
+    .min(2, 'El nombre debe tener al menos 2 caracteres')
+    .max(200, 'El nombre no puede exceder 200 caracteres')
+    .optional()
+    .or(z.literal('')),
+  emergenciaTelefono: z
+    .string()
+    .regex(phoneRegex, 'Teléfono inválido. Debe tener 10-11 dígitos')
+    .optional()
+    .or(z.literal('')),
+  emergenciaParentesco: z
+    .string()
+    .max(50, 'El parentesco no puede exceder 50 caracteres')
+    .optional()
+    .or(z.literal('')),
+  aceptaTerminos: z.literal(true, {
+    errorMap: () => ({ message: 'Debe aceptar los términos y condiciones' }),
+  }),
+  aceptaLopdp: z.literal(true, {
+    errorMap: () => ({ message: 'Debe aceptar la política de protección de datos' }),
+  }),
 });
 
 export type RegistroFormData = z.infer<typeof registroSchema>;
