@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Loader2 } from 'lucide-react';
 import { toastSuccess, toastError } from '@/components/ui/toast-helpers';
+import { useTipoCambio, convertirABolivares, convertirADolares } from '@/hooks/useTipoCambio';
 
 interface Cuenta {
   id: string;
@@ -37,6 +38,7 @@ interface MovimientoResponse {
 export default function CuentasPage() {
   const user = useAuthStore((state) => state.user);
   const isLoading = useAuthStore((state) => state.isLoading);
+  const { tasaActual } = useTipoCambio(1);
 
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [loadingCuentas, setLoadingCuentas] = useState(false);
@@ -185,6 +187,14 @@ export default function CuentasPage() {
                     <p className="text-2xl font-bold text-green-600">
                       {cuenta.moneda === 'VES' ? 'Bs' : '$'}{cuenta.saldo.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                     </p>
+                    {tasaActual && (
+                      <p className="text-sm text-blue-600">
+                        {cuenta.moneda === 'VES'
+                          ? `$ ${convertirADolares(cuenta.saldo, tasaActual.tasaCompra).toLocaleString('es-VE', { minimumFractionDigits: 2 })} USD`
+                          : `Bs ${convertirABolivares(cuenta.saldo, tasaActual.tasaVenta).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                        }
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">

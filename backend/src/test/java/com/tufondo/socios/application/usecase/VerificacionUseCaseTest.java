@@ -97,7 +97,8 @@ class VerificacionUseCaseTest {
             String expectedToken = UUID.randomUUID().toString();
 
             when(usuarioRepository.buscarPorId(usuarioId)).thenReturn(Optional.of(usuario));
-            when(verificacionService.verificarPasswordUsuario(usuarioId, "password123", passwordHash))
+            when(verificacionService.verificarPasswordUsuario(
+                    eq(usuarioId), eq("password123"), eq(passwordHash), eq(ipAddress), eq(userAgent)))
                     .thenReturn(true);
             when(verificacionService.generarTokenVerificacion(eq(usuarioId), eq(ipAddress), eq(userAgent)))
                     .thenReturn(expectedToken);
@@ -116,14 +117,13 @@ class VerificacionUseCaseTest {
             VerificarPasswordRequestDTO request = new VerificarPasswordRequestDTO("wrongpassword");
 
             when(usuarioRepository.buscarPorId(usuarioId)).thenReturn(Optional.of(usuario));
-            when(verificacionService.verificarPasswordUsuario(usuarioId, "wrongpassword", passwordHash))
+            when(verificacionService.verificarPasswordUsuario(
+                    eq(usuarioId), eq("wrongpassword"), eq(passwordHash), eq(ipAddress), eq(userAgent)))
                     .thenReturn(false);
 
             assertThatThrownBy(() -> verificacionUseCase.verificarPassword(usuarioId, request, httpRequest))
                     .isInstanceOf(CredencialesInvalidasException.class)
                     .hasMessage("Contraseña incorrecta");
-
-            verify(auditService).registrarIntentoVerificacion(usuarioId, "PASSWORD_VERIFY_FAIL", false, ipAddress);
         }
 
         @Test

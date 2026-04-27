@@ -29,16 +29,22 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
     private final RedisRateLimitingService rateLimitingService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private static final Map<String, RateLimitConfig> ENDPOINT_LIMITS = Map.of(
-            "/api/v1/auth/login", new RateLimitConfig(5, Duration.ofMinutes(1)),
-            "/api/v1/auth/registro", new RateLimitConfig(3, Duration.ofMinutes(1)),
-            "/api/v1/admin/**", new RateLimitConfig(30, Duration.ofMinutes(1)),
-            "/api/v1/socios/**", new RateLimitConfig(60, Duration.ofMinutes(1)),
-            "/api/v1/cuentas/**", new RateLimitConfig(30, Duration.ofMinutes(1)),
-            "/api/v1/creditos/simular", new RateLimitConfig(10, Duration.ofMinutes(1)),
-            "/api/v1/creditos/**", new RateLimitConfig(30, Duration.ofMinutes(1)),
-            "/api/v1/documentos/**", new RateLimitConfig(20, Duration.ofMinutes(1))
-    );
+    private static final Map<String, RateLimitConfig> ENDPOINT_LIMITS;
+    static {
+        Map<String, RateLimitConfig> limits = new java.util.HashMap<>();
+        limits.put("/api/v1/auth/login", new RateLimitConfig(5, Duration.ofMinutes(1)));
+        limits.put("/api/v1/auth/registro", new RateLimitConfig(3, Duration.ofMinutes(1)));
+        limits.put("/api/v1/auth/recuperar-password", new RateLimitConfig(3, Duration.ofMinutes(1)));
+        limits.put("/api/v1/auth/reset-password", new RateLimitConfig(3, Duration.ofMinutes(1)));
+        limits.put("/api/v1/admin/**", new RateLimitConfig(30, Duration.ofMinutes(1)));
+        limits.put("/api/v1/perfil/**", new RateLimitConfig(10, Duration.ofMinutes(1)));
+        limits.put("/api/v1/socios/**", new RateLimitConfig(60, Duration.ofMinutes(1)));
+        limits.put("/api/v1/cuentas/**", new RateLimitConfig(30, Duration.ofMinutes(1)));
+        limits.put("/api/v1/creditos/simular", new RateLimitConfig(10, Duration.ofMinutes(1)));
+        limits.put("/api/v1/creditos/**", new RateLimitConfig(30, Duration.ofMinutes(1)));
+        limits.put("/api/v1/documentos/**", new RateLimitConfig(20, Duration.ofMinutes(1)));
+        ENDPOINT_LIMITS = Map.copyOf(limits);
+    }
 
     @Override
     protected void doFilterInternal(

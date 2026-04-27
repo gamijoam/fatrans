@@ -67,8 +67,12 @@ class VerificacionServiceTest {
             String hashedPassword = "$argon2hash";
 
             when(passwordEncoder.matches(password, hashedPassword)).thenReturn(true);
+            when(tokenRepository.findByUsuarioIdAndTipoAndUsedFalseAndExpiresAtAfter(
+                    any(UUID.class), any(TipoVerificacion.class), any(Instant.class)))
+                    .thenReturn(Optional.empty());
 
-            boolean result = verificacionService.verificarPasswordUsuario(usuarioId, password, hashedPassword);
+            boolean result = verificacionService.verificarPasswordUsuario(
+                    usuarioId, password, hashedPassword, ipAddress, userAgent);
 
             assertThat(result).isTrue();
             verify(passwordEncoder).matches(password, hashedPassword);
@@ -81,8 +85,14 @@ class VerificacionServiceTest {
             String hashedPassword = "$argon2hash";
 
             when(passwordEncoder.matches(password, hashedPassword)).thenReturn(false);
+            when(tokenRepository.findByUsuarioIdAndTipoAndUsedFalseAndExpiresAtAfter(
+                    any(UUID.class), any(TipoVerificacion.class), any(Instant.class)))
+                    .thenReturn(Optional.empty());
+            when(tokenRepository.save(any(VerificacionTokenEntity.class)))
+                    .thenAnswer(inv -> inv.getArgument(0));
 
-            boolean result = verificacionService.verificarPasswordUsuario(usuarioId, password, hashedPassword);
+            boolean result = verificacionService.verificarPasswordUsuario(
+                    usuarioId, password, hashedPassword, ipAddress, userAgent);
 
             assertThat(result).isFalse();
         }
@@ -101,7 +111,7 @@ class VerificacionServiceTest {
             String token = verificacionService.generarTokenVerificacion(usuarioId, ipAddress, userAgent);
 
             assertThat(token).isNotNull();
-            assertThat(token).matches("[a-f0-9-]{36}");
+            assertThat(token).matches("[A-Za-z0-9_-]{43}");
 
             ArgumentCaptor<VerificacionTokenEntity> captor = ArgumentCaptor.forClass(VerificacionTokenEntity.class);
             verify(tokenRepository).save(captor.capture());

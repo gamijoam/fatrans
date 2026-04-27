@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,13 +31,55 @@ public class VerificacionService {
     private final EmailService emailService;
     private final SecurityAuditService auditService;
 
-    public boolean verificarPasswordUsuario(UUID usuarioId, String password, String hashedPassword) {
-        return passwordEncoder.matches(password, hashedPassword);
+    public boolean verificarPasswordUsuario(UUID usuarioId, String password, String hashedPassword,
+                                          String ipAddress, String userAgent) {
+        Optional<VerificacionTokenEntity> bloqueo = tokenRepository
+                .findByUsuarioIdAndTipoAndUsedFalseAndExpiresAtAfter(
+                        usuarioId, TipoVerificacion.PASSWORD_FALLO, Instant.now());
+
+        if (bloqueo.isPresent() && bloqueo.get().getIntentos() >= MAX_INTENTOS) {
+            auditService.registrarIntentoVerificacion(usuarioId, "PASSWORD_FAIL_MAX_INTENTOS", false, ipAddress);
+            throw new ExcesoIntentosException("Demasiados intentos fallidos. Intente más tarde.");
+        }
+
+        boolean valido = passwordEncoder.matches(password, hashedPassword);
+
+        if (!valido) {
+            Optional<VerificacionTokenEntity> existingBloqueo = tokenRepository
+                    .findByUsuarioIdAndTipoAndUsedFalseAndExpiresAtAfter(
+                            usuarioId, TipoVerificacion.PASSWORD_FALLO, Instant.now());
+
+            if (existingBloqueo.isPresent()) {
+                VerificacionTokenEntity entity = existingBloqueo.get();
+                entity.setIntentos(entity.getIntentos() + 1);
+                tokenRepository.save(entity);
+            } else {
+                String tokenBloqueo = generarTokenSeguro();
+                VerificacionTokenEntity newBloqueo = VerificacionTokenEntity.builder()
+                        .token(tokenBloqueo)
+                        .usuarioId(usuarioId)
+                        .tipo(TipoVerificacion.PASSWORD_FALLO)
+                        .createdAt(Instant.now())
+                        .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
+                        .used(false)
+                        .intentos(1)
+                        .ipAddress(ipAddress)
+                        .userAgent(userAgent)
+                        .build();
+                tokenRepository.save(newBloqueo);
+            }
+            auditService.registrarIntentoVerificacion(usuarioId, "PASSWORD_FAIL", false, ipAddress);
+        } else {
+            invalidarTokensPorTipo(usuarioId, TipoVerificacion.PASSWORD_FALLO);
+            auditService.registrarIntentoVerificacion(usuarioId, "PASSWORD_VERIFIED", true, ipAddress);
+        }
+
+        return valido;
     }
 
     @Transactional
     public String generarTokenVerificacion(UUID usuarioId, String ipAddress, String userAgent) {
-        String token = UUID.randomUUID().toString();
+        String token = generarTokenSeguro();
 
         VerificacionTokenEntity entity = VerificacionTokenEntity.builder()
                 .token(token)
@@ -66,7 +110,7 @@ public class VerificacionService {
 
         existente.ifPresent(tokenRepository::delete);
 
-        String token = UUID.randomUUID().toString();
+        String token = generarTokenSeguro();
 
         VerificacionTokenEntity entity = VerificacionTokenEntity.builder()
                 .token(token)
@@ -177,6 +221,23 @@ public class VerificacionService {
             sb.append(CARACTERES_CODIGO.charAt(random.nextInt(CARACTERES_CODIGO.length())));
         }
         return sb.toString();
+    }
+
+    private String generarTokenSeguro() {
+        SecureRandom secureRandom = new SecureRandom();
+        byte[] tokenBytes = new byte[32];
+        secureRandom.nextBytes(tokenBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
+    }
+
+    @Transactional
+    public void invalidarTokensPorTipo(UUID usuarioId, TipoVerificacion tipo) {
+        List<VerificacionTokenEntity> tokens = tokenRepository
+                .findByUsuarioIdAndTipoAndUsedFalse(usuarioId, tipo);
+        tokens.forEach(token -> {
+            token.setUsed(true);
+            tokenRepository.save(token);
+        });
     }
 
     public static class ExcesoIntentosException extends RuntimeException {
