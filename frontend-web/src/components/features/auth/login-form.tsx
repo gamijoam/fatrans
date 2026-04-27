@@ -104,7 +104,7 @@ export function LoginForm() {
         const rol = userData.rol;
         if (rol === 'SOCIO') {
           router.push('/dashboard');
-        } else if (rol === 'ADMIN' || rol === 'ADMINISTRADOR' || rol === 'GESTOR' || rol === 'SUPER_ADMIN') {
+        } else if (rol === 'ADMIN' || rol === 'SUPER_ADMIN' || rol === 'CAJERO' || rol === 'ANALISTA_KYC') {
           router.push('/admin');
         } else {
           router.push('/dashboard');

@@ -38,11 +38,11 @@ describe('admin-validation', () => {
       expect(result.message).toBe('No autorizado');
     });
 
-    it('debe retornar 403 cuando rol es CAJERO', () => {
+    it('debe retornar 200 cuando rol es CAJERO', () => {
       const token = createMockToken({ rol: 'CAJERO', sub: 'user-123' });
       const result = validateAdminAccess({ accessToken: token });
-      expect(result.valid).toBe(false);
-      expect(result.status).toBe(403);
+      expect(result.valid).toBe(true);
+      expect(result.status).toBe(200);
     });
 
     it('debe retornar 200 cuando rol es ADMIN', () => {
@@ -53,15 +53,8 @@ describe('admin-validation', () => {
       expect(result.message).toBe('OK');
     });
 
-    it('debe retornar 200 cuando rol es ADMINISTRADOR', () => {
-      const token = createMockToken({ rol: 'ADMINISTRADOR', sub: 'admin-123' });
-      const result = validateAdminAccess({ accessToken: token });
-      expect(result.valid).toBe(true);
-      expect(result.status).toBe(200);
-    });
-
-    it('debe retornar 200 cuando rol es GESTOR', () => {
-      const token = createMockToken({ rol: 'GESTOR', sub: 'gestor-123' });
+    it('debe retornar 200 cuando rol es ANALISTA_KYC', () => {
+      const token = createMockToken({ rol: 'ANALISTA_KYC', sub: 'analista-123' });
       const result = validateAdminAccess({ accessToken: token });
       expect(result.valid).toBe(true);
       expect(result.status).toBe(200);

@@ -31,7 +31,7 @@ public class AdminAuditoriaController {
     private final ConsultarAuditoriaUseCase consultarAuditoriaUseCase;
 
     @GetMapping
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or @permisoService.tienePermiso(authentication, T(com.tufondo.auth.domain.model.enums.Permiso).VER_AUDITORIA)")
     @Operation(summary = "Listar logs de auditoría con filtros")
     public ResponseEntity<Map<String, Object>> listarAuditoria(
             @RequestParam(defaultValue = "0") int page,
@@ -55,7 +55,7 @@ public class AdminAuditoriaController {
     }
 
     @GetMapping("/recientes")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN') or @permisoService.tienePermiso(authentication, T(com.tufondo.auth.domain.model.enums.Permiso).VER_AUDITORIA)")
     @Operation(summary = "Listar últimos 100 eventos de auditoría")
     public ResponseEntity<List<AuditLogResponse>> listarRecientes(
             @RequestParam(defaultValue = "50") int limit) {
