@@ -2,6 +2,7 @@ package com.tufondo.auth.domain.repository;
 
 import com.tufondo.auth.domain.model.Usuario;
 import com.tufondo.auth.domain.model.enums.Rol;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,4 +33,8 @@ public interface UsuarioRepository {
     Optional<Usuario> buscarAdminActivo();
 
     Optional<Usuario> buscarSocioActivoPorSocioId(UUID socioId);
+
+    List<Usuario> listarPorRol(Rol rol);
+
+    List<Usuario> listarTodos();
 }

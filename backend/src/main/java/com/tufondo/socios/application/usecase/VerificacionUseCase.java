@@ -38,11 +38,12 @@ public class VerificacionUseCase {
         boolean valido = verificacionService.verificarPasswordUsuario(
                 usuarioId,
                 request.getPassword(),
-                usuario.passwordHash()
+                usuario.passwordHash(),
+                ip,
+                userAgent
         );
 
         if (!valido) {
-            auditService.registrarIntentoVerificacion(usuarioId, "PASSWORD_VERIFY_FAIL", false, ip);
             throw new CredencialesInvalidasException("Contraseña incorrecta");
         }
 

@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { useTipoCambio, convertirABolivares, convertirADolares } from '@/hooks/useTipoCambio';
 
 interface CuentaDetail {
   id: string;
@@ -40,9 +41,10 @@ interface SaldoDetail {
 export default function CuentaDetailPage() {
   const params = useParams();
   const numeroCuenta = params.numero as string;
-  
+
   const user = useAuthStore((state) => state.user);
   const isLoading = useAuthStore((state) => state.isLoading);
+  const { tasaActual } = useTipoCambio(1);
 
   const [cuenta, setCuenta] = useState<CuentaDetail | null>(null);
   const [saldo, setSaldo] = useState<SaldoDetail | null>(null);
@@ -167,7 +169,20 @@ export default function CuentaDetailPage() {
               <p className="text-4xl font-bold text-green-600">
                 {formatMonto(cuenta.saldoDisponible, cuenta.moneda)}
               </p>
+              {tasaActual && (
+                <p className="text-lg text-blue-600 mt-1">
+                  {cuenta.moneda === 'VES'
+                    ? `$ ${convertirADolares(cuenta.saldoDisponible, tasaActual.tasaCompra).toLocaleString('es-VE', { minimumFractionDigits: 2 })} USD`
+                    : `Bs ${convertirABolivares(cuenta.saldoDisponible, tasaActual.tasaVenta).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                  }
+                </p>
+              )}
             </div>
+            {tasaActual && (
+              <p className="text-xs text-gray-400 text-center">
+                Tasa referencial: Bs {tasaActual.tasaVenta.toLocaleString('es-VE', { minimumFractionDigits: 2 })}/$
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-4 pt-4 border-t">
               <div>
                 <p className="text-sm text-gray-500">Saldo Actual</p>

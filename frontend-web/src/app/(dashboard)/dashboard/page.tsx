@@ -5,24 +5,32 @@ import { useAuthStore } from '@/stores/auth-store';
 import { cuentasApi } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { User, Mail, Calendar, Loader2 } from 'lucide-react';
+import { User, Mail, Calendar, Loader2, DollarSign } from 'lucide-react';
 import { ChangePasswordModal } from '@/components/shared/change-password-modal';
+import { useTipoCambio, convertirABolivares, convertirADolares } from '@/hooks/useTipoCambio';
 
 interface DashboardStats {
   totalCuentas: number;
   cuentasActivas: number;
-  saldoTotal: number;
+  saldoTotalVES: number;
+  saldoTotalUSD: number;
+  saldoEnVES: number;
+  saldoEnUSD: number;
   movimientosMes: number;
 }
 
 export default function DashboardPage() {
   const user = useAuthStore((state) => state.user);
   const isLoading = useAuthStore((state) => state.isLoading);
+  const { tasaActual } = useTipoCambio(1);
 
   const [stats, setStats] = useState<DashboardStats>({
     totalCuentas: 0,
     cuentasActivas: 0,
-    saldoTotal: 0,
+    saldoTotalVES: 0,
+    saldoTotalUSD: 0,
+    saldoEnVES: 0,
+    saldoEnUSD: 0,
     movimientosMes: 0,
   });
   const [loadingStats, setLoadingStats] = useState(false);
@@ -40,11 +48,31 @@ export default function DashboardPage() {
       const res = await cuentasApi.getCuentas(user.socioId);
       const data = res.data;
       const activas = data.cuentas.filter((c: { estado: string }) => c.estado === 'ACTIVA').length;
-      const saldoTotal = data.cuentas.reduce((acc: number, c: { saldoActual: number }) => acc + Number(c.saldoActual), 0);
+
+      let saldoEnVES = 0;
+      let saldoEnUSD = 0;
+
+      data.cuentas.forEach((c: { saldoActual: number; moneda: string }) => {
+        if (c.moneda === 'VES') {
+          saldoEnVES += Number(c.saldoActual);
+        } else {
+          saldoEnUSD += Number(c.saldoActual);
+        }
+      });
+
+      const tasaVenta = tasaActual?.tasaVenta || 0;
+      const tasaCompra = tasaActual?.tasaCompra || 0;
+
+      const saldoTotalVES = saldoEnVES + (saldoEnUSD * tasaVenta);
+      const saldoTotalUSD = saldoEnUSD + (saldoEnVES > 0 && tasaCompra > 0 ? saldoEnVES / tasaCompra : 0);
+
       setStats({
         totalCuentas: data.totalCuentas,
         cuentasActivas: activas,
-        saldoTotal,
+        saldoTotalVES,
+        saldoTotalUSD,
+        saldoEnVES,
+        saldoEnUSD,
         movimientosMes: 0,
       });
     } catch (err) {
@@ -101,7 +129,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Cuentas de Ahorro</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-500">Patrimonio Total</CardTitle>
           </CardHeader>
           <CardContent>
             {loadingStats ? (
@@ -109,10 +137,21 @@ export default function DashboardPage() {
             ) : (
               <>
                 <p className="text-2xl font-bold">{stats.totalCuentas}</p>
-                <p className="text-xs text-gray-500 mt-1">Activas: {stats.cuentasActivas}</p>
-                <p className="text-sm font-medium text-green-600 mt-2">
-                  Bs {stats.saldoTotal.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                </p>
+                <p className="text-xs text-gray-500 mt-1">Cuentas: {stats.cuentasActivas} activas</p>
+                <div className="mt-3 space-y-1">
+                  <p className="text-lg font-bold text-green-600">
+                    Bs {stats.saldoTotalVES.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-sm font-medium text-blue-600 flex items-center gap-1">
+                    <DollarSign className="h-3 w-3" />
+                    $ {stats.saldoTotalUSD.toLocaleString('es-VE', { minimumFractionDigits: 2 })} USD
+                  </p>
+                </div>
+                {tasaActual && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Tasa: Bs {tasaActual.tasaVenta.toLocaleString('es-VE', { minimumFractionDigits: 2 })}/$
+                  </p>
+                )}
               </>
             )}
           </CardContent>
@@ -120,11 +159,45 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Créditos</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-500">Saldos en VES</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">0</p>
-            <p className="text-xs text-gray-500 mt-1">Pendientes: 0</p>
+            {loadingStats ? (
+              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            ) : (
+              <>
+                <p className="text-2xl font-bold text-green-600">
+                  Bs {stats.saldoEnVES.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                </p>
+                {stats.saldoEnUSD > 0 && tasaActual && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    ($ {stats.saldoEnUSD.toLocaleString('es-VE', { minimumFractionDigits: 2 })} USD)
+                  </p>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">Saldos en USD</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingStats ? (
+              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            ) : (
+              <>
+                <p className="text-2xl font-bold text-blue-600">
+                  $ {stats.saldoEnUSD.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                </p>
+                {stats.saldoEnVES > 0 && tasaActual && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    (Bs {convertirABolivares(stats.saldoEnUSD, tasaActual.tasaVenta).toLocaleString('es-VE', { minimumFractionDigits: 2 })})
+                  </p>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
 

@@ -1,16 +1,17 @@
 import { describe, it, expect } from 'vitest';
+import jwt from 'jsonwebtoken';
 import {
   validateAdminAccess,
   validarNumeroSolicitud,
   sanitizarTexto,
   esNumeroValido,
+  decodeToken,
 } from '@/lib/auth/admin-validation';
 
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'fallback-secret-do-not-use-in-production';
+
 function createMockToken(payload: object): string {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64');
-  const payloadEncoded = Buffer.from(JSON.stringify(payload)).toString('base64');
-  const signature = 'mock-signature';
-  return `${header}.${payloadEncoded}.${signature}`;
+  return jwt.sign(payload, JWT_SECRET, { algorithm: 'HS256' });
 }
 
 describe('admin-validation', () => {
@@ -78,6 +79,40 @@ describe('admin-validation', () => {
       const result = validateAdminAccess({ accessToken: token });
       expect(result.valid).toBe(false);
       expect(result.status).toBe(401);
+    });
+
+    it('debe retornar 401 cuando token está firmado con clave incorrecta', () => {
+      const wrongToken = jwt.sign({ rol: 'ADMIN', sub: 'admin-123' }, 'wrong-secret');
+      const result = validateAdminAccess({ accessToken: wrongToken });
+      expect(result.valid).toBe(false);
+      expect(result.status).toBe(401);
+    });
+
+    it('debe retornar 401 cuando token está expirado', () => {
+      const expiredToken = jwt.sign(
+        { rol: 'ADMIN', sub: 'admin-123' },
+        JWT_SECRET,
+        { expiresIn: '-1s' }
+      );
+      const result = validateAdminAccess({ accessToken: expiredToken });
+      expect(result.valid).toBe(false);
+      expect(result.status).toBe(401);
+      expect(result.message).toBe('Token expirado');
+    });
+  });
+
+  describe('decodeToken', () => {
+    it('debe decodificar token válido', () => {
+      const token = createMockToken({ rol: 'ADMIN', sub: 'admin-123' });
+      const decoded = decodeToken(token);
+      expect(decoded).not.toBeNull();
+      expect(decoded?.rol).toBe('ADMIN');
+      expect(decoded?.sub).toBe('admin-123');
+    });
+
+    it('debe retornar null para token inválido', () => {
+      const decoded = decodeToken('invalid-token');
+      expect(decoded).toBeNull();
     });
   });
 

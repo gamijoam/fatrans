@@ -1,7 +1,18 @@
+import jwt from 'jsonwebtoken';
+
 const ADMIN_ROLES = ['ADMIN', 'ADMINISTRADOR', 'GESTOR', 'SUPER_ADMIN'];
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'fallback-secret-do-not-use-in-production';
 
 export interface AdminAuthContext {
   accessToken: string | undefined;
+}
+
+export interface TokenPayload {
+  sub: string;
+  rol: string;
+  tipo: string;
+  iat?: number;
+  exp?: number;
 }
 
 export function validateAdminAccess(context: AdminAuthContext): { valid: boolean; status: number; message: string } {
@@ -10,15 +21,29 @@ export function validateAdminAccess(context: AdminAuthContext): { valid: boolean
   }
 
   try {
-    const payload = context.accessToken.split('.')[1];
-    const decoded = Buffer.from(payload, 'base64').toString('utf-8');
-    const data = JSON.parse(decoded);
-    if (!ADMIN_ROLES.includes(data.rol)) {
+    const decoded = jwt.verify(context.accessToken, JWT_SECRET) as TokenPayload;
+
+    if (!decoded.rol || !ADMIN_ROLES.includes(decoded.rol)) {
       return { valid: false, status: 403, message: 'No autorizado' };
     }
+
     return { valid: true, status: 200, message: 'OK' };
-  } catch {
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      return { valid: false, status: 401, message: 'Token expirado' };
+    }
+    if (error instanceof jwt.JsonWebTokenError) {
+      return { valid: false, status: 401, message: 'Token inválido' };
+    }
     return { valid: false, status: 401, message: 'Token inválido' };
+  }
+}
+
+export function decodeToken(token: string): TokenPayload | null {
+  try {
+    return jwt.decode(token) as TokenPayload;
+  } catch {
+    return null;
   }
 }
 

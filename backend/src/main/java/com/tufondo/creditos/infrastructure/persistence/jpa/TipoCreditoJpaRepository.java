@@ -16,13 +16,13 @@ import java.util.Optional;
 @Repository
 public interface TipoCreditoJpaRepository extends JpaRepository<TipoCreditoEntity, Long> {
     
-    Optional<TipoCreditoEntity> findByCodigo(String codigo);
-    
+    Optional<TipoCreditoEntity> findByCodigoIgnoreCase(String codigo);
+
     List<TipoCreditoEntity> findByActivoTrue();
-    
+
     Optional<TipoCreditoEntity> findByIdAndActivoTrue(Long id);
-    
+
     Page<TipoCreditoEntity> findByActivoTrue(Pageable pageable);
-    
-    boolean existsByCodigo(String codigo);
+
+    boolean existsByCodigoIgnoreCase(String codigo);
 }
