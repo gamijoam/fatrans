@@ -81,6 +81,35 @@ public class AdminKYCController {
     }
 
     /**
+     * GET /kyc/admin/socio/{socioId} - Obtener KYC de un socio específico (Admin)
+     */
+    @GetMapping("/admin/socio/{socioId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Obtener verificación KYC actual de un socio")
+    public ResponseEntity<?> obtenerKycPorSocio(@PathVariable UUID socioId) {
+        return verificacionRepository.findBySocioId(socioId)
+            .map(verificacion -> {
+                HistorialKYCResponse.HistorialItemResponse item = toHistorialItem(verificacion);
+                return ResponseEntity.ok(Map.of(
+                    "verificacionId", verificacion.getId(),
+                    "socioId", socioId,
+                    "nivel", verificacion.getNivel(),
+                    "estado", verificacion.getEstado(),
+                    "fechaInicio", verificacion.getFechaInicio(),
+                    "fechaCompletado", verificacion.getFechaCompletado() != null ? verificacion.getFechaCompletado() : "",
+                    "fechaExpiracion", verificacion.getFechaExpiracion() != null ? verificacion.getFechaExpiracion() : "",
+                    "revisadoPor", verificacion.getRevisadoPor() != null ? verificacion.getRevisadoPor() : "",
+                    "motivoRechazo", verificacion.getMotivoRechazo() != null ? verificacion.getMotivoRechazo() : ""
+                ));
+            })
+            .orElse(ResponseEntity.ok(Map.of(
+                "socioId", socioId,
+                "estado", "SIN_KYC",
+                "mensaje", "El socio no tiene verificaciones KYC"
+            )));
+    }
+
+    /**
      * GET /kyc/historial - Historial de Verificaciones
      */
     @GetMapping("/historial")
