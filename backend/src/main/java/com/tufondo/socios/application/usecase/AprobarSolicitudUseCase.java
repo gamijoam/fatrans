@@ -40,38 +40,73 @@ public class AprobarSolicitudUseCase {
         // 1. Obtener y validar solicitud
         SolicitudRegistro solicitud = solicitudRepository.buscarPorId(solicitudId)
                 .orElseThrow(() -> new SolicitudNoEncontradaException(solicitudId));
-        
+
         if (solicitud.getEstado() != EstadoSolicitud.PENDIENTE) {
             throw new SolicitudNoEditableException("La solicitud no está pendiente");
         }
-        
+
         // 2. Crear el Socio desde los datos de la solicitud
         String nombreCompleto = solicitud.getNombreCompleto();
-        String[] partes = nombreCompleto.split(" ");
-        
-        String primerNombre = partes.length > 0 ? partes[0] : "";
-        String segundoNombre = partes.length > 1 ? partes[1] : "";
-        String primerApellido = partes.length > 2 ? partes[2] : "";
-        String segundoApellido = partes.length > 3 ? partes[3] : "";
-        
+        String[] partes = nombreCompleto.trim().split("\\s+");
+
+        // Venezuelan name format: [primerNombre] [segundoNombre] [primerApellido] [segundoApellido]
+        // Last two parts are always surnames (Venezuelan compound surnames)
+        String primerApellido;
+        String segundoApellido;
+        String primerNombre;
+        String segundoNombre;
+
+        if (partes.length >= 2) {
+            // Last two parts = surnames
+            segundoApellido = partes[partes.length - 1];
+            primerApellido = partes[partes.length - 2];
+            // Everything before surnames = first name(s)
+            if (partes.length == 2) {
+                primerNombre = partes[0];
+                segundoNombre = null;
+            } else if (partes.length == 3) {
+                primerNombre = partes[0];
+                segundoNombre = null;
+            } else {
+                // partes.length >= 4: first part is primerNombre, second is segundoNombre
+                primerNombre = partes[0];
+                segundoNombre = partes[1];
+            }
+        } else {
+            primerNombre = partes.length > 0 ? partes[0] : "";
+            segundoNombre = null;
+            primerApellido = "";
+            segundoApellido = null;
+        }
+
         Socio nuevoSocio = Socio.builder()
                 .numeroSocio(generarNumeroSocio())
-                .tipoDocumento(solicitud.getCedula().startsWith("V") ? TipoDocumento.CEDULA : TipoDocumento.PASAPORTE)
+                .tipoDocumento(solicitud.getTipoDocumento() != null ? solicitud.getTipoDocumento() :
+                        (solicitud.getCedula().startsWith("V") ? TipoDocumento.CEDULA : TipoDocumento.PASAPORTE))
                 .numeroDocumento(solicitud.getCedula())
                 .primerNombre(primerNombre)
-                .segundoNombre(segundoNombre.isEmpty() ? null : segundoNombre)
+                .segundoNombre(segundoNombre)
                 .primerApellido(primerApellido)
-                .segundoApellido(segundoApellido.isEmpty() ? null : segundoApellido)
+                .segundoApellido(segundoApellido)
                 .correoElectronico(solicitud.getCorreoElectronico())
                 .telefonoPrincipal(solicitud.getTelefono())
                 .empresa(solicitud.getEmpresa())
+                .departamento(solicitud.getDepartamento())
+                .cargo(solicitud.getCargo())
                 .estado(EstadoSocio.ACTIVO)
-                .estadoCivil(com.tufondo.socios.domain.model.enums.EstadoCivil.SOLTERO)
-                .genero(com.tufondo.socios.domain.model.enums.Genero.OTRO)
-                .fechaNacimiento(LocalDate.of(1990, 1, 1))
+                .estadoCivil(solicitud.getEstadoCivil())
+                .genero(solicitud.getGenero())
+                .fechaNacimiento(solicitud.getFechaNacimiento() != null ? solicitud.getFechaNacimiento() : LocalDate.of(1990, 1, 1))
                 .fechaIngreso(LocalDate.now())
                 .fechaRegistro(LocalDateTime.now())
                 .fechaActivacion(LocalDateTime.now())
+                .direccionResidencia(new com.tufondo.socios.domain.model.valueobjects.Direccion(
+                        solicitud.getDireccionCalle(), null,
+                        solicitud.getDireccionCiudad(), solicitud.getDireccionEstado(),
+                        null, "Venezuela"))
+                .contactoEmergencia(new com.tufondo.socios.domain.model.valueobjects.ContactoEmergencia(
+                        solicitud.getEmergenciaNombre(), solicitud.getEmergenciaTelefono(),
+                        solicitud.getEmergenciaParentesco()))
                 .build();
         
         Socio socioGuardado = socioRepository.guardar(nuevoSocio);
