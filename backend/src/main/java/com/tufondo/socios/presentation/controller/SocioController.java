@@ -114,8 +114,11 @@ public class SocioController {
     @Operation(summary = "Actualizar un socio")
     public ResponseEntity<SocioResponseDTO> actualizarSocio(
             @PathVariable UUID id,
-            @Valid @RequestBody ActualizarSocioDTO request) {
-        SocioResponseDTO response = actualizarSocioUseCase.ejecutar(id, request);
+            @Valid @RequestBody ActualizarSocioDTO request,
+            HttpServletRequest httpRequest) {
+        String ip = getClientIp(httpRequest);
+        String userAgent = httpRequest.getHeader("User-Agent");
+        SocioResponseDTO response = actualizarSocioUseCase.ejecutar(id, request, ip, userAgent);
         return ResponseEntity.ok(response);
     }
 

@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Loader2, ArrowLeft, User, Mail, Phone, MapPin, Building,
-  Calendar, CreditCard, Users, Shield, AlertCircle, CheckCircle, XCircle
+  Calendar, CreditCard, Users, Shield, AlertCircle, CheckCircle, XCircle,
+  FileCheck, Clock, AlertTriangle, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -68,6 +69,19 @@ interface Credito {
   createdAt: string;
 }
 
+interface KycData {
+  verificacionId?: string;
+  socioId: string;
+  nivel?: string;
+  estado: string;
+  fechaInicio?: string;
+  fechaCompletado?: string;
+  fechaExpiracion?: string;
+  revisadoPor?: string;
+  motivoRechazo?: string;
+  mensaje?: string;
+}
+
 const ESTADO_COLORS: Record<string, string> = {
   ACTIVO: 'bg-green-100 text-green-800 border-green-300',
   INACTIVO: 'bg-red-100 text-red-800 border-red-300',
@@ -109,6 +123,7 @@ export default function SocioDetallePage() {
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [beneficiarios, setBeneficiarios] = useState<Beneficiario[]>([]);
   const [creditos, setCreditos] = useState<Credito[]>([]);
+  const [kyc, setKyc] = useState<KycData | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [showDesactivarModal, setShowDesactivarModal] = useState(false);
@@ -117,11 +132,12 @@ export default function SocioDetallePage() {
   const cargarDatos = useCallback(async () => {
     setLoading(true);
     try {
-      const [socioRes, cuentasRes, beneficiariosRes, creditosRes] = await Promise.all([
+      const [socioRes, cuentasRes, beneficiariosRes, creditosRes, kycRes] = await Promise.all([
         fetch(`/api/admin/socios/${socioId}`, { credentials: 'include' }),
         fetch(`/api/admin/socios/${socioId}/cuentas`, { credentials: 'include' }),
         fetch(`/api/admin/socios/${socioId}/beneficiarios`, { credentials: 'include' }),
         fetch(`/api/admin/socios/${socioId}/creditos`, { credentials: 'include' }),
+        fetch(`/api/admin/socios/${socioId}/kyc`, { credentials: 'include' }),
       ]);
 
       if (!socioRes.ok) throw new Error('Error al cargar socio');
@@ -130,6 +146,10 @@ export default function SocioDetallePage() {
       if (cuentasRes.ok) setCuentas(await cuentasRes.json());
       if (beneficiariosRes.ok) setBeneficiarios(await beneficiariosRes.json());
       if (creditosRes.ok) setCreditos(await creditosRes.json());
+      if (kycRes.ok) {
+        const kycData = await kycRes.json();
+        setKyc(kycData);
+      }
 
     } catch (err) {
       console.error('Error cargando datos:', err);
@@ -450,13 +470,83 @@ export default function SocioDetallePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-8">
-                    <AlertCircle className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                    <p className="text-gray-500">Historial KYC en desarrollo</p>
-                    <p className="text-sm text-gray-400 mt-2">
-                      Los documentos y verificación de identidad se mostrarán aquí
-                    </p>
-                  </div>
+                  {!kyc ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-green-600" />
+                    </div>
+                  ) : kyc.estado === 'SIN_KYC' ? (
+                    <div className="text-center py-8">
+                      <AlertCircle className="h-12 w-12 mx-auto text-yellow-400 mb-4" />
+                      <p className="text-gray-500">El socio no tiene verificaciones KYC</p>
+                      <p className="text-sm text-gray-400 mt-2">
+                        El socio aún no ha iniciado el proceso de verificación de identidad
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <p className="text-xs text-gray-500 mb-1">Nivel</p>
+                          <p className="font-semibold text-sm">{kyc.nivel || '-'}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <p className="text-xs text-gray-500 mb-1">Estado</p>
+                          <Badge className={kyc.estado === 'APROBADO' ? 'bg-green-100 text-green-800' : kyc.estado === 'RECHAZADO' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}>
+                            {kyc.estado}
+                          </Badge>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <p className="text-xs text-gray-500 mb-1">Fecha Inicio</p>
+                          <p className="font-semibold text-sm">{formatDate(kyc.fechaInicio)}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <p className="text-xs text-gray-500 mb-1">Expira</p>
+                          <p className="font-semibold text-sm">{formatDate(kyc.fechaExpiracion)}</p>
+                        </div>
+                      </div>
+
+                      {kyc.estado === 'APROBADO' && (
+                        <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          <div>
+                            <p className="text-sm font-medium text-green-800">Verificación Aprobada</p>
+                            <p className="text-xs text-green-600">Revisado por: {kyc.revisadoPor || 'Sistema'}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {kyc.estado === 'RECHAZADO' && (
+                        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <XCircle className="h-5 w-5 text-red-600" />
+                          <div>
+                            <p className="text-sm font-medium text-red-800">Verificación Rechazada</p>
+                            <p className="text-xs text-red-600">Motivo: {kyc.motivoRechazo || 'No especificado'}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {(kyc.estado === 'PENDIENTE' || kyc.estado === 'EN_REVISION') && (
+                        <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <Clock className="h-5 w-5 text-yellow-600" />
+                          <div>
+                            <p className="text-sm font-medium text-yellow-800">En Proceso</p>
+                            <p className="text-xs text-yellow-600">La verificación está siendo revisada</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {kyc.verificacionId && (
+                        <div className="pt-4 border-t">
+                          <Link href={`/admin/kyc/${kyc.verificacionId}`}>
+                            <Button variant="outline" size="sm">
+                              <FileCheck className="h-4 w-4 mr-2" />
+                              Ver Detalle Completo KYC
+                            </Button>
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

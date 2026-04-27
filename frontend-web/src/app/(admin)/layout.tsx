@@ -28,7 +28,7 @@ export default function AdminLayout({
   const pathname = usePathname();
 
   return (
-    <ProtectedRoute allowedRoles={['ADMIN', 'ADMINISTRADOR', 'GESTOR', 'SUPER_ADMIN']}>
+    <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN', 'CAJERO', 'ANALISTA_KYC']}>
       <div className="flex min-h-screen">
         <aside className={`${mobileMenuOpen ? 'block' : 'hidden'} fixed inset-0 z-50 lg:relative lg:inset-auto lg:w-64 lg:block w-64 bg-gray-900 text-white p-4 flex flex-col`}>
           <div className="mb-6 flex items-center justify-between">

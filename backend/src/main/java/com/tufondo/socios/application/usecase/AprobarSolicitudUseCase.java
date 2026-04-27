@@ -1,6 +1,10 @@
 // 📁 com/tufondo/socios/application/usecase/AprobarSolicitudUseCase.java
 package com.tufondo.socios.application.usecase;
 
+import com.tufondo.kyc.domain.model.VerificacionKYC;
+import com.tufondo.kyc.domain.model.enums.EstadoVerificacion;
+import com.tufondo.kyc.domain.model.enums.NivelVerificacion;
+import com.tufondo.kyc.domain.repository.VerificacionKYCRepository;
 import com.tufondo.socios.application.dto.AprobarSolicitudRequestDTO;
 import com.tufondo.socios.application.dto.SolicitudRegistroResponseDTO;
 import com.tufondo.socios.domain.exception.SolicitudNoEditableException;
@@ -34,53 +38,101 @@ public class AprobarSolicitudUseCase {
     private final UsuarioCreatorPort usuarioCreatorPort;
     private final EmailNotificationService emailNotificationService;
     private final SolicitudRegistroDTOMapper dtoMapper;
+    private final VerificacionKYCRepository verificacionKYCRepository;
     
     @Transactional
     public SolicitudRegistroResponseDTO ejecutar(UUID solicitudId, AprobarSolicitudRequestDTO request, String adminId) {
         // 1. Obtener y validar solicitud
         SolicitudRegistro solicitud = solicitudRepository.buscarPorId(solicitudId)
                 .orElseThrow(() -> new SolicitudNoEncontradaException(solicitudId));
-        
+
         if (solicitud.getEstado() != EstadoSolicitud.PENDIENTE) {
             throw new SolicitudNoEditableException("La solicitud no está pendiente");
         }
-        
+
         // 2. Crear el Socio desde los datos de la solicitud
         String nombreCompleto = solicitud.getNombreCompleto();
-        String[] partes = nombreCompleto.split(" ");
-        
-        String primerNombre = partes.length > 0 ? partes[0] : "";
-        String segundoNombre = partes.length > 1 ? partes[1] : "";
-        String primerApellido = partes.length > 2 ? partes[2] : "";
-        String segundoApellido = partes.length > 3 ? partes[3] : "";
-        
+        String[] partes = nombreCompleto.trim().split("\\s+");
+
+        // Venezuelan name format: [primerNombre] [segundoNombre] [primerApellido] [segundoApellido]
+        // Last two parts are always surnames (Venezuelan compound surnames)
+        String primerApellido;
+        String segundoApellido;
+        String primerNombre;
+        String segundoNombre;
+
+        if (partes.length >= 2) {
+            // Last two parts = surnames
+            segundoApellido = partes[partes.length - 1];
+            primerApellido = partes[partes.length - 2];
+            // Everything before surnames = first name(s)
+            if (partes.length == 2) {
+                primerNombre = partes[0];
+                segundoNombre = null;
+            } else if (partes.length == 3) {
+                primerNombre = partes[0];
+                segundoNombre = null;
+            } else {
+                // partes.length >= 4: first part is primerNombre, second is segundoNombre
+                primerNombre = partes[0];
+                segundoNombre = partes[1];
+            }
+        } else {
+            primerNombre = partes.length > 0 ? partes[0] : "";
+            segundoNombre = null;
+            primerApellido = "";
+            segundoApellido = null;
+        }
+
         Socio nuevoSocio = Socio.builder()
                 .numeroSocio(generarNumeroSocio())
-                .tipoDocumento(solicitud.getCedula().startsWith("V") ? TipoDocumento.CEDULA : TipoDocumento.PASAPORTE)
+                .tipoDocumento(solicitud.getTipoDocumento() != null ? solicitud.getTipoDocumento() :
+                        (solicitud.getCedula().startsWith("V") ? TipoDocumento.CEDULA : TipoDocumento.PASAPORTE))
                 .numeroDocumento(solicitud.getCedula())
                 .primerNombre(primerNombre)
-                .segundoNombre(segundoNombre.isEmpty() ? null : segundoNombre)
+                .segundoNombre(segundoNombre)
                 .primerApellido(primerApellido)
-                .segundoApellido(segundoApellido.isEmpty() ? null : segundoApellido)
+                .segundoApellido(segundoApellido)
                 .correoElectronico(solicitud.getCorreoElectronico())
                 .telefonoPrincipal(solicitud.getTelefono())
                 .empresa(solicitud.getEmpresa())
+                .departamento(solicitud.getDepartamento())
+                .cargo(solicitud.getCargo())
                 .estado(EstadoSocio.ACTIVO)
-                .estadoCivil(com.tufondo.socios.domain.model.enums.EstadoCivil.SOLTERO)
-                .genero(com.tufondo.socios.domain.model.enums.Genero.OTRO)
-                .fechaNacimiento(LocalDate.of(1990, 1, 1))
+                .estadoCivil(solicitud.getEstadoCivil())
+                .genero(solicitud.getGenero())
+                .fechaNacimiento(solicitud.getFechaNacimiento() != null ? solicitud.getFechaNacimiento() : LocalDate.of(1990, 1, 1))
                 .fechaIngreso(LocalDate.now())
                 .fechaRegistro(LocalDateTime.now())
                 .fechaActivacion(LocalDateTime.now())
+                .direccionResidencia(new com.tufondo.socios.domain.model.valueobjects.Direccion(
+                        solicitud.getDireccionCalle(), null,
+                        solicitud.getDireccionCiudad(), solicitud.getDireccionEstado(),
+                        null, "Venezuela"))
+                .contactoEmergencia(new com.tufondo.socios.domain.model.valueobjects.ContactoEmergencia(
+                        solicitud.getEmergenciaNombre(), solicitud.getEmergenciaTelefono(),
+                        solicitud.getEmergenciaParentesco()))
                 .build();
         
         Socio socioGuardado = socioRepository.guardar(nuevoSocio);
         
-        // 3. Generar nombre de usuario y password temporal
+        // 3. Auto-trigger KYC para el nuevo socio
+        VerificacionKYC verificacionKYC = VerificacionKYC.builder()
+                .socioId(socioGuardado.getId())
+                .nivel(NivelVerificacion.BASICO)
+                .estado(EstadoVerificacion.PENDIENTE)
+                .fechaInicio(LocalDateTime.now())
+                .fechaExpiracion(LocalDateTime.now().plusYears(2))
+                .build();
+        verificacionKYCRepository.save(verificacionKYC);
+        log.info("KYC auto-triggered for socio {}. VerificacionKYC {} created with estado PENDIENTE",
+                socioGuardado.getId(), verificacionKYC.getId());
+        
+        // 4. Generar nombre de usuario y password temporal
         String nombreUsuario = generarNombreUsuario(nombreCompleto);
         String passwordTemporal = generarPasswordTemporal();
         
-        // 4. Crear el usuario vinculado usando el puerto
+        // 5. Crear el usuario vinculado usando el puerto
         usuarioCreatorPort.crearUsuarioVinculado(
                 socioGuardado.getId(),
                 nombreUsuario,
@@ -88,11 +140,11 @@ public class AprobarSolicitudUseCase {
                 passwordTemporal
         );
         
-        // 5. Actualizar la solicitud
+        // 6. Actualizar la solicitud
         solicitud.aprobar(adminId, request != null ? request.getComentario() : null);
         SolicitudRegistro solicitudActualizada = solicitudRepository.guardar(solicitud);
         
-        // 6. Enviar email con credenciales
+        // 7. Enviar email con credenciales
         emailNotificationService.enviarCredenciales(
                 solicitud.getCorreoElectronico(),
                 nombreUsuario,
