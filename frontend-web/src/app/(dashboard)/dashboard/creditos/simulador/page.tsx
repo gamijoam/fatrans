@@ -138,7 +138,8 @@ export default function SimuladorPage() {
     }
   };
 
-  const formatMonto = (monto: number) => {
+  const formatMonto = (monto: number | null | undefined) => {
+    if (monto == null) return '-';
     return `$${monto.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
   };
 

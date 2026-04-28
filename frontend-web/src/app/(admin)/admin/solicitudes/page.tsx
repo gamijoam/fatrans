@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
+import { adminApi, apiClient } from '@/lib/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,16 +34,6 @@ interface Solicitud {
   motivoRechazo?: string;
 }
 
-interface SolicitudesResponse {
-  success: boolean;
-  data: {
-    solicitudes: Solicitud[];
-    totalElementos: number;
-    totalPaginas: number;
-    paginaActual: number;
-  };
-}
-
 export default function SolicitudesPage() {
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,41 +45,34 @@ export default function SolicitudesPage() {
   const [totalElementos, setTotalElementos] = useState(0);
   const user = useAuthStore((state) => state.user);
 
-  useEffect(() => {
-    fetchSolicitudes(currentPage);
-  }, [currentPage]);
-
-  const fetchSolicitudes = async (page: number) => {
+  const fetchSolicitudes = useCallback(async (page: number) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/solicitudes?estado=PENDIENTE&pagina=${page}`);
-      if (!response.ok) throw new Error('Error al cargar');
-
-      const data: SolicitudesResponse = await response.json();
-      setSolicitudes(data.data.solicitudes);
-      setTotalPages(data.data.totalPaginas);
-      setTotalElementos(data.data.totalElementos);
-    } catch {
-      toast.error('Error al cargar solicitudes');
+      const { data } = await adminApi.getSolicitudes();
+      // Adaptar a la respuesta del backend (Page o List)
+      const content = data.content || data.data?.solicitudes || data || [];
+      setSolicitudes(content);
+      setTotalPages(data.totalPages || 1);
+      setTotalElementos(data.totalElements || content.length);
+    } catch (err) {
+      console.error('Error fetching solicitudes:', err);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchSolicitudes(currentPage);
+  }, [currentPage, fetchSolicitudes]);
 
   const handleAprobar = async (id: string) => {
     setIsProcessing(true);
     try {
-      const response = await fetch(`/api/admin/solicitudes/${id}/aprobar`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (!response.ok) throw new Error('Error al aprobar');
-
+      await apiClient.post(`/v1/socios/solicitudes/${id}/aprobar`);
       toast.success('Solicitud aprobada');
       await fetchSolicitudes(currentPage);
     } catch {
-      toast.error('Error al aprobar solicitud');
+      // Error ya manejado por interceptor
     } finally {
       setIsProcessing(false);
     }
@@ -107,20 +91,12 @@ export default function SolicitudesPage() {
 
     setIsProcessing(true);
     try {
-      const response = await fetch(`/api/admin/solicitudes/${selectedId}/rechazar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ motivo: rejectMotivo }),
-      });
-
-      if (!response.ok) throw new Error('Error al rechazar');
-
+      await apiClient.post(`/v1/socios/solicitudes/${selectedId}/rechazar`, { motivo: rejectMotivo });
       toast.success('Solicitud rechazada');
       setSelectedId(null);
       await fetchSolicitudes(currentPage);
     } catch {
-      toast.error('Error al rechazar solicitud');
+      // Error ya manejado por interceptor
     } finally {
       setIsProcessing(false);
     }
@@ -140,13 +116,15 @@ export default function SolicitudesPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-VE', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    try {
+      return new Date(dateString).toLocaleDateString('es-VE', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return dateString;
+    }
   };
 
   return (

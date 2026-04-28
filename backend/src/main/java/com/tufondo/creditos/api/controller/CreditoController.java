@@ -71,7 +71,7 @@ public class CreditoController {
      * Roles: SOCIO, ADMIN
      */
     @PostMapping("/creditos/solicitudes")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Crear solicitud de crédito")
     public ResponseEntity<SolicitudCreditoResponse> crearSolicitud(
             @Valid @RequestBody CrearSolicitudCreditoRequest request,
@@ -87,7 +87,7 @@ public class CreditoController {
      * Roles: SOCIO (propias), ADMIN (todas)
      */
     @GetMapping("/creditos/solicitudes/{numeroSolicitud}")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Consultar solicitud de crédito")
     public ResponseEntity<SolicitudCreditoResponse> obtenerSolicitud(
             @PathVariable String numeroSolicitud,
@@ -104,7 +104,7 @@ public class CreditoController {
      * Roles: SOCIO (propias), ADMIN (todas)
      */
     @GetMapping("/creditos/solicitudes/socio/{socioId}")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Listar solicitudes de crédito por socio")
     public ResponseEntity<Map<String, Object>> listarSolicitudesPorSocio(
             @PathVariable UUID socioId,
@@ -126,7 +126,7 @@ public class CreditoController {
      * Paginación: page, size, sort
      */
     @GetMapping("/admin/creditos/solicitudes")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Listar todas las solicitudes de crédito (Admin)")
     public ResponseEntity<Page<SolicitudCreditoAdminResponse>> listarTodasSolicitudes(
             @RequestParam(required = false) EstadoSolicitud estado,
@@ -164,7 +164,7 @@ public class CreditoController {
      * Usa TipoCreditoPublicResponse para no exponer campos sensibles
      */
     @GetMapping("/creditos/tipos-credito")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Listar tipos de crédito disponibles")
     public ResponseEntity<Map<String, Object>> listarTiposCredito(
             @RequestParam(defaultValue = "0") int page,
@@ -179,7 +179,7 @@ public class CreditoController {
      * Roles: SOCIO, ADMIN
      */
     @GetMapping("/creditos/tipos-credito/{id}")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Consultar tipo de crédito específico")
     public ResponseEntity<TipoCreditoPublicResponse> obtenerTipoCredito(
             @PathVariable Long id,
@@ -211,7 +211,7 @@ public class CreditoController {
      * Roles: ADMIN
      */
     @PostMapping("/creditos/solicitudes/{numeroSolicitud}/aprobar")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Aprobar solicitud de crédito")
     public ResponseEntity<Map<String, Object>> aprobarSolicitud(
             @PathVariable String numeroSolicitud,
@@ -226,7 +226,7 @@ public class CreditoController {
      * Roles: ADMIN
      */
     @PostMapping("/creditos/solicitudes/{numeroSolicitud}/rechazar")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Rechazar solicitud de crédito")
     public ResponseEntity<Map<String, Object>> rechazarSolicitud(
             @PathVariable String numeroSolicitud,
@@ -244,7 +244,7 @@ public class CreditoController {
      * Roles: SOCIO (propias), ADMIN (todas)
      */
     @GetMapping("/creditos/solicitudes/{numeroSolicitud}/plan")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Consultar plan de amortización")
     public ResponseEntity<PlanAmortizacionResponse> obtenerPlanAmortizacion(
             @PathVariable String numeroSolicitud,
@@ -282,7 +282,7 @@ public class CreditoController {
      * Roles: SOCIO (propias), ADMIN (todas)
      */
     @GetMapping("/creditos/{numeroSolicitud}/cuotas")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Listar cuotas del plan de amortización")
     public ResponseEntity<Map<String, Object>> listarCuotas(
             @PathVariable String numeroSolicitud,
@@ -327,7 +327,7 @@ public class CreditoController {
      * Roles: SOCIO (propias), ADMIN (todas)
      */
     @GetMapping("/creditos/{numeroSolicitud}")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Consultar estado de crédito")
     public ResponseEntity<CreditoResponse> obtenerEstadoCredito(
             @PathVariable String numeroSolicitud,
@@ -346,7 +346,7 @@ public class CreditoController {
      * Roles: SOCIO, ADMIN
      */
     @PostMapping("/simulador")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Simular crédito (rate limited)")
     public ResponseEntity<SimulacionResponse> simularCredito(
             @Valid @RequestBody SimulacionRequest request,

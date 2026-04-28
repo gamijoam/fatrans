@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
+import { adminApi } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Shield, Users, FileText, CreditCard, Clock, CheckCircle, XCircle, Loader2, Wallet, TrendingUp, AlertTriangle, Activity, LogIn, LogOut, UserPlus, UserX, Edit, Check, X, Key, RefreshCw, AlertCircle } from 'lucide-react';
@@ -82,15 +83,11 @@ export default function AdminDashboardPage() {
   const cargarStats = useCallback(async () => {
     setLoadingStats(true);
     try {
-      const res = await fetch('/api/admin/dashboard/estadisticas', {
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Error al cargar estadísticas');
-      const data = await res.json();
+      const { data } = await adminApi.getStats();
       setStats(data);
     } catch (err) {
       console.error('Error cargando stats:', err);
-      toast.error('Error al cargar estadísticas del dashboard');
+      // El error ya lo muestra el toast del interceptor
     } finally {
       setLoadingStats(false);
     }
@@ -99,11 +96,7 @@ export default function AdminDashboardPage() {
   const cargarActividad = useCallback(async () => {
     setLoadingActividad(true);
     try {
-      const res = await fetch('/api/admin/dashboard/actividad?limit=15', {
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Error al cargar actividad');
-      const data = await res.json();
+      const { data } = await adminApi.getActividad(15);
       setActividadReciente(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error cargando actividad:', err);

@@ -4,6 +4,8 @@ import com.tufondo.core.infrastructure.security.ratelimit.GlobalRateLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -29,6 +31,18 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final AdminDashboardRateLimitFilter adminDashboardRateLimitFilter;
     private final GlobalRateLimitFilter globalRateLimitFilter;
+
+    @Bean
+    public RoleHierarchy roleHierarchy() {
+        RoleHierarchyImpl roleHierarchy = new RoleHierarchyImpl();
+        String hierarchy = "ROLE_SUPER_ADMIN > ROLE_ADMIN\n" +
+                          "ROLE_ADMIN > ROLE_ANALISTA_KYC\n" +
+                          "ROLE_ADMIN > ROLE_ANALISTA_CREDITO\n" +
+                          "ROLE_ADMIN > ROLE_CAJERO\n" +
+                          "ROLE_ADMIN > ROLE_SOCIO";
+        roleHierarchy.setHierarchy(hierarchy);
+        return roleHierarchy;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {

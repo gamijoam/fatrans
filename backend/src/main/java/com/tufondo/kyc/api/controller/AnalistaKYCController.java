@@ -35,7 +35,7 @@ public class AnalistaKYCController {
      * GET /kyc/revision/{verificacionId} - Detalle de Revision
      */
     @GetMapping("/revision/{verificacionId}")
-    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Obtener detalle de verificacion para revision")
     public ResponseEntity<RevisionResponse> obtenerDetalleRevision(
             @PathVariable UUID verificacionId) {
@@ -48,7 +48,7 @@ public class AnalistaKYCController {
      * POST /kyc/revision/{verificacionId}/aprobar - Aprobar Verificacion
      */
     @PostMapping("/revision/{verificacionId}/aprobar")
-    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Aprobar verificacion KYC")
     public ResponseEntity<RevisionDecisionResponse> aprobarVerificacion(
             @PathVariable UUID verificacionId,
@@ -68,7 +68,7 @@ public class AnalistaKYCController {
      * POST /kyc/revision/{verificacionId}/rechazar - Rechazar Verificacion
      */
     @PostMapping("/revision/{verificacionId}/rechazar")
-    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Rechazar verificacion KYC")
     public ResponseEntity<RevisionDecisionResponse> rechazarVerificacion(
             @PathVariable UUID verificacionId,
@@ -84,7 +84,7 @@ public class AnalistaKYCController {
      * POST /kyc/revision/{verificacionId}/solicitar-info - Solicitar Mas Informacion
      */
     @PostMapping("/revision/{verificacionId}/solicitar-info")
-    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Solicitar informacion adicional")
     public ResponseEntity<RevisionDecisionResponse> solicitarInfo(
             @PathVariable UUID verificacionId,

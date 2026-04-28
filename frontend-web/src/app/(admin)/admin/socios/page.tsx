@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { sociosApi } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -103,39 +104,27 @@ export default function AdminSociosPage() {
   const cargarSocios = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        size: '15',
-        sortBy: 'fechaRegistro',
-        direction: 'DESC',
-      });
-      if (debouncedBusqueda) params.set('numeroDocumento', debouncedBusqueda);
-      if (filtroEstado) params.set('estado', filtroEstado);
-
-      const res = await fetch(`/api/admin/socios?${params.toString()}`, {
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Error al cargar socios');
-
-      const data = await res.json();
-      setSocios(data.content || []);
+      const { data } = await sociosApi.getAll();
+      const content = data.content || data || [];
+      setSocios(content);
+      
       setPageInfo({
-        totalElements: data.totalElements || 0,
-        totalPages: data.totalPages || 0,
-        size: data.size || 15,
+        totalElements: data.totalElements || content.length,
+        totalPages: data.totalPages || 1,
+        size: data.size || content.length,
         number: data.number || 0,
-        first: data.first || true,
-        last: data.last || true,
-        empty: data.empty !== undefined ? data.empty : true,
+        first: data.first !== undefined ? data.first : true,
+        last: data.last !== undefined ? data.last : true,
+        empty: data.empty !== undefined ? data.empty : content.length === 0,
       });
 
       const calculatedStats: SociosStats = {
-        total: data.totalElements || 0,
+        total: data.totalElements || content.length,
         activos: 0,
         inactivos: 0,
         pendientes: 0,
       };
-      (data.content || []).forEach((s: Socio) => {
+      content.forEach((s: Socio) => {
         switch (s.estado) {
           case 'ACTIVO': calculatedStats.activos++; break;
           case 'INACTIVO': calculatedStats.inactivos++; break;
@@ -146,7 +135,6 @@ export default function AdminSociosPage() {
 
     } catch (err) {
       console.error('Error cargando socios:', err);
-      toast.error('Error al cargar socios');
     } finally {
       setLoading(false);
     }

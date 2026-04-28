@@ -53,7 +53,7 @@ public class SolicitudRegistroController {
     }
     
     @GetMapping("/solicitudes")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Listar solicitudes de registro (Admin)")
     public ResponseEntity<Map<String, Object>> listarSolicitudes(
             @RequestParam(required = false) EstadoSolicitud estado,
@@ -78,7 +78,7 @@ public class SolicitudRegistroController {
     }
     
     @PostMapping("/solicitudes/{id}/aprobar")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Aprobar una solicitud de registro (Admin)")
     public ResponseEntity<Map<String, Object>> aprobarSolicitud(
             @PathVariable UUID id,
@@ -99,7 +99,7 @@ public class SolicitudRegistroController {
     }
     
     @PostMapping("/solicitudes/{id}/rechazar")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Rechazar una solicitud de registro (Admin)")
     public ResponseEntity<Map<String, Object>> rechazarSolicitud(
             @PathVariable UUID id,
