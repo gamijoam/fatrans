@@ -42,7 +42,7 @@ export default function AdminLayout({
   const pathname = usePathname();
 
   return (
-    <ProtectedRoute allowedRoles={['ADMIN']}>
+    <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN', 'CAJERO', 'ANALISTA_KYC']}>
       <div className="flex min-h-screen">
         <aside className="hidden md:flex w-64 bg-slate-900 text-white p-4 flex-col">
           <div className="mb-6">

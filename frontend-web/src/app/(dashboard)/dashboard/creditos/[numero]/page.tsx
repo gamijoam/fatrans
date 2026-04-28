@@ -72,7 +72,8 @@ export default function CreditoDetailPage() {
     cargarSolicitud();
   }, [numero, isLoading]);
 
-  const formatMonto = (monto: number) => {
+  const formatMonto = (monto: number | null | undefined) => {
+    if (monto == null) return '-';
     return `$${monto.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
   };
 

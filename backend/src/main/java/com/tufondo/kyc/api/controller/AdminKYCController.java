@@ -40,7 +40,7 @@ public class AdminKYCController {
      * GET /kyc/cola-revision - Cola de Revision
      */
     @GetMapping("/cola-revision")
-    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Obtener cola de revision de verificaciones")
     public ResponseEntity<ColaRevisionResponse> obtenerColaRevision(
             @RequestParam(defaultValue = "0") int page,
@@ -84,7 +84,7 @@ public class AdminKYCController {
      * GET /kyc/admin/socio/{socioId} - Obtener KYC de un socio específico (Admin)
      */
     @GetMapping("/admin/socio/{socioId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Obtener verificación KYC actual de un socio")
     public ResponseEntity<?> obtenerKycPorSocio(@PathVariable UUID socioId) {
         return verificacionRepository.findBySocioId(socioId)
@@ -139,7 +139,7 @@ public class AdminKYCController {
      * GET /kyc/admin/estadisticas - Estadisticas
      */
     @GetMapping("/admin/estadisticas")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Obtener estadisticas de KYC")
     public ResponseEntity<EstadisticasKYCResponse> obtenerEstadisticas() {
 

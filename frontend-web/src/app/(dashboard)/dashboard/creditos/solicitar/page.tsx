@@ -143,7 +143,8 @@ export default function SolicitarCreditoPage() {
     }
   };
 
-  const formatMonto = (monto: number, moneda: string = 'USD') => {
+  const formatMonto = (monto: number | null | undefined, moneda = 'USD') => {
+    if (monto == null) return '-';
     if (moneda === 'VES') {
       return `Bs ${monto.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
     }

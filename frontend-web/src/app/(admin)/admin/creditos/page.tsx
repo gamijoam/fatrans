@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { creditosApi } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2, CheckCircle, XCircle, Clock, DollarSign, AlertCircle } from 'lucide-react';
-import { toast } from 'sonner';
 
 interface SolicitudCredito {
   id: string;
@@ -66,7 +66,27 @@ const ESTADO_ICONS: Record<string, React.ReactNode> = {
   DESEMBOLSADO: <DollarSign className="h-4 w-4" />,
 };
 
-import { formatDate, formatCurrency } from '@/lib/utils/format';
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '-';
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('es-VE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('es-VE', {
+    style: 'currency',
+    currency: 'VES',
+    minimumFractionDigits: 2,
+  }).format(value);
+}
 
 const ESTADOS = ['PENDIENTE', 'EN_EVALUACION', 'APROBADA', 'RECHAZADA', 'DESEMBOLSADO', 'CANCELADA'];
 
@@ -83,40 +103,38 @@ export default function AdminCreditosPage() {
   const cargarSolicitudes = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
+      const params: Record<string, string> = {
         page: page.toString(),
         size: '15',
         sortBy: 'createdAt',
         sortDir: 'DESC',
-      });
-      if (filtroEstado) params.set('estado', filtroEstado);
+      };
+      if (filtroEstado) params['estado'] = filtroEstado;
 
-      const res = await fetch(`/api/admin/creditos/solicitudes?${params.toString()}`, {
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Error al cargar solicitudes');
-
-      const data = await res.json();
-      setSolicitudes(data.content || []);
+      const { data } = await creditosApi.getSolicitudesAdmin(params);
+      
+      const content = data.content || data || [];
+      setSolicitudes(content);
+      
       setPageInfo({
-        totalElements: data.totalElements || 0,
-        totalPages: data.totalPages || 0,
+        totalElements: data.totalElements || content.length,
+        totalPages: data.totalPages || 1,
         size: data.size || 15,
         number: data.number || 0,
-        first: data.first || true,
-        last: data.last || true,
-        empty: data.empty !== undefined ? data.empty : true,
+        first: data.first !== undefined ? data.first : true,
+        last: data.last !== undefined ? data.last : true,
+        empty: data.empty !== undefined ? data.empty : content.length === 0,
       });
 
       const calculatedStats: CreditosStats = {
-        total: data.totalElements || 0,
+        total: data.totalElements || content.length,
         aprobados: 0,
         pendientes: 0,
         enEvaluacion: 0,
         rechazados: 0,
         desembolsados: 0,
       };
-      (data.content || []).forEach((s: SolicitudCredito) => {
+      content.forEach((s: SolicitudCredito) => {
         switch (s.estado) {
           case 'PENDIENTE': calculatedStats.pendientes++; break;
           case 'EN_EVALUACION': calculatedStats.enEvaluacion++; break;
@@ -128,8 +146,8 @@ export default function AdminCreditosPage() {
       setStats((prev) => ({ ...prev, ...calculatedStats }));
 
     } catch (err) {
-      console.error('Error cargando solicitudes:', err);
-      toast.error('Error al cargar solicitudes de crédito');
+      console.error('Error cargando solicitudes de crédito:', err);
+      // El error ya es manejado por el interceptor del apiClient
     } finally {
       setLoading(false);
     }

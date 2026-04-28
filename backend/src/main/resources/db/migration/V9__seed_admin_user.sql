@@ -1,11 +1,4 @@
--- V8__seed_admin_user.sql
--- Creación del usuario ADMINISTRADOR inicial por defecto
-
--- Credenciales:
--- Usuario: admin
--- Password: Admin123!
--- Rol: ADMIN
-
+-- V9__seed_admin_user.sql
 INSERT INTO usuarios (
     id,
     nombre_usuario,
@@ -26,7 +19,7 @@ INSERT INTO usuarios (
     'Administrador TuFondo',
     'SUPER_ADMIN',
     NULL,
-    true,
+    TRUE,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP,
     0

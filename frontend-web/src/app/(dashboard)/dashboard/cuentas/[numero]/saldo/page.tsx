@@ -145,7 +145,8 @@ export default function SaldoDetailPage() {
     );
   }
 
-  const formatMonto = (monto: number) => {
+  const formatMonto = (monto: number | null | undefined) => {
+    if (monto == null) return '-';
     const simbolo = cuenta?.moneda === 'VES' ? 'Bs' : '$';
     return `${simbolo} ${monto.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
   };

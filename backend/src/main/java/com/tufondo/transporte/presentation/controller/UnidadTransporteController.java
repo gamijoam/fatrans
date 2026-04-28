@@ -23,17 +23,17 @@ public class UnidadTransporteController {
     private final ListarUnidadesSocioUseCase listarUnidadesSocioUseCase;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<UnidadTransporteResponseDTO> registrarUnidad(
             @PathVariable UUID socioId,
             @Valid @RequestBody RegistrarUnidadRequestDTO request) {
-        
+
         UnidadTransporteResponseDTO response = registrarUnidadUseCase.ejecutar(request, socioId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<List<UnidadTransporteResponseDTO>> listarUnidades(
             @PathVariable UUID socioId) {
         

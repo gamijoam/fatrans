@@ -98,7 +98,8 @@ export default function CuentaDetailPage() {
     );
   }
 
-  const formatMonto = (monto: number, moneda: string) => {
+  const formatMonto = (monto: number | null | undefined, moneda: string) => {
+    if (monto == null) return '-';
     const simbolo = moneda === 'VES' ? 'Bs' : '$';
     return `${simbolo} ${monto.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
   };

@@ -30,7 +30,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
 
   return (
-    <ProtectedRoute allowedRoles={['SOCIO']}>
+    <ProtectedRoute allowedRoles={['SOCIO', 'ADMIN', 'SUPER_ADMIN']}>
       <div className="flex min-h-screen">
         {/* Desktop Sidebar */}
         <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 p-4 flex-col">
