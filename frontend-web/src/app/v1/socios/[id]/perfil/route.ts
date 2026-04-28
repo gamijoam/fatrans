@@ -4,47 +4,42 @@ import jwt from 'jsonwebtoken';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'fallback-secret-do-not-use-in-production';
 
-function getSocioIdFromToken(accessToken: string): string | null {
-  try {
-    const decoded = jwt.verify(accessToken, JWT_SECRET) as { socio_id?: string; socioId?: string };
-    return decoded.socio_id || decoded.socioId || null;
-  } catch {
-    return null;
-  }
-}
-
-export async function GET(
+export async function PUT(
   request: NextRequest,
-  { params }: { params: { numero: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const accessToken = request.cookies.get('access_token');
+    const accessToken = request.cookies.get('access_token')?.value;
 
     if (!accessToken) {
       return NextResponse.json({ message: 'No autenticado' }, { status: 401 });
     }
 
-    const socioId = getSocioIdFromToken(accessToken.value);
-    if (!socioId) {
+    try {
+      jwt.verify(accessToken, JWT_SECRET);
+    } catch {
       return NextResponse.json({ message: 'Token inválido' }, { status: 401 });
     }
 
+    const body = await request.json();
+
     const backendResponse = await fetch(
-      `${BACKEND_URL}/api/v1/creditos/solicitudes/${params.numero}?socioId=${socioId}`,
+      `${BACKEND_URL}/api/v1/socios/${params.id}/perfil`,
       {
-        method: 'GET',
+        method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${accessToken.value}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
         },
         credentials: 'include',
+        body: JSON.stringify(body),
       }
     );
 
     if (!backendResponse.ok) {
       const errorData = await backendResponse.json().catch(() => ({}));
       return NextResponse.json(
-        { message: errorData.message || 'Error al obtener solicitud' },
+        { message: errorData.message || 'Error al actualizar perfil' },
         { status: backendResponse.status }
       );
     }
@@ -53,7 +48,10 @@ export async function GET(
     return NextResponse.json(data, { status: 200 });
 
   } catch (error) {
-    console.error('Solicitud error:', error);
-    return NextResponse.json({ message: 'Error al obtener solicitud' }, { status: 500 });
+    console.error('Socio profile update error:', error);
+    return NextResponse.json(
+      { message: 'Error interno del servidor' },
+      { status: 500 }
+    );
   }
 }

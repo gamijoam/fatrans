@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import jwt from 'jsonwebtoken';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'fallback-secret-do-not-use-in-production';
 
 function getSocioIdFromToken(accessToken: string): string | null {
   try {
-    const payload = accessToken.split('.')[1];
-    const decoded = Buffer.from(payload, 'base64').toString('utf-8');
-    const data = JSON.parse(decoded);
-    return data.socio_id || data.socioId || null;
+    const decoded = jwt.verify(accessToken, JWT_SECRET) as { socio_id?: string; socioId?: string };
+    return decoded.socio_id || decoded.socioId || null;
   } catch {
     return null;
   }
