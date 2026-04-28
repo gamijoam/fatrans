@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN', 'CAJERO', 'ANALISTA_KYC'];
+const ADMIN_ROLES = ['ADMIN', 'ADMINISTRADOR', 'GESTOR', 'SUPER_ADMIN', 'CAJERO', 'ANALISTA_KYC', 'SISTEMA'];
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'fallback-secret-do-not-use-in-production';
 
 export interface AdminAuthContext {

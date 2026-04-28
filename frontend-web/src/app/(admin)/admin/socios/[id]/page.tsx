@@ -144,7 +144,10 @@ export default function SocioDetallePage() {
 
       setSocio(await socioRes.json());
       if (cuentasRes.ok) setCuentas(await cuentasRes.json());
-      if (beneficiariosRes.ok) setBeneficiarios(await beneficiariosRes.json());
+      if (beneficiariosRes.ok) {
+        const benData = await beneficiariosRes.json();
+        setBeneficiarios(benData.beneficiarios || []);
+      }
       if (creditosRes.ok) setCreditos(await creditosRes.json());
       if (kycRes.ok) {
         const kycData = await kycRes.json();
