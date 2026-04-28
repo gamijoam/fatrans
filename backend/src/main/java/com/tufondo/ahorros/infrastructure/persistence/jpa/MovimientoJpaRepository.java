@@ -37,7 +37,18 @@ public interface MovimientoJpaRepository extends JpaRepository<MovimientoEntity,
     
     Page<MovimientoEntity> findByCuentaAhorroIdAndTipoOrderByFechaMovimientoDesc(
             UUID cuentaAhorroId, TipoMovimiento tipo, Pageable pageable);
-    
+
+    @Query("SELECT m FROM MovimientoEntity m WHERE m.cuentaAhorroId = :cuentaId " +
+           "AND m.fechaMovimiento BETWEEN :fechaInicio AND :fechaFin " +
+           "AND m.tipo = :tipo " +
+           "ORDER BY m.fechaMovimiento DESC")
+    Page<MovimientoEntity> findByCuentaYRangoFechasYTipo(
+            @Param("cuentaId") UUID cuentaAhorroId,
+            @Param("fechaInicio") LocalDateTime fechaInicio,
+            @Param("fechaFin") LocalDateTime fechaFin,
+            @Param("tipo") TipoMovimiento tipo,
+            Pageable pageable);
+
     Page<MovimientoEntity> findBySocioIdOrderByFechaMovimientoDesc(UUID socioId, Pageable pageable);
 
     @Query("SELECT COALESCE(SUM(m.monto), 0) FROM MovimientoEntity m " +

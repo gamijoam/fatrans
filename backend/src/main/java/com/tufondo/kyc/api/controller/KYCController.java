@@ -1,6 +1,7 @@
 // com.tufondo.kyc.api.controller.KYCController
 package com.tufondo.kyc.api.controller;
 
+import com.tufondo.auth.infrastructure.security.AuthenticatedUser;
 import com.tufondo.kyc.application.dto.request.RevocarConsentimientoRequest;
 import com.tufondo.kyc.application.dto.request.EnviarDocumentosRequest;
 import com.tufondo.kyc.application.dto.request.IniciarKYCRequest;
@@ -142,6 +143,9 @@ public class KYCController {
     }
 
     private UUID extraerSocioId(Authentication authentication) {
+        if (authentication.getPrincipal() instanceof AuthenticatedUser authUser) {
+            return authUser.getSocioId();
+        }
         return UUID.fromString(authentication.getName());
     }
 

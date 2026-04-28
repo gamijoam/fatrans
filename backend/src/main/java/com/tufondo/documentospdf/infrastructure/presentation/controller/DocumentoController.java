@@ -1,6 +1,7 @@
 // com.tufondo.documentospdf.infrastructure.presentation.controller.DocumentoController
 package com.tufondo.documentospdf.infrastructure.presentation.controller;
 
+import com.tufondo.auth.infrastructure.security.AuthenticatedUser;
 import com.tufondo.documentospdf.application.dto.DescargarDocumentoResponseDTO;
 import com.tufondo.documentospdf.application.dto.DocumentoListResponseDTO;
 import com.tufondo.documentospdf.application.dto.DocumentoResponseDTO;
@@ -230,9 +231,12 @@ public class DocumentoController {
 
     private UUID extraerSocioId(Authentication authentication) {
         try {
+            if (authentication.getPrincipal() instanceof AuthenticatedUser authUser) {
+                return authUser.getSocioId();
+            }
             return fromString(authentication.getName());
         } catch (Exception e) {
-            log.warn("No se pudo extraer socioId del token, usando nombre directo");
+            log.warn("No se pudo extraer socioId del token");
             return null;
         }
     }

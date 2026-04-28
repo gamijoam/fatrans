@@ -40,6 +40,7 @@ public class JwtService {
                 .claim("correo", usuario.correoElectronico())
                 .claim("rol", usuario.rol().name())
                 .claim("tipo_token", "ACCESS")
+                .claim("socio_id", usuario.socioId() != null ? usuario.socioId().toString() : null)
                 .issuer(jwtProperties.issuer())
                 .issuedAt(Date.from(ahora))
                 .expiration(Date.from(expiracion))
@@ -108,6 +109,12 @@ public class JwtService {
     public String extraerRol(String token) {
         Claims claims = validarToken(token);
         return claims.get("rol", String.class);
+    }
+
+    public UUID extraerSocioId(String token) {
+        Claims claims = validarToken(token);
+        String socioIdStr = claims.get("socio_id", String.class);
+        return socioIdStr != null ? UUID.fromString(socioIdStr) : null;
     }
 
     public Instant extraerExpiracionAccessToken(String token) {

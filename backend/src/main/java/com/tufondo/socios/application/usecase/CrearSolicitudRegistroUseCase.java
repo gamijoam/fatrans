@@ -27,7 +27,6 @@ public class CrearSolicitudRegistroUseCase {
     
     @Transactional
     public SolicitudRegistroResponseDTO ejecutar(SolicitudRegistroRequestDTO request) {
-        // Validar que la cédula no exista en solicitudes ni en socios
         if (solicitudRepository.existePorCedula(request.getCedula())) {
             throw new CedulaDuplicadaException(request.getCedula());
         }
@@ -35,7 +34,6 @@ public class CrearSolicitudRegistroUseCase {
             throw new CedulaDuplicadaException(request.getCedula());
         }
         
-        // Validar que el email no exista en solicitudes ni en socios
         if (solicitudRepository.existePorCorreo(request.getCorreoElectronico())) {
             throw new CorreoDuplicadoException(request.getCorreoElectronico());
         }
@@ -43,21 +41,35 @@ public class CrearSolicitudRegistroUseCase {
             throw new CorreoDuplicadoException(request.getCorreoElectronico());
         }
         
-        // Crear la solicitud con estado PENDIENTE
         SolicitudRegistro solicitud = SolicitudRegistro.builder()
                 .nombreCompleto(request.getNombreCompleto())
+                .tipoDocumento(request.getTipoDocumento())
                 .cedula(request.getCedula())
+                .fechaNacimiento(request.getFechaNacimiento())
+                .genero(request.getGenero())
+                .estadoCivil(request.getEstadoCivil())
                 .correoElectronico(request.getCorreoElectronico())
                 .telefono(request.getTelefono())
                 .empresa(request.getEmpresa())
+                .rifEmpresa(request.getRifEmpresa())
+                .departamento(request.getDepartamento())
+                .cargo(request.getCargo())
+                .salario(request.getSalario())
+                .direccionEstado(request.getDireccionEstado())
+                .direccionCiudad(request.getDireccionCiudad())
+                .direccionMunicipio(request.getDireccionMunicipio())
+                .direccionCalle(request.getDireccionCalle())
+                .emergenciaNombre(request.getEmergenciaNombre())
+                .emergenciaTelefono(request.getEmergenciaTelefono())
+                .emergenciaParentesco(request.getEmergenciaParentesco())
+                .aceptaTerminos(request.getAceptaTerminos())
+                .aceptaLopdp(request.getAceptaLopdp())
                 .estado(EstadoSolicitud.PENDIENTE)
                 .fechaSolicitud(LocalDateTime.now())
                 .build();
         
-        // Guardar la solicitud
         SolicitudRegistro saved = solicitudRepository.guardar(solicitud);
         
-        // Enviar email de confirmación
         emailNotificationService.enviarNotificacionSolicitudRecibida(request.getCorreoElectronico());
         
         return dtoMapper.toResponseDTO(saved);

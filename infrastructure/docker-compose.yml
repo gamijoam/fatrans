@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
@@ -10,7 +8,7 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./seed_admin.sql:/docker-entrypoint-initdb.d/seed_admin.sql:ro
+      # - ./seed_admin.sql:/docker-entrypoint-initdb.d/seed_admin.sql:ro  # TEMPORALMENTE DESACTIVADO - seed corre antes de Hibernate
     ports:
       - "15432:5432"
 
@@ -55,17 +53,18 @@ services:
       - redis
       - minio
 
-  frontend:
-    build:
-      context: ../frontend-web
-      dockerfile: Dockerfile
-    ports:
-      - "13000:3000"
-    environment:
-      NEXT_PUBLIC_API_URL: http://backend:8080/api
-      NODE_ENV: production
-    depends_on:
-      - backend
+  # frontend:
+  #   build:
+  #     context: ../frontend-web
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "13000:3000"
+  #   environment:
+  #     NEXT_PUBLIC_API_URL: http://backend:8080/api
+  #     NODE_ENV: production
+  #   depends_on:
+  #     - backend
+  #   # DESACTIVADO - Levantar manualmente con: cd frontend-web && npm run dev
 
   minio_init:
     image: minio/mc:latest

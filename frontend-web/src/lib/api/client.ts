@@ -1,18 +1,24 @@
 import axios from 'axios';
-import Cookies from 'js-cookie';
+import { toast } from 'sonner';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: '',
   timeout: 10_000,
   withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 apiClient.interceptors.request.use((config) => {
-  if (['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase() || '')) {
-    const csrfToken = Cookies.get('csrf_token');
+  const method = config.method?.toLowerCase();
+  if (['post', 'put', 'delete', 'patch'].includes(method || '')) {
+    // CSRF: El backend debe enviar cookie 'csrf_token' con SameSite=Strict y HttpOnly=false
+    // para que JavaScript pueda leerla. Alternativamente usar double-submit pattern.
+    const csrfToken = document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('csrf_token='))
+      ?.split('=')[1];
+    
     if (csrfToken) {
       config.headers['X-CSRF-Token'] = csrfToken;
     }
@@ -27,39 +33,79 @@ apiClient.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
+      
       try {
-        const newToken = await refreshAccessToken();
-        if (newToken) {
-          originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
-          return apiClient(originalRequest);
-        }
+        await apiClient.post('/v1/auth/refresh-web');
+        return apiClient(originalRequest);
       } catch {
-        await logout();
+        toast.error('Sesión expirada. Por favor inicie sesión nuevamente.');
         window.location.href = '/login';
       }
     }
+
+    const message = error.response?.data?.message || error.message || 'Error desconocido';
+    toast.error(message);
+    
     return Promise.reject(error);
   }
 );
 
-export async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = Cookies.get('refresh_token');
-  if (!refreshToken) return null;
-  try {
-    const response = await apiClient.post('/v1/auth/refresh', { refreshToken });
-    return response.data.accessToken;
-  } catch {
-    return null;
-  }
-}
+export const authApi = {
+  login: (identificador: string, password: string) =>
+    apiClient.post('/v1/auth/login-web', { identificador, password }),
+  logout: () => apiClient.post('/v1/auth/logout-web'),
+  refresh: () => apiClient.post('/v1/auth/refresh-web'),
+  me: () => apiClient.get('/v1/auth/me'),
+  changePassword: (passwordActual: string, nuevoPassword: string) =>
+    apiClient.post('/v1/auth/cambiar-password', { passwordActual, nuevoPassword }),
+};
 
-export async function logout(): Promise<void> {
-  try {
-    await apiClient.post('/v1/auth/logout');
-  } finally {
-    Cookies.remove('access_token');
-    Cookies.remove('refresh_token');
-    Cookies.remove('csrf_token');
-    Cookies.remove('usuario');
-  }
-}
+export const sociosApi = {
+  getById: (id: string) => apiClient.get(`/v1/socios/${id}`),
+  updateProfile: (id: string, data: unknown) => apiClient.put(`/v1/socios/${id}/perfil`, data),
+};
+
+export const cuentasApi = {
+  getCuentas: (socioId: string) => apiClient.get(`/api/cuentas/socio/${socioId}`),
+  getCuenta: (numeroCuenta: string) => apiClient.get(`/api/cuentas/${numeroCuenta}`),
+  getSaldo: (numeroCuenta: string) => apiClient.get(`/api/cuentas/${numeroCuenta}/saldo`),
+  getMovimientos: (numeroCuenta: string, page = 0, size = 10, fechaInicio?: string, fechaFin?: string, tipo?: string) => {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    if (fechaInicio) params.append('fechaInicio', fechaInicio);
+    if (fechaFin) params.append('fechaFin', fechaFin);
+    if (tipo) params.append('tipo', tipo);
+    return apiClient.get(`/api/cuentas/${numeroCuenta}/movimientos?${params}`);
+  },
+  deposito: (numeroCuenta: string, monto: number) =>
+    apiClient.post(`/api/cuentas/${numeroCuenta}/depositos`, {
+      monto,
+      canalOrigen: 'WEB',
+      descripcion: 'Depósito en línea'
+    }),
+  retiro: (numeroCuenta: string, monto: number) =>
+    apiClient.post(`/api/cuentas/${numeroCuenta}/retiros`, {
+      monto,
+      canalOrigen: 'WEB'
+    }),
+};
+
+export const creditosApi = {
+  getTiposCredito: () => apiClient.get('/api/creditos/tipos-credito'),
+  getTipoCredito: (id: string) => apiClient.get(`/v1/creditos/tipos-credito/${id}`),
+  getSolicitudesPorSocio: (socioId: string) => apiClient.get(`/api/creditos/solicitudes/socio/${socioId}`),
+  getSolicitud: (numero: string) => apiClient.get(`/api/creditos/solicitudes/${numero}`),
+  crearSolicitud: (data: {
+    tipoCreditoId: string;
+    montoSolicitado: number;
+    plazoMeses: number;
+    cuentaGarantiaId?: string;
+    canalOrigen: string;
+  }) => apiClient.post('/api/creditos/solicitudes', data),
+  getPlan: (solicitudNumero: string) => apiClient.get(`/v1/creditos/solicitudes/${solicitudNumero}/plan`),
+  getCuotas: (creditoNumero: string) => apiClient.get(`/v1/creditos/${creditoNumero}/cuotas`),
+  simular: (data: {
+    tipoCreditoId: string;
+    monto: number;
+    plazoMeses: number;
+  }) => apiClient.post('/api/creditos/simulador', data),
+};

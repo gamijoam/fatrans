@@ -44,7 +44,37 @@ La arquitectura está pensada bajo la filosofía de **"empezar ligero, validar r
 
 ---
 
-## Frontend Flutter
+## Frontend Next.js
+
+### Documentación Base del Proyecto
+📄 **[base-proyecto/README.md](base-proyecto/README.md)** - Índice completo de documentación frontend
+
+Documentación del nuevo frontend web basado en Next.js 14+ con arquitectura BFF:
+
+### 📚 Guías de Referencia
+- **[GUIA_TIPOS_GENERADOS.md](informacion/GUIA_TIPOS_GENERADOS.md)** - Cómo usar los tipos TypeScript generados desde OpenAPI
+- **[GUIA_COMPONENTES_UI.md](informacion/GUIA_COMPONENTES_UI.md)** - Componentes de UI (Skeleton, Spinner, Toast, Progress)
+
+- [FRONTEND_ROADMAP.md](base-proyecto/FRONTEND_ROADMAP.md) - Roadmap de implementación (20 semanas)
+- [ESTRUCTURA_PAGINAS.md](base-proyecto/ESTRUCTURA_PAGINAS.md) - Todas las páginas y componentes
+- [ROLES_PERMISOS.md](base-proyecto/ROLES_PERMISOS.md) - Matriz de roles y permisos
+- [DISENO_SISTEMA.md](base-proyecto/DISENO_SISTEMA.md) - Design system, colores, tipografía
+- [API_CONTRACTS.md](base-proyecto/API_CONTRACTS.md) - Contratos API FE-BE
+- [STACK_TECNOLOGICO.md](base-proyecto/STACK_TECNOLOGICO.md) - Stack tecnológico
+- [FLUJO_AUTENTICACION.md](base-proyecto/FLUJO_AUTENTICACION.md) - Flujo de auth con BFF
+
+### Guía de Inicio Rápido
+
+```bash
+# Frontend Next.js
+cd frontend-web
+npm install
+npm run dev
+```
+
+---
+
+## Frontend Flutter (Legacy)
 
 ### Guía de Inicio Rápido
 📄 **[GUIA_INICIO_RAPIDO_FLUTTER.md](frontend/GUIA_INICIO_RAPIDO_FLUTTER.md)** - Cómo ejecutar Flutter Web
@@ -65,15 +95,25 @@ flutter run -d chrome --release --web-port 18081
 
 ## Stack Tecnológico
 
+### Backend
 | Componente | Tecnología | Versión |
 |------------|------------|---------|
 | **Lenguaje** | Java | 21 |
 | **Framework** | Spring Boot | 3.2.4 |
 | **Base de Datos** | PostgreSQL | 15 |
 | **Caché** | Redis | 7 |
-| **Frontend App** | Flutter | 3.x |
-| **Frontend Landing** | Astro | - |
 | **Documentación API** | OpenAPI/Swagger | 2.5.0 |
+
+### Frontend Web (Next.js 14+)
+| Componente | Tecnología | Versión |
+|------------|------------|---------|
+| **Framework** | Next.js | 14+ |
+| **UI Library** | React | 18+ |
+| **Estilos** | Tailwind CSS + shadcn/ui | 3.4+ |
+| **Estado Cliente** | Zustand | 4+ |
+| **Estado Servidor** | TanStack Query | 5+ |
+| **Validación** | Zod | 3+ |
+| **API Client** | Axios | 1+ |
 
 ---
 

@@ -3,6 +3,7 @@ package com.tufondo.creditos.domain.model;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
  * Define las características de cada tipo de crédito oferecido.
  */
 @Getter
+@Setter
 @Builder
 public class TipoCredito {
     private Long id;

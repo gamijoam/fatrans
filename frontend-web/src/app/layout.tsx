@@ -1,25 +1,24 @@
 import type { Metadata } from 'next';
-import { Toaster } from 'sonner';
-import { QueryProvider } from '@/components/shared/query-provider';
+import { Inter } from 'next/font/google';
 import './globals.css';
+import { Providers } from './providers';
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Fondo de Ahorro',
-  description: 'Plataforma de Fondo de Ahorro',
+  title: 'FATTRANS - Fondo de Ahorro',
+  description: 'Plataforma digital de gestión de fondo de ahorro',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="es">
-      <body>
-        <QueryProvider>
-          {children}
-          <Toaster position="top-right" richColors />
-        </QueryProvider>
+      <body className={inter.className}>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

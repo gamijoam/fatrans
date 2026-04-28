@@ -53,4 +53,6 @@ public interface UsuarioJpaRepository extends JpaRepository<UsuarioEntity, UUID>
     @Modifying
     @Query("UPDATE UsuarioEntity u SET u.intentosFallidos = 0, u.fechaBloqueo = null, u.ultimaModificacion = :ahora WHERE u.id = :id")
     void resetearIntentosFallidos(@Param("id") UUID id, @Param("ahora") Instant ahora);
+
+    List<UsuarioEntity> findByRol(Rol rol);
 }

@@ -64,6 +64,13 @@ public class MovimientoRepositoryImpl implements MovimientoRepository {
     }
 
     @Override
+    public Page<Movimiento> buscarPorCuentaYRangoFechasYTipo(UUID cuentaAhorroId,
+            LocalDateTime fechaInicio, LocalDateTime fechaFin, TipoMovimiento tipo, Pageable pageable) {
+        return jpaRepository.findByCuentaYRangoFechasYTipo(cuentaAhorroId, fechaInicio, fechaFin, tipo, pageable)
+                .map(this::toDomain);
+    }
+
+    @Override
     public Page<Movimiento> buscarPorSocioId(UUID socioId, Pageable pageable) {
         return jpaRepository.findBySocioIdOrderByFechaMovimientoDesc(socioId, pageable)
                 .map(this::toDomain);

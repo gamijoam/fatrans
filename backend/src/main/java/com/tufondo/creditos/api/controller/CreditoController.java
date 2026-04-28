@@ -360,6 +360,13 @@ public class CreditoController {
     // ==================== Métodos helper ====================
 
     private UUID extraerSocioId(Authentication authentication) {
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof com.tufondo.auth.infrastructure.security.AuthenticatedUser authUser) {
+            UUID socioId = authUser.getSocioId();
+            if (socioId != null) {
+                return socioId;
+            }
+        }
         return fromString(authentication.getName());
     }
 

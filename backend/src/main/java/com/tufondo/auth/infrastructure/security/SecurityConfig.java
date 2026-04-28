@@ -1,5 +1,6 @@
 package com.tufondo.auth.infrastructure.security;
 
+import com.tufondo.core.infrastructure.security.ratelimit.GlobalRateLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,6 +28,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final AdminDashboardRateLimitFilter adminDashboardRateLimitFilter;
+    private final GlobalRateLimitFilter globalRateLimitFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -56,7 +58,8 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(adminDashboardRateLimitFilter, JwtAuthenticationFilter.class);
+            .addFilterAfter(adminDashboardRateLimitFilter, JwtAuthenticationFilter.class)
+            .addFilterAfter(globalRateLimitFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -79,7 +82,7 @@ public class SecurityConfig {
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
-        configuration.setExposedHeaders(List.of("X-User-Id", "X-User-Rol", "X-Correlation-Id"));
+        configuration.setExposedHeaders(List.of("X-User-Id", "X-User-Rol", "X-Correlation-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);

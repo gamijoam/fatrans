@@ -18,11 +18,13 @@ public final class Usuario {
     private final Instant ultimaModificacion;
     private final int intentosFallidos;
     private final Instant fechaBloqueo;
+    private final boolean debeCambiarPassword;
 
     private Usuario(UUID id, String nombreUsuario, String correoElectronico,
                     String passwordHash, String nombreCompleto, Rol rol,
                     UUID socioId, boolean cuentaActiva, Instant fechaCreacion,
-                    Instant ultimaModificacion, int intentosFallidos, Instant fechaBloqueo) {
+                    Instant ultimaModificacion, int intentosFallidos, Instant fechaBloqueo,
+                    boolean debeCambiarPassword) {
         this.id = id;
         this.nombreUsuario = nombreUsuario;
         this.correoElectronico = correoElectronico;
@@ -35,6 +37,7 @@ public final class Usuario {
         this.ultimaModificacion = ultimaModificacion;
         this.intentosFallidos = intentosFallidos;
         this.fechaBloqueo = fechaBloqueo;
+        this.debeCambiarPassword = debeCambiarPassword;
     }
 
     public static Usuario crear(String nombreUsuario, String correoElectronico,
@@ -52,35 +55,43 @@ public final class Usuario {
             Instant.now(),
             null,
             0,
-            null
+            null,
+            true
         );
     }
 
     public static Usuario desdeParametros(UUID id, String nombreUsuario, String correoElectronico,
                                           String passwordHash, String nombreCompleto, Rol rol,
                                           UUID socioId, boolean cuentaActiva, Instant fechaCreacion,
-                                          Instant ultimaModificacion, int intentosFallidos, Instant fechaBloqueo) {
+                                          Instant ultimaModificacion, int intentosFallidos, Instant fechaBloqueo,
+                                          boolean debeCambiarPassword) {
         return new Usuario(id, nombreUsuario, correoElectronico, passwordHash, nombreCompleto,
                           rol, socioId, cuentaActiva, fechaCreacion, ultimaModificacion,
-                          intentosFallidos, fechaBloqueo);
+                          intentosFallidos, fechaBloqueo, debeCambiarPassword);
     }
 
     public Usuario conIntentosFallidos(int intentos, Instant fechaBloqueo) {
         return new Usuario(id, nombreUsuario, correoElectronico, passwordHash, nombreCompleto,
                           rol, socioId, cuentaActiva, fechaCreacion, Instant.now(),
-                          intentos, fechaBloqueo);
+                          intentos, fechaBloqueo, debeCambiarPassword);
     }
 
     public Usuario conIntentosReseteados() {
         return new Usuario(id, nombreUsuario, correoElectronico, passwordHash, nombreCompleto,
                           rol, socioId, cuentaActiva, fechaCreacion, Instant.now(),
-                          0, null);
+                          0, null, debeCambiarPassword);
     }
 
     public Usuario conCuentaDesactivada() {
         return new Usuario(id, nombreUsuario, correoElectronico, passwordHash, nombreCompleto,
                           rol, socioId, false, fechaCreacion, Instant.now(),
-                          intentosFallidos, fechaBloqueo);
+                          intentosFallidos, fechaBloqueo, debeCambiarPassword);
+    }
+
+    public Usuario conPasswordCambiado(String nuevoPasswordHash) {
+        return new Usuario(id, nombreUsuario, correoElectronico, nuevoPasswordHash, nombreCompleto,
+                          rol, socioId, cuentaActiva, fechaCreacion, Instant.now(),
+                          0, null, false);
     }
 
     public UUID id() { return id; }
@@ -95,4 +106,5 @@ public final class Usuario {
     public Instant ultimaModificacion() { return ultimaModificacion; }
     public int intentosFallidos() { return intentosFallidos; }
     public Instant fechaBloqueo() { return fechaBloqueo; }
+    public boolean debeCambiarPassword() { return debeCambiarPassword; }
 }
