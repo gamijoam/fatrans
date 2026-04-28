@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { validateAdminAccess } from '@/lib/auth/admin-validation';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
-
-const ADMIN_ROLES = ['ADMIN', 'ADMINISTRADOR', 'GESTOR', 'SUPER_ADMIN'];
-
-function validateAdminRole(token: string): boolean {
-  try {
-    const payload = token.split('.')[1];
-    const decoded = Buffer.from(payload, 'base64').toString('utf-8');
-    const data = JSON.parse(decoded);
-    return ADMIN_ROLES.includes(data.rol);
-  } catch {
-    return false;
-  }
-}
 
 export async function GET(request: NextRequest) {
   const origin = request.headers.get('origin');
@@ -29,13 +17,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const accessToken = request.cookies.get('access_token');
-    if (!accessToken) {
-      return NextResponse.json({ message: 'No autenticado' }, { status: 401 });
+    const authResult = validateAdminAccess({ accessToken: accessToken?.value });
+    if (!authResult.valid) {
+      return NextResponse.json({ message: authResult.message }, { status: authResult.status });
     }
-
-    if (!validateAdminRole(accessToken.value)) {
-      return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
-    }
+    const token = accessToken!.value;
 
     const { searchParams } = new URL(request.url);
     const estado = searchParams.get('estado') || 'PENDIENTE';
@@ -46,7 +32,7 @@ export async function GET(request: NextRequest) {
       {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${accessToken.value}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         credentials: 'include',
