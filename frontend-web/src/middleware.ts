@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  const publicRoutes = ['/', '/login', '/registro', '/recuperar-password'];
+  const publicRoutes = ['/', '/login', '/auth/login', '/registro', '/recuperar-password'];
   const isPublicRoute = publicRoutes.some((route) => pathname === route);
   const isAuthApi = pathname.startsWith('/api/auth/');
 
