@@ -37,8 +37,8 @@ public class ObtenerUsuarioActualUseCase {
 
         String usuarioId = authentication.getName();
 
-        if (usuarioId == null || usuarioId.isBlank()) {
-            throw new TokenInvalidoException("No hay usuario autenticado");
+        if (usuarioId == null || usuarioId.isBlank() || "anonymousUser".equals(usuarioId)) {
+            throw new TokenInvalidoException("No hay usuario autenticado válido");
         }
 
         Usuario usuario = usuarioRepository.buscarPorId(UUID.fromString(usuarioId))

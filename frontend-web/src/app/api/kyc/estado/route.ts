@@ -23,6 +23,10 @@ export async function GET(request: NextRequest) {
 
     if (!backendResponse.ok) {
       const errorData = await backendResponse.json().catch(() => ({}));
+      // Backend retorna 500 + KYC_000 cuando el socio no tiene KYC iniciado
+      if (errorData.error === 'KYC_000' || backendResponse.status === 500) {
+        return NextResponse.json({ estado: 'SIN_KYC', mensaje: 'No has iniciado el proceso KYC' }, { status: 200 });
+      }
       return NextResponse.json(
         { message: errorData.message || 'Error al obtener estado KYC' },
         { status: backendResponse.status }

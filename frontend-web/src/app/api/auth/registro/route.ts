@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:13000',
-    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_APP_URL, process.env.NEXT_PUBLIC_ADMIN_URL, 'https://auth.fatrans.com.ve', 'https://www.fatrans.com.ve', 'https://fatrans.com.ve',
   ].filter(Boolean);
 
   const allowedReferers = [

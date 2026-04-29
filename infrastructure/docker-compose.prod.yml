@@ -3,24 +3,26 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: fatrans_postgres
+    container_name: fatrans-postgres
     environment:
-      POSTGRES_DB: fatrans_db
-      POSTGRES_USER: fatrans_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fatrans_secret_2026}
+      POSTGRES_DB: fondo
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: fatrans-secret-2026
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fatrans_user -d fatrans_db"]
+      test: ["CMD-SHELL", "pg_isready -U app -d fondo"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - fatrans-network
 
   redis:
     image: redis:7-alpine
-    container_name: fatrans_redis
+    container_name: fatrans-redis
     ports:
       - "6379:6379"
     healthcheck:
@@ -28,13 +30,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - fatrans-network
 
   minio:
     image: minio/minio:latest
-    container_name: fatrans_minio
+    container_name: fatrans-minio
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-fatransminio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-fatransminio_secret_2026}
+      MINIO_ROOT_USER: fatransminio
+      MINIO_ROOT_PASSWORD: fatransminio_secret_2026
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
@@ -46,34 +50,28 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-
-  minio_init:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      sleep 5;
-      mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER:-fatransminio} $${MINIO_ROOT_PASSWORD:-fatransminio_secret_2026};
-      mc mb myminio/fatrans-docs --ignore-existing;
-      mc anonymous set download myminio/fatrans-docs;
-      echo 'MinIO buckets ready';
-      exit 0;
-      "
+    networks:
+      - fatrans-network
 
   backend:
-    image: ghcr.io/fatrans/fatrans-backend:latest
-    container_name: fatrans_backend
+    image: fatrans-backend:latest
+    container_name: fatrans-backend
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      DATABASE_URL: jdbc:postgresql://postgres:5432/fatrans_db
-      DATABASE_USERNAME: fatrans_user
-      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-fatrans_secret_2026}
-      REDIS_URL: redis://redis:6379
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-fatransminio}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-fatransminio_secret_2026}
+      DB_URL: jdbc:postgresql://fatrans-postgres:5432/fondo
+      DB_USER: app
+      DB_PASS: fatrans-secret-2026
+      REDIS_HOST: fatrans-redis
+      REDIS_PORT: 6379
+      MINIO_ENDPOINT: http://fatrans-minio:9000
+      MINIO_ACCESS_KEY: fatransminio
+      MINIO_SECRET_KEY: fatransminio_secret_2026
+      CORS_ORIGINS: https://fatrans.com.ve,https://www.fatrans.com.ve,https://auth.fatrans.com.ve,https://app.fatrans.com.ve,https://admin.fatrans.com.ve,https://api.fatrans.com.ve
+      JWT_SECRET: fatrans-fondo-ahorro-platform-super-secret-key-production-2026-v1
+      JWT_ISSUER: fatrans-fondo-ahorro
+      COOKIE_DOMAIN: .fatrans.com.ve
+      JWT_ACCESS_EXPIRATION_MINUTES: 60
+      JWT_REFRESH_EXPIRATION_DAYS: 7
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,36 +82,53 @@ services:
     ports:
       - "8080:8080"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/v1/auth/login | grep -E '405|400|200' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
+    networks:
+      - fatrans-network
+
+  # NOTA: ambos frontends usan la misma imagen (mismo BUILD_ID).
+  # Para reconstruir: docker build -t fatrans-frontend:latest ../frontend-web/
+  # Luego: docker tag fatrans-frontend:latest fatrans-frontend-public:latest
+  #        docker tag fatrans-frontend:latest fatrans-frontend-protected:latest
 
   frontend_public:
-    image: ghcr.io/fatrans/fatrans-frontend-public:latest
-    container_name: fatrans_frontend_public
+    image: fatrans-frontend-public:latest
+    container_name: fatrans-frontend-public
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:8080
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: https://api.fatrans.com.ve/api
+      NEXT_PUBLIC_APP_URL: https://app.fatrans.com.ve
+      NEXT_PUBLIC_ADMIN_URL: https://admin.fatrans.com.ve
+      BACKEND_URL: http://fatrans-backend:8080
+      JWT_SECRET: fatrans-fondo-ahorro-platform-super-secret-key-production-2026-v1
     restart: unless-stopped
+    networks:
+      - fatrans-network
 
   frontend_protected:
-    image: ghcr.io/fatrans/fatrans-frontend-protected:latest
-    container_name: fatrans_frontend_protected
+    image: fatrans-frontend-protected:latest
+    container_name: fatrans-frontend-protected
     ports:
       - "3001:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:8080
-      NEXT_PUBLIC_APP_URL: http://localhost:3001
+      NEXT_PUBLIC_API_URL: https://api.fatrans.com.ve/api
+      NEXT_PUBLIC_APP_URL: https://app.fatrans.com.ve
+      NEXT_PUBLIC_ADMIN_URL: https://admin.fatrans.com.ve
+      BACKEND_URL: http://fatrans-backend:8080
+      JWT_SECRET: fatrans-fondo-ahorro-platform-super-secret-key-production-2026-v1
     restart: unless-stopped
+    networks:
+      - fatrans-network
 
 volumes:
   postgres_data:
   minio_data:
 
 networks:
-  default:
-    name: fatrans_network
+  fatrans-network:
+    external: true

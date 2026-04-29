@@ -19,6 +19,7 @@ import {
   Bell,
   Settings,
   LogOut,
+  Shield,
 } from 'lucide-react';
 
 const menuItems = [
@@ -26,6 +27,7 @@ const menuItems = [
   { icon: Wallet, label: 'Cuentas', href: '/dashboard/cuentas' },
   { icon: CreditCard, label: 'Créditos', href: '/dashboard/creditos' },
   { icon: Users, label: 'Beneficiarios', href: '/dashboard/beneficiarios' },
+  { icon: Shield, label: 'KYC', href: '/dashboard/kyc' },
   { icon: FileText, label: 'Documentos', href: '/dashboard/documentos' },
   { icon: User, label: 'Mi Perfil', href: '/perfil' },
 ];
@@ -234,10 +236,6 @@ export function SocioShell({ children }: { children: React.ReactNode }) {
                       <Link href="/dashboard/documentos" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50">
                         <FileText className="w-4 h-4" />
                         Documentos
-                      </Link>
-                      <Link href="/dashboard/configuracion" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50">
-                        <Settings className="w-4 h-4" />
-                        Configuración
                       </Link>
                     </div>
                     <div className="py-2 border-t border-slate-100">

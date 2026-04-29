@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { creditosApi } from '@/lib/api/client';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -111,8 +111,10 @@ export default function AdminCreditosPage() {
       };
       if (filtroEstado) params['estado'] = filtroEstado;
 
-      const { data } = await creditosApi.getSolicitudesAdmin(params);
-      
+      const queryStr = new URLSearchParams(params).toString();
+      const res = await fetch(`/api/admin/creditos/solicitudes?${queryStr}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Error cargando creditos');
+      const data = await res.json();
       const content = data.content || data || [];
       setSolicitudes(content);
       

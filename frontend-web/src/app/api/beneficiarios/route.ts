@@ -30,6 +30,10 @@ export async function GET(request: NextRequest) {
 
     if (!backendResponse.ok) {
       const errorData = await backendResponse.json().catch(() => ({}));
+      // Backend retorna error cuando no hay beneficiarios — tratar como lista vacía
+      if (errorData.code === 'BENEFICIARIO_NO_ENCONTRADO' || backendResponse.status === 404) {
+        return NextResponse.json({ beneficiarios: [], total: 0 }, { status: 200 });
+      }
       return NextResponse.json(
         { message: errorData.message || 'Error al obtener beneficiarios' },
         { status: backendResponse.status }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
-import { adminApi, apiClient } from '@/lib/api/client';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,12 +48,12 @@ export default function SolicitudesPage() {
   const fetchSolicitudes = useCallback(async (page: number) => {
     setIsLoading(true);
     try {
-      const { data } = await adminApi.getSolicitudes();
-      // Adaptar a la respuesta del backend (Page o List)
-      const content = data.content || data.data?.solicitudes || data || [];
+      const res = await fetch("/api/admin/solicitudes", { credentials: "include" });
+      const data = await res.json();
+      const content = data.data?.solicitudes || data.content || data || [];
       setSolicitudes(content);
-      setTotalPages(data.totalPages || 1);
-      setTotalElementos(data.totalElements || content.length);
+      setTotalPages(data.data?.totalPaginas || data.totalPages || 1);
+      setTotalElementos(data.data?.totalElementos || data.totalElements || content.length);
     } catch (err) {
       console.error('Error fetching solicitudes:', err);
     } finally {
@@ -68,11 +68,12 @@ export default function SolicitudesPage() {
   const handleAprobar = async (id: string) => {
     setIsProcessing(true);
     try {
-      await apiClient.post(`/v1/socios/solicitudes/${id}/aprobar`);
+      const resA = await fetch(`/api/admin/solicitudes/${id}/aprobar`, { method: 'POST', credentials: 'include' });
+      if (!resA.ok) { const e = await resA.json().catch(() => ({})); throw new Error(e.message || 'Error al aprobar'); }
       toast.success('Solicitud aprobada');
       await fetchSolicitudes(currentPage);
-    } catch {
-      // Error ya manejado por interceptor
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al aprobar solicitud');
     } finally {
       setIsProcessing(false);
     }
@@ -91,12 +92,17 @@ export default function SolicitudesPage() {
 
     setIsProcessing(true);
     try {
-      await apiClient.post(`/v1/socios/solicitudes/${selectedId}/rechazar`, { motivo: rejectMotivo });
+      const resR = await fetch(`/api/admin/solicitudes/${selectedId}/rechazar`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivo: rejectMotivo }),
+      });
+      if (!resR.ok) { const e = await resR.json().catch(() => ({})); throw new Error(e.message || 'Error al rechazar'); }
       toast.success('Solicitud rechazada');
       setSelectedId(null);
       await fetchSolicitudes(currentPage);
-    } catch {
-      // Error ya manejado por interceptor
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al rechazar solicitud');
     } finally {
       setIsProcessing(false);
     }
