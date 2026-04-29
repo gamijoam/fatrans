@@ -72,8 +72,13 @@ export const cuentasApi = {
   getCuentas: (socioId: string) => apiClient.get(`/v1/cuentas/socio/${socioId}`),
   getCuenta: (numeroCuenta: string) => apiClient.get(`/v1/cuentas/${numeroCuenta}`),
   getSaldo: (numeroCuenta: string) => apiClient.get(`/v1/cuentas/${numeroCuenta}/saldo`),
-  getMovimientos: (numeroCuenta: string, page = 0, size = 10) => 
-    apiClient.get(`/v1/cuentas/${numeroCuenta}/movimientos?page=${page}&size=${size}`),
+  getMovimientos: (numeroCuenta: string, page = 0, size = 10, fechaInicio?: string, fechaFin?: string, tipoFiltro?: string) => {
+    let url = `/v1/cuentas/${numeroCuenta}/movimientos?page=${page}&size=${size}`;
+    if (fechaInicio) url += `&fechaInicio=${fechaInicio}`;
+    if (fechaFin) url += `&fechaFin=${fechaFin}`;
+    if (tipoFiltro) url += `&tipo=${tipoFiltro}`;
+    return apiClient.get(url);
+  },
   deposito: (numeroCuenta: string, monto: number) =>
     apiClient.post(`/v1/cuentas/${numeroCuenta}/depositos`, {
       monto,
@@ -95,11 +100,16 @@ export const creditosApi = {
     return apiClient.get(`/v1/admin/creditos/solicitudes${query ? `?${query}` : ''}`);
   },
   getSolicitudesPorSocio: (socioId: string) => apiClient.get(`/v1/creditos/solicitudes/socio/${socioId}`),
+  getSolicitud: (numero: string) => apiClient.get(`/v1/creditos/solicitudes/${numero}`),
+  crearSolicitud: (data: unknown) => apiClient.post('/v1/creditos/solicitudes', data),
   simular: (data: unknown) => apiClient.post('/v1/simulador', data),
 };
 
 export const adminApi = {
   getStats: () => apiClient.get('/v1/admin/dashboard/estadisticas'),
-  // Endpoint de actividad no existe en el backend, devolvemos array vacío para evitar 404/500
-  getActividad: () => Promise.resolve({ data: [] }),
+  getActividad: (limit: number = 15) => apiClient.get(`/v1/admin/actividad?limit=${limit}`),
+  getSolicitudes: (params?: Record<string, string>) => {
+    const query = params ? new URLSearchParams(params).toString() : '';
+    return apiClient.get(`/v1/admin/creditos/solicitudes${query ? `?${query}` : ''}`);
+  },
 };
