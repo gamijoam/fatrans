@@ -1,11 +1,11 @@
-import { LoginForm } from '@/components/features/auth/login-form';
+import type { Metadata } from "next";
+import { LoginFormNeobank } from '@/components/features/auth/login-form-neobank';
+
+export const metadata: Metadata = {
+  title: "Iniciar Sesión | Fatrans",
+  description: "Acceso seguro a tu cuenta Fatrans.",
+};
 
 export default function LoginPage() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-24 bg-gradient-to-br from-white via-green-50 to-blue-50">
-      <div className="w-full max-w-md">
-        <LoginForm />
-      </div>
-    </main>
-  );
+  return <LoginFormNeobank />;
 }
