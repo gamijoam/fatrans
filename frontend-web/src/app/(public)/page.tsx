@@ -42,11 +42,32 @@ function IconShield({ className = "" }: { className?: string }) {
   );
 }
 
+function IconTruck({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" />
+      <path d="M15 18H9" />
+      <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14" />
+      <circle cx="17" cy="18" r="2" />
+      <circle cx="7" cy="18" r="2" />
+    </svg>
+  );
+}
+
 function IconTrend({ className = "" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="m22 7-8.5 8.5-5-5L2 17" />
       <path d="M16 7h6v6" />
+    </svg>
+  );
+}
+
+function IconPhone({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="2" width="14" height="20" rx="2" />
+      <path d="M12 18h.01" />
     </svg>
   );
 }
@@ -72,6 +93,11 @@ const BENEFITS = [
     icon: IconCredit,
     title: "Crédito en 24 horas",
     description: "Solicita y recibe aprobación en un día. Colateral de tu propio ahorro. Sin paperwork innecesario.",
+  },
+  {
+    icon: IconTruck,
+    title: "Gestiona tu unidad",
+    description: "Registro de vehículo, rutas y turnos. Todo relacionado a tu cuenta de ahorro y crédito.",
   },
   {
     icon: IconShield,
@@ -102,6 +128,9 @@ function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-slate-100">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-[#16A34A] flex items-center justify-center">
+            <IconTruck className="w-4 h-4 text-white" />
+          </div>
           <span className="text-xl font-bold text-[#0F2744]">Fatrans</span>
         </div>
 
@@ -119,13 +148,13 @@ function Navbar() {
             href="/login"
             className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-[#0F2744] transition"
           >
-            Tu Cartera
+            Iniciar sesión
           </a>
           <a
             href="/registro"
             className="px-5 py-2.5 bg-[#16A34A] text-white text-sm font-semibold rounded-lg hover:bg-[#15803D] transition shadow-sm"
           >
-            Afíliate con nosotros
+            Abre tu cuenta
           </a>
         </div>
       </div>
@@ -159,7 +188,7 @@ function Hero() {
                 href="/registro"
                 className="inline-flex items-center justify-center px-8 py-4 bg-[#16A34A] text-white font-semibold rounded-xl hover:bg-[#15803D] transition shadow-lg shadow-[#16A34A]/20"
               >
-                Afíliate con nosotros
+                Abre tu cuenta gratis
               </a>
               <a
                 href="#beneficios"
@@ -392,7 +421,7 @@ function CTABand() {
     <section className="py-20 bg-[#16A34A]">
       <div className="max-w-4xl mx-auto px-6 text-center">
         <h2 className="text-3xl lg:text-4xl font-bold text-white mb-6">
-          Obtén tu cuenta en minutos, solo con tu cédula
+          Abre tu cuenta en minutos, solo con tu cédula
         </h2>
         <p className="text-lg text-white/80 mb-10 max-w-xl mx-auto">
           Sin costos de apertura. Sin mantenimiento. Sin letra pequeña. Empieza a ahorrar hoy mismo.
@@ -402,7 +431,7 @@ function CTABand() {
             href="/registro"
             className="inline-flex items-center justify-center px-10 py-4 bg-white text-[#16A34A] font-bold rounded-xl hover:bg-slate-100 transition shadow-lg"
           >
-            Obtén tu cuenta
+            Crear mi cuenta gratis
           </a>
           <a
             href="/login"
@@ -423,6 +452,9 @@ function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-[#16A34A] flex items-center justify-center">
+                <IconTruck className="w-4 h-4 text-white" />
+              </div>
               <span className="text-xl font-bold">Fatrans</span>
             </div>
             <p className="text-sm text-slate-400 leading-relaxed">
@@ -434,7 +466,7 @@ function Footer() {
             <h4 className="font-semibold mb-4">Plataforma</h4>
             <ul className="space-y-2 text-sm text-slate-400">
               <li><a href="/registro" className="hover:text-white transition">Registrarse</a></li>
-              <li><a href="/login" className="hover:text-white transition">Tu Cartera</a></li>
+              <li><a href="/login" className="hover:text-white transition">Iniciar sesión</a></li>
               <li><a href="#beneficios" className="hover:text-white transition">Beneficios</a></li>
             </ul>
           </div>
