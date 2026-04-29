@@ -1,85 +1,397 @@
-import React from 'react';
-import { AccountCard } from '@/components/ui/account-card';
-import { Car, AlertTriangle } from 'lucide-react';
+'use client';
 
-export default function DashboardPage() {
-  // Simulación de datos para la vista del transportista
-  const tasaBcvHoy = 50.20;
-  
+import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
+import { useAuthStore } from '@/stores/auth-store';
+import { Loader2, Wallet, CreditCard, TrendingUp, Plus, ArrowUpRight, ArrowDownRight, Truck, AlertTriangle, Shield, ChevronRight, FileText, Calendar } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+
+interface CuentaAhorro {
+  id: string;
+  numeroCuenta: string;
+  tipoCuenta: string;
+  moneda: string;
+  saldoActual: number;
+  estado: string;
+}
+
+interface Actividad {
+  id: string;
+  tipo: 'DEPOSITO' | 'RETIRO' | 'INTERES';
+  descripcion: string;
+  monto: number;
+  fecha: string;
+  icono: string;
+}
+
+function formatCurrency(amount: number, currency: string = 'VES') {
+  return new Intl.NumberFormat('es-VE', {
+    style: 'currency',
+    currency: currency === 'USD' ? 'USD' : 'VES',
+    minimumFractionDigits: 2,
+  }).format(amount);
+}
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString('es-VE', {
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+function maskAccountNumber(numero: string) {
+  return numero.replace(/.(?=.{4})/g, '*');
+}
+
+function AccountCard({ cuenta }: { cuenta: CuentaAhorro }) {
+  const isUSD = cuenta.moneda === 'USD';
+  const gradient = isUSD
+    ? 'from-slate-800 to-slate-900'
+    : 'from-[#0F2744] to-[#1a4a7a]';
+
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
-      {/* Header Personalizado */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Hola, Carlos 👋</h1>
-        <p className="text-gray-500 mt-1">Lunes, 27 Abr 2026</p>
+    <div className="relative overflow-hidden rounded-2xl">
+      <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
+      <div className="relative p-6 text-white">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2">
+            <Wallet className="w-5 h-5 text-white/70" />
+            <span className="text-sm font-medium text-white/70">
+              {cuenta.tipoCuenta === 'AHORRO' ? 'Cuenta de Ahorro' : cuenta.tipoCuenta}
+            </span>
+          </div>
+          <span className="text-xs font-medium px-2 py-1 bg-white/20 rounded-full">
+            {isUSD ? 'USD' : 'VES'}
+          </span>
+        </div>
+
+        <div className="mb-6">
+          <p className="text-xs text-white/50 mb-1">Saldo Disponible</p>
+          <p className="text-3xl font-bold tracking-tight">
+            {formatCurrency(cuenta.saldoActual, cuenta.moneda)}
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-white/50">Número de Cuenta</p>
+            <p className="text-sm font-medium tracking-wider">
+              {maskAccountNumber(cuenta.numeroCuenta)}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="text-xs text-white/70">{cuenta.estado}</span>
+          </div>
+        </div>
+      </div>
+      {/* Decorative circles */}
+      <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-white/5" />
+      <div className="absolute -bottom-5 -right-5 w-20 h-20 rounded-full bg-white/5" />
+    </div>
+  );
+}
+
+function QuickActionButton({ icon: Icon, label, onClick, color }: { icon: typeof Plus; label: string; onClick?: () => void; color: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all active:scale-95 min-w-[100px]"
+    >
+      <div className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center`}>
+        <Icon className="w-6 h-6 text-white" />
+      </div>
+      <span className="text-xs font-medium text-slate-700 text-center">{label}</span>
+    </button>
+  );
+}
+
+function VehicleAlertBanner() {
+  return (
+    <div className="flex items-center gap-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+      <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+        <AlertTriangle className="w-6 h-6 text-amber-600" />
+      </div>
+      <div className="flex-1">
+        <p className="text-sm font-semibold text-amber-900">SOAT vence en 15 días</p>
+        <p className="text-xs text-amber-700">Renueva tu seguro antes del 15 May 2026</p>
+      </div>
+      <button className="px-4 py-2 bg-amber-500 text-white text-xs font-semibold rounded-lg hover:bg-amber-600 transition-colors">
+        Renovarlo
+      </button>
+    </div>
+  );
+}
+
+function VehicleCard() {
+  return (
+    <Card className="overflow-hidden border-slate-200">
+      <div className="bg-gradient-to-r from-[#0F2744] to-[#1a4a7a] p-5 text-white">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
+            <Truck className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="font-semibold">Toyota Hilux</p>
+            <p className="text-xs text-white/70">Placa: ABC-1234</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-xs text-white/50">Año</p>
+            <p className="font-medium">2022</p>
+          </div>
+          <div>
+            <p className="text-xs text-white/50">Color</p>
+            <p className="font-medium">Gris Oscuro</p>
+          </div>
+        </div>
+      </div>
+      <CardContent className="p-4">
+        <VehicleAlertBanner />
+        <div className="mt-4 flex items-center justify-between">
+          <Link href="/dashboard/unidad" className="text-xs text-[#16A34A] font-medium hover:underline flex items-center gap-1">
+            Ver detalle <ChevronRight className="w-3 h-3" />
+          </Link>
+          <button className="text-xs text-slate-500 hover:text-slate-700">
+            Editar
+          </button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TransactionItem({ actividad }: { actividad: Actividad }) {
+  const isDeposit = actividad.tipo === 'DEPOSITO' || actividad.tipo === 'INTERES';
+  const isInterest = actividad.tipo === 'INTERES';
+
+  const iconBg = isInterest ? 'bg-emerald-100' : isDeposit ? 'bg-emerald-100' : 'bg-slate-100';
+  const iconColor = isInterest ? 'text-emerald-600' : isDeposit ? 'text-emerald-600' : 'text-slate-600';
+  const IconComponent = isDeposit ? ArrowDownRight : ArrowUpRight;
+
+  return (
+    <div className="flex items-center gap-4 py-4 border-b border-slate-100 last:border-0">
+      <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center flex-shrink-0`}>
+        <IconComponent className={`w-5 h-5 ${iconColor}`} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-slate-900 truncate">{actividad.descripcion}</p>
+        <p className="text-xs text-slate-500">{formatDate(actividad.fecha)}</p>
+      </div>
+      <div className={`text-sm font-semibold ${isDeposit ? 'text-emerald-600' : 'text-slate-700'}`}>
+        {isDeposit ? '+' : '-'}{formatCurrency(actividad.monto)}
+      </div>
+    </div>
+  );
+}
+
+function ProgressBar({ percentage, color }: { percentage: number; color: string }) {
+  return (
+    <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+      <div
+        className={`h-full ${color} rounded-full transition-all duration-500`}
+        style={{ width: `${Math.min(percentage, 100)}%` }}
+      />
+    </div>
+  );
+}
+
+export default function SocioDashboardPage() {
+  const user = useAuthStore((state) => state.user);
+  const isLoading = useAuthStore((state) => state.isLoading);
+
+  const [cuentas, setCuentas] = useState<CuentaAhorro[]>([]);
+  const [loadingCuentas, setLoadingCuentas] = useState(true);
+
+  const cargarCuentas = useCallback(async () => {
+    if (!user?.socioId) return;
+    setLoadingCuentas(true);
+    try {
+      const res = await fetch(`/api/cuentas/socio/${user.socioId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCuentas(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      setLoadingCuentas(false);
+    }
+  }, [user?.socioId]);
+
+  useEffect(() => {
+    if (!isLoading && user?.socioId) {
+      cargarCuentas();
+    }
+  }, [isLoading, user?.socioId, cargarCuentas]);
+
+  const saldoTotal = cuentas.reduce((acc, c) => acc + c.saldoActual, 0);
+  const cuentaPrincipal = cuentas.find(c => c.moneda === 'VES') || cuentas[0];
+
+  const mockActividad: Actividad[] = [
+    { id: '1', tipo: 'DEPOSITO', descripcion: 'Depósito en efectivo', monto: 500000, fecha: '2026-04-28', icono: 'down' },
+    { id: '2', tipo: 'RETIRO', descripcion: 'Retiro en cajero', monto: 150000, fecha: '2026-04-27', icono: 'up' },
+    { id: '3', tipo: 'INTERES', descripcion: 'Abono de intereses', monto: 12500, fecha: '2026-04-26', icono: 'down' },
+    { id: '4', tipo: 'DEPOSITO', descripcion: 'Transferencia recibida', monto: 2000000, fecha: '2026-04-25', icono: 'down' },
+  ];
+
+  const mockBeneficiarios = [
+    { nombre: 'María García', porcentaje: 60 },
+    { nombre: 'Juan Pérez', porcentaje: 30 },
+    { nombre: 'Ana López', porcentaje: 10 },
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-[#16A34A]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto">
+      {/* Welcome Section */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#0F2744]">
+            Hola, {user?.nombreCompleto?.split(' ')[0] || ' Socio'}
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">Aquí está el resumen de tu cuenta</p>
+        </div>
       </div>
 
-      {/* Grid Principal */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Columna Izquierda: Cuentas (Ocupa 2 espacios en LG) */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
-          <h2 className="text-xl font-semibold text-[#1A3C6E] flex items-center gap-2">
-            Tus Cuentas
-          </h2>
-          
-          <div className="flex flex-wrap gap-6">
-            <AccountCard 
-              numeroCuenta="01340001000000005678"
-              saldoVes={12450000.50}
-              tasaBcv={tasaBcvHoy}
-              estado="ACTIVA"
-              tipo="CORRIENTE"
-            />
-            
-            <AccountCard 
-              numeroCuenta="01340001000000009999"
-              saldoVes={5000000.00}
-              tasaBcv={tasaBcvHoy}
-              estado="ACTIVA"
-              tipo="EMERGENCIA"
-            />
+      {/* Hero Balance Card */}
+      <div className="bg-gradient-to-br from-[#0F2744] via-[#0F2744] to-[#1a4a7a] rounded-3xl p-6 lg:p-8 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-white/5 translate-y-1/2 -translate-x-1/2" />
+
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-1">
+            <Shield className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-medium text-white/60 uppercase tracking-wider">Saldo Total Disponible</span>
+          </div>
+          <p className="text-4xl lg:text-5xl font-bold tracking-tight mb-6">
+            {formatCurrency(saldoTotal)}
+          </p>
+
+          {/* Quick Actions */}
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/dashboard/cuentas"
+              className="flex items-center gap-2 px-5 py-3 bg-white text-[#0F2744] font-semibold rounded-xl hover:bg-slate-100 transition-colors shadow-lg"
+            >
+              <Plus className="w-5 h-5" />
+              Aportar
+            </Link>
+            <Link
+              href="/dashboard/creditos/solicitar"
+              className="flex items-center gap-2 px-5 py-3 bg-[#16A34A] text-white font-semibold rounded-xl hover:bg-[#15803D] transition-colors shadow-lg"
+            >
+              <CreditCard className="w-5 h-5" />
+              Solicitar Crédito
+            </Link>
           </div>
         </div>
+      </div>
 
-        {/* Columna Derecha: Transporte / Unidad */}
-        <div className="flex flex-col gap-6">
-          <h2 className="text-xl font-semibold text-[#1A3C6E] flex items-center gap-2">
-            <Car size={24} />
-            Tu Unidad
-          </h2>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider font-bold">Encava Ent-610</p>
-                <h3 className="text-xl font-mono font-bold text-gray-800">AA11BB2</h3>
-              </div>
-              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-medium">Buseta</span>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-500">Año</span>
-                <span className="font-medium text-gray-900">2012</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-500">Ruta</span>
-                <span className="font-medium text-gray-900">Caracas - Guarenas</span>
-              </div>
-            </div>
-
-            {/* Alerta de Vencimiento de SOAT (Simulando el Epic de Transporte) */}
-            <div className="mt-5 p-3 bg-orange-50 border border-orange-200 rounded-lg flex gap-3">
-              <AlertTriangle className="text-orange-500 shrink-0" size={20} />
-              <div>
-                <p className="text-sm font-semibold text-orange-800">El Seguro SOAT vence en 15 días</p>
-                <p className="text-xs text-orange-600 mt-1">Tienes fondos suficientes en tu cuenta de Emergencia para renovarlo.</p>
-              </div>
-            </div>
-
-          </div>
+      {/* Account Cards */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-[#0F2744]">Mis Cuentas</h2>
+          <Link href="/dashboard/cuentas" className="text-sm text-[#16A34A] font-medium hover:underline">
+            Ver todas
+          </Link>
         </div>
+
+        {loadingCuentas ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-[#16A34A]" />
+          </div>
+        ) : cuentas.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {cuentas.map((cuenta) => (
+              <Link key={cuenta.id} href={`/dashboard/cuentas/${cuenta.numeroCuenta}`}>
+                <AccountCard cuenta={cuenta} />
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <Card className="p-8 text-center border-dashed border-2 border-slate-200 bg-slate-50">
+            <Wallet className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 mb-4">No tienes cuentas activas aún</p>
+            <Link
+              href="/dashboard/cuentas"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#16A34A] text-white text-sm font-medium rounded-lg hover:bg-[#15803D]"
+            >
+              <Plus className="w-4 h-4" />
+              Abrir cuenta
+            </Link>
+          </Card>
+        )}
+      </div>
+
+      {/* Two Column Grid: Activity & Vehicle */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Activity */}
+        <Card className="border-slate-200">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h3 className="font-semibold text-[#0F2744]">Actividad Reciente</h3>
+              <Link href="/dashboard/cuentas" className="text-xs text-[#16A34A] font-medium hover:underline">
+                Ver todo
+              </Link>
+            </div>
+            <div className="px-5">
+              {mockActividad.map((actividad) => (
+                <TransactionItem key={actividad.id} actividad={actividad} />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Vehicle Card */}
+        <div className="space-y-4">
+          <VehicleCard />
+
+          {/* Beneficiaries Summary */}
+          <Card className="border-slate-200">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-[#0F2744]">Beneficiarios</h3>
+                <Link href="/dashboard/beneficiarios" className="text-xs text-[#16A34A] font-medium hover:underline">
+                  Gestionar
+                </Link>
+              </div>
+
+              <div className="space-y-3 mb-4">
+                {mockBeneficiarios.map((b) => (
+                  <div key={b.nombre}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-slate-700">{b.nombre}</span>
+                      <span className="font-medium text-[#0F2744]">{b.porcentaje}%</span>
+                    </div>
+                    <ProgressBar percentage={b.porcentaje} color="bg-[#16A34A]" />
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                <span className="text-sm font-medium text-slate-700">Total asignado</span>
+                <span className="text-sm font-bold text-emerald-600">100%</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Quick Links */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <QuickActionButton icon={FileText} label="Documentos" color="bg-slate-600" />
+        <QuickActionButton icon={Calendar} label="Simulador" color="bg-[#0F2744]" />
+        <QuickActionButton icon={Truck} label="Mi Unidad" color="bg-amber-500" />
+        <QuickActionButton icon={Shield} label="KYC" color="bg-emerald-600" />
       </div>
     </div>
   );
