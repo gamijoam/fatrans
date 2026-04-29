@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
-import { adminApi } from '@/lib/api/client';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -207,8 +207,8 @@ export default function AdminDashboardPage() {
   const cargarStats = useCallback(async () => {
     setLoadingStats(true);
     try {
-      const { data } = await adminApi.getStats();
-      setStats(data);
+      const res = await fetch("/api/admin/dashboard/estadisticas", { credentials: "include" });
+      if (res.ok) { const data = await res.json(); setStats(data); } else { throw new Error("Error stats"); }
     } catch (err) {
       console.error('Error cargando stats:', err);
     } finally {
@@ -219,7 +219,8 @@ export default function AdminDashboardPage() {
   const cargarActividad = useCallback(async () => {
     setLoadingActividad(true);
     try {
-      const { data } = await adminApi.getActividad(15);
+      const resA = await fetch("/api/admin/dashboard/actividad?limit=15", { credentials: "include" });
+      const data = resA.ok ? await resA.json() : [];
       setActividadReciente(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error cargando actividad:', err);

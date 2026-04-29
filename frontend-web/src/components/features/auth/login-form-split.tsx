@@ -62,12 +62,8 @@ export function LoginFormSplit() {
         throw new Error(result.message || 'Credenciales inválidas');
       }
 
-      const userResponse = await fetch('/api/auth/me', {
-        credentials: 'include',
-      });
-
-      if (userResponse.ok) {
-        const userData = await userResponse.json();
+      if (result.success && result.user) {
+        const userData = result.user;
         setUser({
           id: userData.id,
           nombreUsuario: userData.nombreUsuario,
@@ -80,13 +76,16 @@ export function LoginFormSplit() {
         setLoading(false);
 
         const rol = userData.rol;
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fatrans.com.ve';
+        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'https://admin.fatrans.com.ve';
+
         if (rol === 'SOCIO') {
-          router.push('/dashboard');
+          window.location.href = `${appUrl}/dashboard`;
         } else {
-          router.push('/admin');
+          window.location.href = `${adminUrl}/admin`;
         }
       }
-    } catch (error) {
+      } catch (error) {
       setLoading(false);
       console.error('Login error:', error);
       const message = error instanceof Error ? sanitizeHTML(error.message) : 'Error de conexión';

@@ -9,6 +9,10 @@ export async function POST(request: NextRequest) {
     'http://localhost:3000',
     'http://localhost:13000',
     process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_ADMIN_URL,
+    'https://auth.fatrans.com.ve',
+    'https://www.fatrans.com.ve',
+    'https://fatrans.com.ve',
   ].filter(Boolean);
 
   if (origin && !allowedOrigins.includes(origin)) {
@@ -46,9 +50,11 @@ export async function POST(request: NextRequest) {
 
     const setCookieHeaders = backendResponse.headers.getSetCookie();
     
-    const accessToken = setCookieHeaders
+    let accessToken = setCookieHeaders
       .find(c => c.startsWith('access_token='))
       ?.split(';')[0]?.replace('access_token=', '') || '';
+      
+    accessToken = accessToken.replace(/^"|"$/g, '');
     
     const userId = backendResponse.headers.get('X-User-Id') || '';
     const userRol = backendResponse.headers.get('X-User-Rol') || '';

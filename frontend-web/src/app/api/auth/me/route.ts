@@ -13,9 +13,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    let accessTokenValue = accessToken.value;
+    accessTokenValue = accessTokenValue.replace(/^"|"$/g, '');
+
     const backendResponse = await fetch(`${BACKEND_URL}/api/v1/auth/me`, {
       method: 'GET',
-      headers: { 'Authorization': `Bearer ${accessToken.value}` },
+      headers: { 'Authorization': `Bearer ${accessTokenValue}` },
       credentials: 'include',
     });
 

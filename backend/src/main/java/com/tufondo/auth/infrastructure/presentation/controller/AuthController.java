@@ -79,13 +79,16 @@ public class AuthController {
         LoginResponseDTO login = authUseCase.login(request, clientIp);
         boolean isSecure = isSecureCookie(httpRequest);
 
+        String cookieDomain = System.getenv().getOrDefault("COOKIE_DOMAIN", ".fatrans.com.ve");
+
         // Crear cookie de access token (httpOnly, secure, sameSite)
         ResponseCookie accessCookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE, login.accessToken())
                 .httpOnly(true)
                 .secure(isSecure)
                 .path("/")
                 .maxAge(ACCESS_TOKEN_MAX_AGE)
-                .sameSite("Strict")
+                .sameSite("Lax")
+                .domain(cookieDomain)
                 .build();
         httpResponse.addHeader("Set-Cookie", accessCookie.toString());
 
@@ -96,7 +99,8 @@ public class AuthController {
                 .secure(isSecure)
                 .path("/api/v1/auth/refresh-web")
                 .maxAge(REFRESH_TOKEN_MAX_AGE)
-                .sameSite("Strict")
+                .sameSite("Lax")
+                .domain(cookieDomain)
                 .build();
         httpResponse.addHeader("Set-Cookie", refreshCookie.toString());
 
