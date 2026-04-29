@@ -1,6 +1,9 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 
+ARG NEXT_PUBLIC_API_URL=https://fatrans.com.ve/api
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 COPY package.json package-lock.json* ./
 RUN npm ci
 
@@ -19,6 +22,5 @@ COPY --from=builder /app/public ./public
 EXPOSE 3000
 
 ENV PORT=3000
-ENV NEXT_PUBLIC_API_URL=http://backend:8080/api
 
 CMD ["node", "server.js"]
