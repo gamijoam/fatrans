@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Fatans | El respaldo financiero del transportista",
+  title: "Fatrans | El respaldo financiero del transportista",
   description: "Ahorra en VES y USD, accede a crédito express y gestiona tu unidad. Solo con tu cédula.",
   openGraph: {
-    title: "Fatans | Finanzas para el Transporte",
+    title: "Fatrans | Finanzas para el Transporte",
     description: "Tu fondo de ahorro diseñado para choferes, propietarios y mecánicos.",
     type: "website",
   },
@@ -131,7 +131,7 @@ function Navbar() {
           <div className="w-8 h-8 rounded-lg bg-[#16A34A] flex items-center justify-center">
             <IconTruck className="w-4 h-4 text-white" />
           </div>
-          <span className="text-xl font-bold text-[#0F2744]">Fatans</span>
+          <span className="text-xl font-bold text-[#0F2744]">Fatrans</span>
         </div>
 
         <div className="hidden md:flex items-center gap-8">
@@ -455,7 +455,7 @@ function Footer() {
               <div className="w-8 h-8 rounded-lg bg-[#16A34A] flex items-center justify-center">
                 <IconTruck className="w-4 h-4 text-white" />
               </div>
-              <span className="text-xl font-bold">Fatans</span>
+              <span className="text-xl font-bold">Fatrans</span>
             </div>
             <p className="text-sm text-slate-400 leading-relaxed">
               Plataforma financiera para el sector transporte venezolano.
