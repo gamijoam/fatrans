@@ -46,10 +46,14 @@ export default function RecuperarPasswordPage() {
       }
 
       setSubmitted(true);
-      toast.success('Correo enviado', 'Si el email existe en nuestro sistema, recibirás un enlace de recuperación');
+      toast.success('Correo enviado', {
+        description: 'Si el email existe en nuestro sistema, recibirás un enlace de recuperación',
+      });
     } catch (err) {
       console.error('Error:', err);
-      toast.error('Error', err instanceof Error ? err.message : 'No se pudo procesar la solicitud');
+      toast.error('Error', {
+        description: err instanceof Error ? err.message : 'No se pudo procesar la solicitud',
+      });
     } finally {
       setLoading(false);
     }
