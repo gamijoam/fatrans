@@ -1,6 +1,5 @@
 name: Deploy → QA
 
-# Se dispara automáticamente al hacer merge a develop
 on:
   push:
     branches: [develop]
@@ -15,6 +14,10 @@ jobs:
     name: Deploy a QA (qa.fatrans.com.ve)
     runs-on: ubuntu-latest
 
+    permissions:
+      pull-requests: write
+      issues: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,47 +29,13 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
-          # 20 minutos — el build del frontend Next.js tarda ~5min en el VPS
-          timeout: 20m
+          timeout: 15m
           script: |
-            # Ejecutar deploy en background con nohup para que no muera si el SSH cierra
-            nohup bash /opt/fatrans-qa/deploy-qa.sh ${{ github.sha }} > /var/log/fatrans-qa-deploy.log 2>&1 &
-            DEPLOY_PID=$!
-            echo "Deploy iniciado con PID $DEPLOY_PID"
-
-            # Esperar hasta 18 minutos monitoreando el log
-            for i in $(seq 1 108); do
-              sleep 10
-
-              # Verificar si el proceso terminó
-              if ! kill -0 $DEPLOY_PID 2>/dev/null; then
-                # Proceso terminó — ver si fue exitoso
-                if grep -q "Deploy QA completado exitosamente" /var/log/fatrans-qa-deploy.log; then
-                  echo "✅ Deploy QA exitoso"
-                  tail -5 /var/log/fatrans-qa-deploy.log
-                  exit 0
-                else
-                  echo "❌ Deploy QA falló"
-                  tail -20 /var/log/fatrans-qa-deploy.log
-                  exit 1
-                fi
-              fi
-
-              # Mostrar última línea del log cada 30s
-              if [ $((i % 3)) -eq 0 ]; then
-                echo "⏳ [$(date '+%H:%M:%S')] $(tail -1 /var/log/fatrans-qa-deploy.log)"
-              fi
-            done
-
-            # Timeout alcanzado
-            echo "❌ Timeout — el deploy tardó más de 18 minutos"
-            tail -10 /var/log/fatrans-qa-deploy.log
-            exit 1
+            bash /opt/fatrans-qa/deploy-qa.sh ${{ github.sha }}
 
       - name: Verificar QA levantado
-        if: success()
         run: |
-          sleep 10
+          sleep 15
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://qa.fatrans.com.ve || echo "000")
           echo "QA HTTP status: $STATUS"
 
@@ -78,17 +47,15 @@ jobs:
             const status = '${{ job.status }}';
             const sha = context.sha.substring(0, 7);
             const icon = status === 'success' ? '✅' : '❌';
-
             const msg = status === 'success'
-              ? `${icon} **Deploy QA exitoso** — \`${sha}\`\n\n🌐 https://qa.fatrans.com.ve\n🌐 https://qa-app.fatrans.com.ve\n🌐 https://qa-admin.fatrans.com.ve`
-              : `${icon} **Deploy QA FALLÓ** — \`${sha}\` — revisar logs en VPS: \`cat /var/log/fatrans-qa-deploy.log\``;
-
+              ? icon + ' **Deploy QA exitoso** — ' + sha + '\n\n🌐 https://qa.fatrans.com.ve\n🌐 https://qa-app.fatrans.com.ve\n🌐 https://qa-admin.fatrans.com.ve'
+              : icon + ' **Deploy QA FALLÓ** — ' + sha + ' — revisar logs en GitHub Actions';
             const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
               owner: context.repo.owner,
               repo: context.repo.repo,
               commit_sha: context.sha
             });
-
+            if (prs.data.length === 0) { console.log('Sin PRs asociados.'); return; }
             for (const pr of prs.data) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
