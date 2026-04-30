@@ -13,6 +13,7 @@ jobs:
   deploy-qa:
     name: Deploy a QA (qa.fatrans.com.ve)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     permissions:
       pull-requests: write
@@ -29,15 +30,19 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
-          timeout: 15m
+          timeout: 25m
+          command_timeout: 25m
           script: |
             bash /opt/fatrans-qa/deploy-qa.sh ${{ github.sha }}
 
       - name: Verificar QA levantado
         run: |
           sleep 15
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://qa.fatrans.com.ve || echo "000")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://qa-auth.fatrans.com.ve || echo "000")
           echo "QA HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "301" ] && [ "$STATUS" != "302" ]; then
+            echo "⚠️ QA no responde con 200 (status: $STATUS)"
+          fi
 
       - name: Notificar resultado
         if: always()
@@ -48,8 +53,8 @@ jobs:
             const sha = context.sha.substring(0, 7);
             const icon = status === 'success' ? '✅' : '❌';
             const msg = status === 'success'
-              ? icon + ' **Deploy QA exitoso** — ' + sha + '\n\n🌐 https://qa.fatrans.com.ve\n🌐 https://qa-app.fatrans.com.ve\n🌐 https://qa-admin.fatrans.com.ve'
-              : icon + ' **Deploy QA FALLÓ** — ' + sha + ' — revisar logs en GitHub Actions';
+              ? `${icon} **Deploy QA exitoso** — \`${sha}\`\n\n🌐 https://qa-auth.fatrans.com.ve\n🌐 https://qa-app.fatrans.com.ve\n🌐 https://qa-admin.fatrans.com.ve`
+              : `${icon} **Deploy QA FALLÓ** — \`${sha}\` — revisar logs en GitHub Actions`;
             const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
               owner: context.repo.owner,
               repo: context.repo.repo,
