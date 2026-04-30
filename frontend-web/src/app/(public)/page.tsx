@@ -145,13 +145,13 @@ function Navbar() {
 
         <div className="flex items-center gap-3">
           <a
-            href="/login"
+            href={process.env.NEXT_PUBLIC_AUTH_URL ? `${process.env.NEXT_PUBLIC_AUTH_URL}/login` : "/login"}
             className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-[#0F2744] transition"
           >
             Iniciar sesión
           </a>
           <a
-            href="/registro"
+            href={process.env.NEXT_PUBLIC_AUTH_URL ? `${process.env.NEXT_PUBLIC_AUTH_URL}/registro` : "/registro"}
             className="px-5 py-2.5 bg-[#16A34A] text-white text-sm font-semibold rounded-lg hover:bg-[#15803D] transition shadow-sm"
           >
             Abre tu cuenta
@@ -185,7 +185,7 @@ function Hero() {
 
             <div className="flex flex-col sm:flex-row gap-4">
               <a
-                href="/registro"
+                href={process.env.NEXT_PUBLIC_AUTH_URL ? `${process.env.NEXT_PUBLIC_AUTH_URL}/registro` : "/registro"}
                 className="inline-flex items-center justify-center px-8 py-4 bg-[#16A34A] text-white font-semibold rounded-xl hover:bg-[#15803D] transition shadow-lg shadow-[#16A34A]/20"
               >
                 Abre tu cuenta gratis
@@ -343,7 +343,7 @@ function Benefits() {
             </div>
 
             <a
-              href="/registro"
+              href={process.env.NEXT_PUBLIC_AUTH_URL ? `${process.env.NEXT_PUBLIC_AUTH_URL}/registro` : "/registro"}
               className="block w-full py-4 bg-[#16A34A] text-white font-semibold text-center rounded-xl hover:bg-[#15803D] transition"
             >
               Empieza a ahorrar
@@ -428,13 +428,13 @@ function CTABand() {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <a
-            href="/registro"
+            href={process.env.NEXT_PUBLIC_AUTH_URL ? `${process.env.NEXT_PUBLIC_AUTH_URL}/registro` : "/registro"}
             className="inline-flex items-center justify-center px-10 py-4 bg-white text-[#16A34A] font-bold rounded-xl hover:bg-slate-100 transition shadow-lg"
           >
             Crear mi cuenta gratis
           </a>
           <a
-            href="/login"
+            href={process.env.NEXT_PUBLIC_AUTH_URL ? `${process.env.NEXT_PUBLIC_AUTH_URL}/login` : "/login"}
             className="inline-flex items-center justify-center px-10 py-4 border-2 border-white text-white font-semibold rounded-xl hover:bg-white/10 transition"
           >
             Ya tengo cuenta
@@ -465,8 +465,8 @@ function Footer() {
           <div>
             <h4 className="font-semibold mb-4">Plataforma</h4>
             <ul className="space-y-2 text-sm text-slate-400">
-              <li><a href="/registro" className="hover:text-white transition">Registrarse</a></li>
-              <li><a href="/login" className="hover:text-white transition">Iniciar sesión</a></li>
+              <li><a href={process.env.NEXT_PUBLIC_AUTH_URL ? `${process.env.NEXT_PUBLIC_AUTH_URL}/registro` : "/registro"} className="hover:text-white transition">Registrarse</a></li>
+              <li><a href={process.env.NEXT_PUBLIC_AUTH_URL ? `${process.env.NEXT_PUBLIC_AUTH_URL}/login` : "/login"} className="hover:text-white transition">Iniciar sesión</a></li>
               <li><a href="#beneficios" className="hover:text-white transition">Beneficios</a></li>
             </ul>
           </div>
