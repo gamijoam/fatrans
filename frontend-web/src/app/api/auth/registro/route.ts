@@ -4,25 +4,6 @@ import { registroSchema } from '@/lib/utils/validators';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get('origin');
-  const referer = request.headers.get('referer');
-    const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:13000',
-    process.env.NEXT_PUBLIC_APP_URL,
-    process.env.NEXT_PUBLIC_ADMIN_URL,
-    process.env.NEXT_PUBLIC_AUTH_URL,
-  ].filter(Boolean);
-
-  const allowedReferers = [
-    'http://localhost:3000',
-    'http://localhost:13000',
-  ];
-
-  if (origin && !allowedOrigins.includes(origin)) {
-    return NextResponse.json({ message: 'Origen no permitido' }, { status: 403 });
-  }
-
   if (referer && !allowedReferers.some((r) => referer.startsWith(r))) {
     return NextResponse.json({ message: 'Referer no permitido' }, { status: 403 });
   }

@@ -7,19 +7,6 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const origin = request.headers.get('origin');
-    const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:13000',
-    process.env.NEXT_PUBLIC_APP_URL,
-    process.env.NEXT_PUBLIC_ADMIN_URL,
-    process.env.NEXT_PUBLIC_AUTH_URL,
-  ].filter(Boolean);
-
-  if (origin && !allowedOrigins.includes(origin)) {
-    return NextResponse.json({ message: 'Origen no permitido' }, { status: 403 });
-  }
-
   try {
     const accessToken = request.cookies.get('access_token');
     const authResult = validateAdminAccess({ accessToken: accessToken?.value });

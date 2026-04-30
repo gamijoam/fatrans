@@ -4,19 +4,6 @@ import { validateAdminAccess } from '@/lib/auth/admin-validation';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 
 export async function GET(request: NextRequest) {
-  const origin = request.headers.get('origin');
-    const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:13000',
-    process.env.NEXT_PUBLIC_APP_URL,
-    process.env.NEXT_PUBLIC_ADMIN_URL,
-    process.env.NEXT_PUBLIC_AUTH_URL,
-  ].filter(Boolean);
-
-  if (origin && !allowedOrigins.includes(origin)) {
-    return NextResponse.json({ message: 'Origen no permitido' }, { status: 403 });
-  }
-
   try {
     const accessToken = request.cookies.get('access_token');
     const authResult = validateAdminAccess({ accessToken: accessToken?.value });
