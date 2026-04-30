@@ -17,10 +17,12 @@ const changePasswordRequestSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const origin = request.headers.get('origin');
-  const allowedOrigins = [
+    const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:13000',
-    process.env.NEXT_PUBLIC_APP_URL, process.env.NEXT_PUBLIC_ADMIN_URL, process.env.NEXT_PUBLIC_AUTH_URL, process.env.NEXT_PUBLIC_APP_URL, 
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_ADMIN_URL,
+    process.env.NEXT_PUBLIC_AUTH_URL,
   ].filter(Boolean);
 
   if (origin && !allowedOrigins.includes(origin)) {
