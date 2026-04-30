@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
+      # PostgreSQL para tests de integración
       postgres:
         image: postgres:15-alpine
         env:
@@ -24,6 +25,17 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      # Redis para el rate limiter (cae a modo local si no conecta, pero mejor tenerlo)
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -46,17 +58,38 @@ jobs:
       - name: Ejecutar tests
         working-directory: ./backend
         env:
-          DB_URL: jdbc:postgresql://localhost:5432/fondo_test
-          DB_USER: app
-          DB_PASS: testpass
-          JWT_SECRET: test-secret-key-para-ci-con-minimo-32-caracteres
+          SPRING_PROFILES_ACTIVE: test
+          # H2 en memoria — los tests con @SpringBootTest usan application-test.yml
+          DB_URL: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+          DB_USER: sa
+          DB_PASS: ""
+          # Redis disponible en el runner
           REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          REDIS_PASSWORD: ""
+          # JWT
+          JWT_SECRET: test-secret-key-for-testing-purposes-only-minimum-256-bits-long
+          JWT_ISSUER: fondo-test
+          # MinIO — mockeado con @MockBean en los tests que lo necesitan
           MINIO_ENDPOINT: http://localhost:9000
           MINIO_ACCESS_KEY: minioadmin
           MINIO_SECRET_KEY: minioadmin
-        run: mvn test -q
+          # Rate limiting desactivado en tests
+          RATE_LIMITING_ENABLED: "false"
+          RATE_LIMITING_REDIS_BACKED: "false"
+          # ClamAV desactivado en tests
+          CLAMAV_ENABLED: "false"
+        run: mvn test -Dspring.profiles.active=test 2>&1
 
-      - name: Verificar que el JAR compila para producción
+      - name: Publicar reporte de tests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-report
+          path: backend/target/surefire-reports/
+          retention-days: 7
+
+      - name: Verificar que el JAR compila
         working-directory: ./backend
         run: mvn package -DskipTests -q
 
@@ -95,10 +128,12 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://qa-api.fatrans.com.ve/api
           NEXT_PUBLIC_APP_URL: https://qa-app.fatrans.com.ve
+          NEXT_PUBLIC_ADMIN_URL: https://qa-admin.fatrans.com.ve
+          NEXT_PUBLIC_AUTH_URL: https://qa.fatrans.com.ve
         run: npm run build
 
   # ─────────────────────────────────────────────
-  # JOB 3: Resumen del PR (comentario automático)
+  # JOB 3: Resumen automático en el PR
   # ─────────────────────────────────────────────
   pr-summary:
     name: Resumen del PR
@@ -114,20 +149,21 @@ jobs:
             const backend = '${{ needs.backend-ci.result }}';
             const frontend = '${{ needs.frontend-ci.result }}';
             const sha = context.sha.substring(0, 7);
-
             const icon = (r) => r === 'success' ? '✅' : r === 'failure' ? '❌' : '⚠️';
 
             const body = `## 🤖 Resultado CI — \`${sha}\`
 
             | Componente | Estado |
             |---|---|
-            | Backend (Java/Spring Boot) | ${icon(backend)} ${backend} |
-            | Frontend (Next.js) | ${icon(frontend)} ${frontend} |
+            | Backend (Java 21 / Spring Boot) | ${icon(backend)} ${backend} |
+            | Frontend (Next.js 14) | ${icon(frontend)} ${frontend} |
 
             ${backend === 'success' && frontend === 'success'
               ? '**✅ Todo OK — listo para merge a `develop` → se desplegará en QA automáticamente.**'
               : '**❌ Hay errores — revisar los jobs fallidos antes de hacer merge.**'
-            }`;
+            }
+
+            > 📎 El reporte detallado de tests del backend está disponible en los **Artifacts** de este workflow.`;
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,

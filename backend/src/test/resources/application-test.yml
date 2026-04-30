@@ -3,22 +3,30 @@ spring:
     name: fondo-backend-test
 
   datasource:
-    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
     driver-class-name: org.h2.Driver
     username: sa
-    password: 
+    password:
 
   jpa:
     hibernate:
       ddl-auto: create-drop
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
         dialect: org.hibernate.dialect.H2Dialect
 
   flyway:
     enabled: false
+
+  # Redis apuntando a localhost — el CI lo levanta como service
+  # Si no hay Redis, el rate limiter cae a modo local (ver RedisRateLimitingService.init())
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      timeout: 500
 
   security:
     user:
@@ -29,7 +37,7 @@ server:
   port: 0
 
 jwt:
-  secret: test-secret-key-for-testing-purposes-only-minimum-256-bits
+  secret: test-secret-key-for-testing-purposes-only-minimum-256-bits-long
   issuer: fondo-test
   accessToken:
     expirationMinutes: 60
@@ -37,3 +45,22 @@ jwt:
     expirationDays: 1
   sesion:
     ventana-inicializacion-segundos: 60
+
+# Rate limiting: desactivar redis-backed en tests
+# Si Redis no está disponible, cae a buckets locales (no falla el arranque)
+rate-limiting:
+  enabled: false
+  redis-backed: false
+
+# MinIO mockeado en tests — los tests que lo usan usan @MockBean
+minio:
+  endpoint: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket-name: fondodocs
+
+# ClamAV desactivado en tests
+clamav:
+  enabled: false
+  host: localhost
+  port: 3310
