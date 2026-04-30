@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
     process.env.NEXT_PUBLIC_ADMIN_URL,
     process.env.NEXT_PUBLIC_AUTH_URL,
     process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
     
   ].filter(Boolean);
 

@@ -9,7 +9,8 @@ export async function POST(request: NextRequest) {
   const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:13000',
-    process.env.NEXT_PUBLIC_APP_URL, process.env.NEXT_PUBLIC_ADMIN_URL, process.env.NEXT_PUBLIC_AUTH_URL, process.env.NEXT_PUBLIC_APP_URL, 
+    process.env.NEXT_PUBLIC_APP_URL, process.env.NEXT_PUBLIC_ADMIN_URL, process.env.NEXT_PUBLIC_AUTH_URL,
+    process.env.NEXT_PUBLIC_APP_URL, process.env.NEXT_PUBLIC_APP_URL, 
   ].filter(Boolean);
 
   const allowedReferers = [
