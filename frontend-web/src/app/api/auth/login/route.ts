@@ -10,9 +10,9 @@ export async function POST(request: NextRequest) {
     'http://localhost:13000',
     process.env.NEXT_PUBLIC_APP_URL,
     process.env.NEXT_PUBLIC_ADMIN_URL,
-    'https://auth.fatrans.com.ve',
-    'https://www.fatrans.com.ve',
-    'https://fatrans.com.ve',
+    process.env.NEXT_PUBLIC_AUTH_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+    
   ].filter(Boolean);
 
   if (origin && !allowedOrigins.includes(origin)) {

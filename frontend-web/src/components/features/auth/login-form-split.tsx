@@ -76,8 +76,8 @@ export function LoginFormSplit() {
         setLoading(false);
 
         const rol = userData.rol;
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fatrans.com.ve';
-        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'https://admin.fatrans.com.ve';
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || '';
 
         if (rol === 'SOCIO') {
           window.location.href = `${appUrl}/dashboard`;
