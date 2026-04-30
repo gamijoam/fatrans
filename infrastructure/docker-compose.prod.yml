@@ -104,6 +104,7 @@ services:
       NEXT_PUBLIC_API_URL: https://api.fatrans.com.ve/api
       NEXT_PUBLIC_APP_URL: https://app.fatrans.com.ve
       NEXT_PUBLIC_ADMIN_URL: https://admin.fatrans.com.ve
+      NEXT_PUBLIC_AUTH_URL: https://auth.fatrans.com.ve
       BACKEND_URL: http://fatrans-backend:8080
       JWT_SECRET: fatrans-fondo-ahorro-platform-super-secret-key-production-2026-v1
     restart: unless-stopped
@@ -119,6 +120,7 @@ services:
       NEXT_PUBLIC_API_URL: https://api.fatrans.com.ve/api
       NEXT_PUBLIC_APP_URL: https://app.fatrans.com.ve
       NEXT_PUBLIC_ADMIN_URL: https://admin.fatrans.com.ve
+      NEXT_PUBLIC_AUTH_URL: https://auth.fatrans.com.ve
       BACKEND_URL: http://fatrans-backend:8080
       JWT_SECRET: fatrans-fondo-ahorro-platform-super-secret-key-production-2026-v1
     restart: unless-stopped
