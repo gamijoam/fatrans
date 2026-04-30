@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import type { Metadata } from "next";
 import { LoginFormNeobank } from '@/components/features/auth/login-form-neobank';
 
