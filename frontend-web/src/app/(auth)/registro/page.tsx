@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { RegistrationForm } from '@/components/features/auth/registration-form';
 
 export default function RegistroPage() {
