@@ -1,0 +1,64 @@
+name: Deploy → QA
+
+# Se dispara automáticamente al hacer merge a develop
+on:
+  push:
+    branches: [develop]
+
+jobs:
+  deploy-qa:
+    name: Deploy a QA (qa.fatrans.com.ve)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy vía SSH al VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          timeout: 15m
+          script: |
+            bash /opt/fatrans-qa/deploy-qa.sh ${{ github.sha }}
+
+      - name: Verificar QA levantado
+        run: |
+          sleep 15
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://qa.fatrans.com.ve || echo "000")
+          echo "QA HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "301" ] && [ "$STATUS" != "302" ]; then
+            echo "⚠️ QA no responde con 200 (status: $STATUS) — revisar logs en VPS"
+          fi
+
+      - name: Notificar resultado
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const sha = context.sha.substring(0, 7);
+            const icon = status === 'success' ? '✅' : '❌';
+
+            const msg = status === 'success'
+              ? `${icon} **Deploy QA exitoso** — \`${sha}\`\n\n🌐 https://qa.fatrans.com.ve\n🌐 https://qa-app.fatrans.com.ve\n🌐 https://qa-admin.fatrans.com.ve`
+              : `${icon} **Deploy QA FALLÓ** — \`${sha}\` — revisar logs en GitHub Actions`;
+
+            // Buscar PR asociado al commit
+            const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha
+            });
+
+            for (const pr of prs.data) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: msg
+              });
+            }
