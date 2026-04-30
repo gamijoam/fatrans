@@ -1,17 +1,23 @@
 name: Deploy → Producción
 
-# Solo al hacer merge a main
-# Requiere aprobación manual en GitHub (Environment protection)
 on:
   push:
     branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
 
 jobs:
   deploy-prod:
     name: Deploy a Producción (fatrans.com.ve)
     runs-on: ubuntu-latest
 
-    # "production" es un Environment de GitHub con protección de aprobación
+    permissions:
+      pull-requests: write
+      issues: write
+
     environment:
       name: production
       url: https://fatrans.com.ve
@@ -43,7 +49,7 @@ jobs:
         with:
           script: |
             const sha = context.sha.substring(0, 7);
-            console.log(`✅ Deploy producción OK — SHA ${sha}`);
+            console.log('✅ Deploy producción OK — SHA ' + sha);
 
       - name: Rollback automático si falla
         if: failure()
@@ -55,12 +61,11 @@ jobs:
           port: 22
           script: |
             echo "⚠️ Deploy falló — intentando rollback..."
-            # Restaurar imagen anterior (tagged con SHA anterior)
             PREV=$(docker images fatrans-backend --format "{{.Tag}}" | grep -v latest | sort -r | sed -n '2p')
             if [ -n "$PREV" ]; then
               docker tag fatrans-backend:$PREV fatrans-backend:latest
               cd /opt/fatrans/backend/infrastructure
-              docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend
+              docker-compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend
               echo "Rollback a $PREV completado"
             else
               echo "No hay imagen anterior para rollback"
