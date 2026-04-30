@@ -5,6 +5,12 @@ on:
   pull_request:
     branches: [develop, main]
 
+# Permisos necesarios para que el bot pueda comentar en el PR
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   # ─────────────────────────────────────────────
   # JOB 1: Compilar y testear el Backend (Java)
@@ -14,7 +20,6 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      # PostgreSQL para tests de integración
       postgres:
         image: postgres:15-alpine
         env:
@@ -29,7 +34,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      # Redis para el rate limiter (cae a modo local si no conecta, pero mejor tenerlo)
       redis:
         image: redis:7-alpine
         ports:
@@ -59,25 +63,19 @@ jobs:
         working-directory: ./backend
         env:
           SPRING_PROFILES_ACTIVE: test
-          # H2 en memoria — los tests con @SpringBootTest usan application-test.yml
           DB_URL: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
           DB_USER: sa
           DB_PASS: ""
-          # Redis disponible en el runner
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           REDIS_PASSWORD: ""
-          # JWT
           JWT_SECRET: test-secret-key-for-testing-purposes-only-minimum-256-bits-long
           JWT_ISSUER: fondo-test
-          # MinIO — mockeado con @MockBean en los tests que lo necesitan
           MINIO_ENDPOINT: http://localhost:9000
           MINIO_ACCESS_KEY: minioadmin
           MINIO_SECRET_KEY: minioadmin
-          # Rate limiting desactivado en tests
           RATE_LIMITING_ENABLED: "false"
           RATE_LIMITING_REDIS_BACKED: "false"
-          # ClamAV desactivado en tests
           CLAMAV_ENABLED: "false"
         run: mvn test -Dspring.profiles.active=test 2>&1
 
@@ -140,6 +138,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend-ci, frontend-ci]
     if: always()
+
+    # Permisos explícitos también a nivel de job (doble seguro)
+    permissions:
+      pull-requests: write
+      issues: write
 
     steps:
       - name: Comentar resultado en el PR
