@@ -71,10 +71,16 @@ describe('POST /api/auth/registro (BFF)', () => {
     fetchSpy = vi.spyOn(global, 'fetch');
     // Silenciar console.error en tests (los assertions sobre console no son el foco aquí).
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Simular las URLs públicas que define el deploy (prod + QA). Permite ejercitar
+    // la validación cross-subdomain de origin/referer sin acoplarse al .env real.
+    vi.stubEnv('NEXT_PUBLIC_AUTH_URL', 'https://qa-auth.fatrans.com.ve');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://qa-app.fatrans.com.ve');
+    vi.stubEnv('NEXT_PUBLIC_ADMIN_URL', 'https://qa-admin.fatrans.com.ve');
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('reenvía TODOS los campos del schema al backend con un payload válido', async () => {
@@ -268,6 +274,57 @@ describe('POST /api/auth/registro (BFF)', () => {
     expect(res.status).toBe(403);
     const json = await res.json();
     expect(json.message).toBe('Referer no permitido');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('permite origin/referer del subdominio auth de QA (qa-auth.fatrans.com.ve)', async () => {
+    fetchSpy.mockResolvedValue(
+      new Response(JSON.stringify({ id: 'qa-1' }), { status: 201 }) as any
+    );
+    const req = buildRequest({
+      body: buildValidPayload(),
+      origin: 'https://qa-auth.fatrans.com.ve',
+      referer: 'https://qa-auth.fatrans.com.ve/registro',
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(201);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('permite origin/referer del subdominio auth de producción (auth.fatrans.com.ve)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_URL', 'https://auth.fatrans.com.ve');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.fatrans.com.ve');
+    vi.stubEnv('NEXT_PUBLIC_ADMIN_URL', 'https://admin.fatrans.com.ve');
+
+    fetchSpy.mockResolvedValue(
+      new Response(JSON.stringify({ id: 'prod-1' }), { status: 201 }) as any
+    );
+    const req = buildRequest({
+      body: buildValidPayload(),
+      origin: 'https://auth.fatrans.com.ve',
+      referer: 'https://auth.fatrans.com.ve/registro',
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(201);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('rechaza un referer cuyo host coincide en prefijo pero NO en dominio (anti-spoof)', async () => {
+    // "https://qa-auth.fatrans.com.ve.evil.com/..." NO debe colar — String#startsWith con
+    // origin completo evita el match parcial porque el host real es "qa-auth.fatrans.com.ve.evil.com".
+    const req = buildRequest({
+      body: buildValidPayload(),
+      origin: null,
+      referer: 'https://qa-auth.fatrans.com.ve.evil.com/registro',
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(403);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 

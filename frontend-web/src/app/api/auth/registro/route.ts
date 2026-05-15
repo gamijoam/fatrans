@@ -59,16 +59,24 @@ export async function POST(request: NextRequest) {
     process.env.NEXT_PUBLIC_AUTH_URL,
   ].filter(Boolean);
 
-  const allowedReferers = [
-    'http://localhost:3000',
-    'http://localhost:13000',
-  ];
+  // El referer llega como "https://qa-auth.fatrans.com.ve/registro". Parseamos su origin
+  // y lo comparamos con la misma whitelist de allowedOrigins (evita drift entre listas).
+  // OJO con startsWith: "https://auth.fatrans.com.ve.evil.com" también empezaría con
+  // "https://auth.fatrans.com.ve" — por eso usamos URL.origin que extrae esquema+host+puerto.
+  function refererOriginAllowed(headerValue: string): boolean {
+    try {
+      const refOrigin = new URL(headerValue).origin;
+      return allowedOrigins.includes(refOrigin);
+    } catch {
+      return false;
+    }
+  }
 
   if (origin && !allowedOrigins.includes(origin)) {
     return NextResponse.json({ message: 'Origen no permitido' }, { status: 403 });
   }
 
-  if (referer && !allowedReferers.some((r) => referer.startsWith(r))) {
+  if (referer && !refererOriginAllowed(referer)) {
     return NextResponse.json({ message: 'Referer no permitido' }, { status: 403 });
   }
 
