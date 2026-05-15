@@ -68,6 +68,12 @@ public class SolicitudRegistroRepositoryImpl implements SolicitudRegistroReposit
         jpaRepository.deleteById(id);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public long contarPorEstado(EstadoSolicitud estado) {
+        return jpaRepository.countByEstado(estado);
+    }
+
     private SolicitudRegistroEntity toEntity(SolicitudRegistro domain) {
         return SolicitudRegistroEntity.builder()
                 .id(domain.getId())

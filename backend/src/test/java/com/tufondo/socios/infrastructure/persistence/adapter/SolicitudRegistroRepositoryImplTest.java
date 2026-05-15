@@ -217,6 +217,38 @@ class SolicitudRegistroRepositoryImplTest {
     }
 
     /**
+     * Cubre el bug del dashboard de admin: el card "Solicitudes Pendientes" mostraba 0
+     * porque el contador apuntaba a `SolicitudCredito`, no a `SolicitudRegistro`. Este
+     * test verifica que la nueva firma `contarPorEstado()` devuelve el conteo correcto
+     * filtrado por estado.
+     */
+    @Test
+    @DisplayName("contarPorEstado devuelve el número de solicitudes en ese estado")
+    void contarPorEstadoFiltraCorrectamente() {
+        // Arrange: 2 pendientes, 1 aprobada.
+        repository.guardar(nuevaSolicitudMinima("V-40000001", "p1@test.com")
+                .aceptaTerminos(true).aceptaLopdp(true)
+                .estado(EstadoSolicitud.PENDIENTE).build());
+        repository.guardar(nuevaSolicitudMinima("V-40000002", "p2@test.com")
+                .aceptaTerminos(true).aceptaLopdp(true)
+                .estado(EstadoSolicitud.PENDIENTE).build());
+        repository.guardar(nuevaSolicitudMinima("V-40000003", "a1@test.com")
+                .aceptaTerminos(true).aceptaLopdp(true)
+                .estado(EstadoSolicitud.APROBADA).build());
+        jpaRepository.flush();
+
+        assertThat(repository.contarPorEstado(EstadoSolicitud.PENDIENTE))
+                .as("Debe contar las 2 solicitudes pendientes")
+                .isEqualTo(2L);
+        assertThat(repository.contarPorEstado(EstadoSolicitud.APROBADA))
+                .as("Debe contar la única solicitud aprobada")
+                .isEqualTo(1L);
+        assertThat(repository.contarPorEstado(EstadoSolicitud.RECHAZADA))
+                .as("Sin solicitudes rechazadas, debe devolver 0")
+                .isEqualTo(0L);
+    }
+
+    /**
      * Builder utilitario con los campos mínimos NOT NULL en el schema.
      */
     private SolicitudRegistro.SolicitudRegistroBuilder nuevaSolicitudMinima(String cedula, String correo) {

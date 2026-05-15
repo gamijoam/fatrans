@@ -43,6 +43,8 @@ interface DashboardStats {
   solicitudesPendientes: number;
   solicitudesAprobadas: number;
   solicitudesRechazadas: number;
+  /** Solicitudes de registro de socios pendientes de aprobar (NO de crédito). */
+  solicitudesRegistroPendientes: number;
   capitalDesembolsado: number;
   carteraVencida: number;
   cuotasVencidas: number;
@@ -301,8 +303,8 @@ export default function AdminDashboardPage() {
         />
         <MetricCard
           title="Solicitudes Pendientes"
-          value={stats?.solicitudesPendientes || 0}
-          subtitle="Requieren revisión inmediata"
+          value={stats?.solicitudesRegistroPendientes || 0}
+          subtitle="Solicitudes de registro por aprobar"
           trend={{ value: 8.2, positive: false }}
           icon={Clock}
           iconBg="bg-amber-100"
@@ -475,7 +477,7 @@ export default function AdminDashboardPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-900">Ver Solicitudes</p>
-                    <p className="text-xs text-slate-500">{stats?.solicitudesPendientes || 0} pendientes</p>
+                    <p className="text-xs text-slate-500">{stats?.solicitudesRegistroPendientes || 0} pendientes</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors" />

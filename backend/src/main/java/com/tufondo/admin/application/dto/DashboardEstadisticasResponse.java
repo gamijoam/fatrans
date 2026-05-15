@@ -32,6 +32,14 @@ public class DashboardEstadisticasResponse {
     private BigDecimal capitalDesembolsado;
     private BigDecimal carteraVencida;
 
+    /**
+     * Solicitudes de registro de socios pendientes de aprobar por un admin.
+     * Antes el card "Solicitudes Pendientes" del dashboard mostraba el conteo
+     * de solicitudes de crédito (`solicitudesPendientes`), no el de registro —
+     * por eso aparecía 0 aunque hubiera nuevas solicitudes esperando.
+     */
+    private long solicitudesRegistroPendientes;
+
     private long cuotasVencidas;
     private long cuotasEnMora;
     private long cuotasPagadas;
