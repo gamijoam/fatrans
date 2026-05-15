@@ -51,15 +51,13 @@ export function RegistrationForm() {
     setIsLoading(true);
 
     try {
-      const payload = {
-        ...data,
-        salario: data.salario ? parseFloat(data.salario.replace(',', '.')) : null,
-      };
-
+      // El BFF revalida con registroSchema (defensa en profundidad) y normaliza
+      // el salario (string con coma → string con punto). El form envía tal cual lo
+      // que Zod ya validó: salario como string opcional.
       const response = await fetch('/api/auth/registro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(data),
       });
 
       const result = await response.json();

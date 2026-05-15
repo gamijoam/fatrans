@@ -6,6 +6,7 @@ import com.tufondo.socios.application.usecase.*;
 import com.tufondo.socios.domain.model.enums.EstadoSolicitud;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -37,8 +38,25 @@ public class SolicitudRegistroController {
     @PostMapping("/solicitud")
     @Operation(summary = "Crear una nueva solicitud de registro")
     public ResponseEntity<Map<String, Object>> crearSolicitud(
-            @Valid @RequestBody SolicitudRegistroRequestDTO request) {
-        
+            @Valid @RequestBody SolicitudRegistroRequestDTO request,
+            HttpServletRequest httpRequest) {
+
+        // Auditoría LOPDP: priorizamos los valores ya capturados por el BFF
+        // (que parsea correctamente x-forwarded-for) y caemos al request del
+        // servlet como fallback. Nunca pisamos un valor explícito del BFF con
+        // el remoteAddr crudo, porque éste puede ser la IP del proxy/Nginx
+        // en producción.
+        if (isBlank(request.getIpRegistro())) {
+            request.setIpRegistro(resolveClientIp(httpRequest));
+        }
+        if (isBlank(request.getUserAgentRegistro())) {
+            String ua = httpRequest.getHeader("User-Agent");
+            if (ua != null && ua.length() > 500) {
+                ua = ua.substring(0, 500);
+            }
+            request.setUserAgentRegistro(ua);
+        }
+
         SolicitudRegistroResponseDTO response = crearSolicitudUseCase.ejecutar(request);
         
         Map<String, Object> body = new HashMap<>();
@@ -77,6 +95,36 @@ public class SolicitudRegistroController {
         return ResponseEntity.ok(body);
     }
     
+    /**
+     * Resuelve la IP del cliente honrando proxies (X-Forwarded-For). Toma el
+     * primer hop del header (el cliente original) y cae a remoteAddr cuando
+     * el header no está presente.
+     */
+    private String resolveClientIp(HttpServletRequest request) {
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            int comma = xff.indexOf(',');
+            String first = (comma >= 0 ? xff.substring(0, comma) : xff).trim();
+            if (!first.isEmpty()) {
+                return truncate(first, 45);
+            }
+        }
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isBlank()) {
+            return truncate(xRealIp.trim(), 45);
+        }
+        return truncate(request.getRemoteAddr(), 45);
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) return null;
+        return s.length() <= max ? s : s.substring(0, max);
+    }
+
     @PostMapping("/solicitudes/{id}/aprobar")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Aprobar una solicitud de registro (Admin)")

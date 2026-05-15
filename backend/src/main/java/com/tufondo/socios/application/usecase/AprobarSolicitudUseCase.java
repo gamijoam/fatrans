@@ -23,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -129,7 +130,9 @@ public class AprobarSolicitudUseCase {
                 socioGuardado.getId(), verificacionKYC.getId());
         
         // 4. Generar nombre de usuario y password temporal
-        String nombreUsuario = generarNombreUsuario(nombreCompleto);
+        // Uses parsed names (primerNombre + primerApellido) to avoid the
+        // off-by-one bug where partes[1] could be a second name instead of the surname.
+        String nombreUsuario = generarNombreUsuario(primerNombre, primerApellido);
         String passwordTemporal = generarPasswordTemporal();
         
         // 5. Crear el usuario vinculado usando el puerto
@@ -153,9 +156,9 @@ public class AprobarSolicitudUseCase {
         
         log.info("Solicitud {} aprobada. Socio {} creado con usuario {}",
                 solicitudId, socioGuardado.getId(), nombreUsuario);
-        log.info("[DEV] Credenciales -> Email: {}, Usuario: {}, Password: {}",
-                solicitud.getCorreoElectronico(), nombreUsuario, passwordTemporal);
-        
+        log.info("Credenciales enviadas por email para socioId={}, usuario={}",
+                socioGuardado.getId(), nombreUsuario);
+
         return dtoMapper.toResponseDTO(solicitudActualizada);
     }
     
@@ -168,43 +171,66 @@ public class AprobarSolicitudUseCase {
         return numero;
     }
     
-    private String generarNombreUsuario(String nombreCompleto) {
-        // Juan Pérez García → juan.perez
-        String[] partes = nombreCompleto.toLowerCase().split(" ");
-        String nombre = partes[0];
-        String apellido = partes.length > 1 ? partes[1].replaceAll("[^a-z]", "") : "";
-        
-        String base = apellido.isEmpty() ? nombre : nombre + "." + apellido;
+    /**
+     * Genera el username a partir de los nombres ya parseados.
+     * Ejemplos (formato venezolano):
+     *   ("María", "González")              → "maria.gonzalez"
+     *   ("Juan",  "Pérez")                 → "juan.perez"
+     *   ("María José", "González López")   → "maria.gonzalez"  (toma primeros tokens)
+     * Si hay colisión, agrega sufijo numérico.
+     */
+    private String generarNombreUsuario(String primerNombre, String primerApellido) {
+        String nombre = sanitizarParaUsername(primerNombre);
+        String apellido = sanitizarParaUsername(primerApellido);
+
+        String base = apellido.isEmpty()
+                ? (nombre.isEmpty() ? "socio" : nombre)
+                : nombre + "." + apellido;
+
         String nombreUsuario = base;
-        
         int counter = 1;
         while (usuarioCreatorPort.existeNombreUsuario(nombreUsuario)) {
             nombreUsuario = base + counter;
             counter++;
         }
-        
+
         return nombreUsuario;
     }
+
+    private String sanitizarParaUsername(String parte) {
+        if (parte == null) return "";
+        // Toma el primer token, baja a minúsculas, remueve acentos y deja solo a-z0-9.
+        String primerToken = parte.trim().split("\\s+")[0].toLowerCase();
+        String sinAcentos = java.text.Normalizer.normalize(primerToken, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        return sinAcentos.replaceAll("[^a-z0-9]", "");
+    }
     
+    /**
+     * Genera una contraseña temporal criptográficamente segura.
+     * Usa SecureRandom (NO ThreadLocalRandom — éste es predecible).
+     * Garantiza al menos 1 mayúscula, 1 minúscula, 1 dígito y 1 caracter especial,
+     * con longitud total de 12 caracteres.
+     */
     private String generarPasswordTemporal() {
         String upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
         String lower = "abcdefghijkmnpqrstuvwxyz";
         String numbers = "23456789";
         String special = "@$!%*?&";
-        
-        ThreadLocalRandom random = ThreadLocalRandom.current();
-        
+
+        SecureRandom random = new SecureRandom();
+
         StringBuilder sb = new StringBuilder();
         sb.append(upper.charAt(random.nextInt(upper.length())));
         sb.append(lower.charAt(random.nextInt(lower.length())));
         sb.append(numbers.charAt(random.nextInt(numbers.length())));
         sb.append(special.charAt(random.nextInt(special.length())));
-        
+
         String allChars = upper + lower + numbers + special;
         for (int i = 0; i < 8; i++) {
             sb.append(allChars.charAt(random.nextInt(allChars.length())));
         }
-        
+
         char[] chars = sb.toString().toCharArray();
         for (int i = chars.length - 1; i > 0; i--) {
             int j = random.nextInt(i + 1);
@@ -212,7 +238,7 @@ public class AprobarSolicitudUseCase {
             chars[i] = chars[j];
             chars[j] = temp;
         }
-        
+
         return new String(chars);
     }
 }

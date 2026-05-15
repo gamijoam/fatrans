@@ -17,7 +17,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 
 @Component
@@ -33,7 +32,10 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
     static {
         Map<String, RateLimitConfig> limits = new java.util.HashMap<>();
         limits.put("/api/v1/auth/login", new RateLimitConfig(5, Duration.ofMinutes(1)));
-        limits.put("/api/v1/auth/registro", new RateLimitConfig(3, Duration.ofMinutes(1)));
+        // El endpoint real de registro público es /api/v1/socios/solicitud
+        // (ver SolicitudRegistroController.crearSolicitud). Antes apuntaba a
+        // /api/v1/auth/registro — inexistente — y dejaba el registro sin rate-limit.
+        limits.put("/api/v1/socios/solicitud", new RateLimitConfig(3, Duration.ofMinutes(1)));
         limits.put("/api/v1/auth/recuperar-password", new RateLimitConfig(3, Duration.ofMinutes(1)));
         limits.put("/api/v1/auth/reset-password", new RateLimitConfig(3, Duration.ofMinutes(1)));
         limits.put("/api/v1/admin/**", new RateLimitConfig(30, Duration.ofMinutes(1)));
@@ -89,22 +91,32 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
+    /**
+     * Devuelve la regla más específica que matchea el path.
+     * Prioridad: match exacto > prefijo más largo (wildcard).
+     * Esto evita que reglas amplias (p.ej. /api/v1/socios/**) sobrescriban
+     * reglas estrictas (p.ej. /api/v1/socios/solicitud).
+     */
     private RateLimitConfig findMatchingConfig(String path) {
+        RateLimitConfig exactMatch = ENDPOINT_LIMITS.get(path);
+        if (exactMatch != null) {
+            return exactMatch;
+        }
+
+        RateLimitConfig bestMatch = null;
+        int bestPrefixLength = -1;
         for (Map.Entry<String, RateLimitConfig> entry : ENDPOINT_LIMITS.entrySet()) {
             String pattern = entry.getKey();
-            if (matchesPattern(path, pattern)) {
-                return entry.getValue();
+            if (!pattern.endsWith("/**")) {
+                continue;
+            }
+            String prefix = pattern.substring(0, pattern.length() - 3);
+            if (path.startsWith(prefix) && prefix.length() > bestPrefixLength) {
+                bestMatch = entry.getValue();
+                bestPrefixLength = prefix.length();
             }
         }
-        return null;
-    }
-
-    private boolean matchesPattern(String path, String pattern) {
-        if (pattern.endsWith("/**")) {
-            String prefix = pattern.substring(0, pattern.length() - 3);
-            return path.startsWith(prefix);
-        }
-        return path.equals(pattern);
+        return bestMatch;
     }
 
     private String buildRateLimitKey(String clientIp, String path) {

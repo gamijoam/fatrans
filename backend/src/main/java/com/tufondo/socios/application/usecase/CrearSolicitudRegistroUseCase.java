@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Service
@@ -64,6 +65,11 @@ public class CrearSolicitudRegistroUseCase {
                 .emergenciaParentesco(request.getEmergenciaParentesco())
                 .aceptaTerminos(request.getAceptaTerminos())
                 .aceptaLopdp(request.getAceptaLopdp())
+                .ipRegistro(request.getIpRegistro())
+                .userAgentRegistro(request.getUserAgentRegistro())
+                // Sello de tiempo del consentimiento LOPDP: SOLO si el usuario aceptó.
+                // No confiamos en el cliente para esto — siempre Instant.now() server-side.
+                .consentLopdpTimestamp(Boolean.TRUE.equals(request.getAceptaLopdp()) ? Instant.now() : null)
                 .estado(EstadoSolicitud.PENDIENTE)
                 .fechaSolicitud(LocalDateTime.now())
                 .build();
