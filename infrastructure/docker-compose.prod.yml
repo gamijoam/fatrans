@@ -45,11 +45,16 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
+    # La imagen minio/minio:latest no incluye curl/wget — el healthcheck debe
+    # usar `mc` (cliente CLI incluido) o fallará siempre aunque el servicio
+    # responda correctamente. (Bug observado 2026-05-15: minio quedó unhealthy
+    # pese a HTTP 200 en /minio/health/live).
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
       interval: 30s
       timeout: 20s
       retries: 3
+      start_period: 15s
     networks:
       - fatrans-network
 
