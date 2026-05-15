@@ -89,10 +89,21 @@ public class BiometricController {
     @Operation(summary = "Webhook del proveedor biométrico (HMAC firmado)")
     public ResponseEntity<Void> webhook(HttpServletRequest http) throws IOException {
         byte[] rawBody = http.getInputStream().readAllBytes();
-        String signature = http.getHeader("x-signature");
         String timestamp = http.getHeader("x-timestamp");
 
-        procesarWebhookUseCase.ejecutar(rawBody, signature, timestamp);
+        // Didit envía tres firmas. Preferimos V2 (HMAC sobre JSON canonicalizado:
+        // sort recursivo de keys + floats whole-number como int + re-encode sin
+        // escape Unicode). V2 sobrevive a middleware que re-encoda JSON (Cloudflare,
+        // proxies). X-Signature simple es fallback frágil con caracteres especiales.
+        String sigV2 = http.getHeader("x-signature-v2");
+        String sig;
+        if (sigV2 != null && !sigV2.isBlank()) {
+            sig = "v2:" + sigV2;
+        } else {
+            sig = http.getHeader("x-signature");
+        }
+
+        procesarWebhookUseCase.ejecutar(rawBody, sig, timestamp);
         return ResponseEntity.ok().build();
     }
 
