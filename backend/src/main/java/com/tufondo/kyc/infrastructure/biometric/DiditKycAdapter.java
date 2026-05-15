@@ -1,5 +1,7 @@
 package com.tufondo.kyc.infrastructure.biometric;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -63,12 +65,25 @@ public class DiditKycAdapter implements BiometricVerificatorPort {
     private final DiditProperties props;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    /**
+     * ObjectMapper dedicado para canonicalización V2. Configurado para producir
+     * EXACTAMENTE el mismo output que Python `json.dumps(separators=(",", ":"),
+     * sort_keys=True, ensure_ascii=False)` — que es el algoritmo de referencia
+     * de Didit. No usamos el ObjectMapper inyectado por Spring porque puede tener
+     * features distintas (e.g. pretty print, escape Unicode) que rompen la firma.
+     */
+    private final ObjectMapper canonicalMapper;
 
     @Autowired
     public DiditKycAdapter(DiditProperties props, ObjectMapper objectMapper) {
         this.props = props;
         this.restTemplate = new RestTemplate();
         this.objectMapper = objectMapper;
+        // ESCAPE_NON_ASCII = false → "José" se serializa como bytes UTF-8 sin escape.
+        // QUOTE_FIELD_NAMES = true por defecto (JSON requiere).
+        // Sin pretty print → sin espacios entre tokens (`{"a":1,"b":2}`).
+        this.canonicalMapper = new ObjectMapper(new JsonFactory()
+                .disable(JsonGenerator.Feature.ESCAPE_NON_ASCII));
     }
 
     @Override
@@ -174,7 +189,14 @@ public class DiditKycAdapter implements BiometricVerificatorPort {
             expectedSignature = hmacSha256Hex(props.getWebhookSecret(), canonical);
             String provided = normalizeSignature(signatureHeader.substring("v2:".length()));
             if (!constantTimeEquals(expectedSignature, provided)) {
-                log.warn("Webhook Didit firma V2 inválida (timestamp={})", timestampHeader);
+                // Logging diagnóstico para debug: dump del canonical body (primeros 400
+                // chars) + firma esperada y recibida. Útil cuando Didit y nosotros
+                // canonicalizamos distinto. Eliminar este log en cuanto la verificación
+                // funcione (el body puede contener PII en producción real).
+                String canonicalStr = new String(canonical, java.nio.charset.StandardCharsets.UTF_8);
+                String preview = canonicalStr.length() > 400 ? canonicalStr.substring(0, 400) + "…" : canonicalStr;
+                log.warn("Webhook Didit firma V2 inválida (timestamp={}). expected={} provided={} canonical_preview={}",
+                        timestampHeader, expectedSignature, provided, preview);
                 throw new KYCException("Firma de webhook inválida");
             }
         } else {
@@ -230,9 +252,9 @@ public class DiditKycAdapter implements BiometricVerificatorPort {
      * </ul>
      */
     byte[] canonicalizeJson(byte[] rawBody) throws java.io.IOException {
-        JsonNode root = objectMapper.readTree(rawBody);
+        JsonNode root = canonicalMapper.readTree(rawBody);
         JsonNode canonical = canonicalizeNode(root);
-        return objectMapper.writeValueAsBytes(canonical);
+        return canonicalMapper.writeValueAsBytes(canonical);
     }
 
     private JsonNode canonicalizeNode(JsonNode node) {
