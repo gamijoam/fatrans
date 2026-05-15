@@ -1,40 +1,146 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller, type Path } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
-import { registroSchema, ESTADOS_VENEZUELA, TIPOS_DOCUMENTO, GENEROS, ESTADOS_CIVILES } from '@/lib/utils/validators';
+import {
+  registroSchema,
+  ESTADOS_VENEZUELA,
+  TIPOS_DOCUMENTO,
+  GENEROS,
+  ESTADOS_CIVILES,
+} from '@/lib/utils/validators';
 import type { RegistroFormData } from '@/lib/utils/validators';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Loader2, AlertCircle, CheckCircle, FileText, User, MapPin, Phone, Building } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ProgressBar } from '@/components/ui/progress';
+import {
+  Loader2,
+  AlertCircle,
+  CheckCircle,
+  User,
+  MapPin,
+  Phone,
+  Building,
+  ShieldCheck,
+  ArrowLeft,
+  ArrowRight,
+} from 'lucide-react';
 import { sanitizeHTML } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 
-const getLabelText = (enumValue: string): string => {
-  const labels: Record<string, string> = {
-    CEDULA: 'Cédula de Identidad (V-)',
-    CEDULA_EXTRANJERO: 'Cédula Extranjero (E-)',
-    PASAPORTE: 'Pasaporte',
-    RIF: 'RIF',
-    MASCULINO: 'Masculino',
-    FEMENINO: 'Femenino',
-    OTRO: 'Otro',
-    SOLTERO: 'Soltero/a',
-    CASADO: 'Casado/a',
-    DIVORCIADO: 'Divorciado/a',
-    VIUDO: 'Viudo/a',
-    UNION_LIBRE: 'Unión Libre',
-  };
-  return labels[enumValue] || enumValue;
+const ENUM_LABELS: Record<string, string> = {
+  CEDULA: 'Cédula de Identidad (V-)',
+  CEDULA_EXTRANJERO: 'Cédula Extranjero (E-)',
+  PASAPORTE: 'Pasaporte',
+  RIF: 'RIF',
+  MASCULINO: 'Masculino',
+  FEMENINO: 'Femenino',
+  OTRO: 'Otro',
+  SOLTERO: 'Soltero/a',
+  CASADO: 'Casado/a',
+  DIVORCIADO: 'Divorciado/a',
+  VIUDO: 'Viudo/a',
+  UNION_LIBRE: 'Unión Libre',
+};
+const labelFor = (v: string) => ENUM_LABELS[v] ?? v;
+
+type FieldName = Path<RegistroFormData>;
+
+type StepDef = {
+  id: 'personal' | 'contacto' | 'laboral' | 'emergencia' | 'confirmacion';
+  title: string;
+  description: string;
+  icon: typeof User;
+  /** Campos validados antes de avanzar (vacío = sin validación, ej. último paso). */
+  fields: FieldName[];
 };
 
+const STEPS: StepDef[] = [
+  {
+    id: 'personal',
+    title: 'Datos personales',
+    description: 'Identificación y datos básicos',
+    icon: User,
+    fields: ['nombreCompleto', 'tipoDocumento', 'cedula', 'fechaNacimiento', 'genero', 'estadoCivil'],
+  },
+  {
+    id: 'contacto',
+    title: 'Contacto y dirección',
+    description: 'Cómo te ubicamos',
+    icon: MapPin,
+    fields: [
+      'correoElectronico',
+      'telefono',
+      'direccionEstado',
+      'direccionCiudad',
+      'direccionMunicipio',
+      'direccionCalle',
+    ],
+  },
+  {
+    id: 'laboral',
+    title: 'Información laboral',
+    description: 'Empresa donde trabajas',
+    icon: Building,
+    fields: ['empresa', 'rifEmpresa', 'departamento', 'cargo', 'salario'],
+  },
+  {
+    id: 'emergencia',
+    title: 'Contacto de emergencia',
+    description: 'A quién contactar si pasa algo',
+    icon: Phone,
+    fields: ['emergenciaNombre', 'emergenciaTelefono', 'emergenciaParentesco'],
+  },
+  {
+    id: 'confirmacion',
+    title: 'Confirmación',
+    description: 'Revisa y acepta',
+    icon: ShieldCheck,
+    fields: ['aceptaTerminos', 'aceptaLopdp'],
+  },
+];
+
+/** Pequeño helper visual: muestra "(Opcional)" después del label si aplica. */
+function FieldLabel({ htmlFor, children, optional }: { htmlFor: string; children: React.ReactNode; optional?: boolean }) {
+  return (
+    <Label htmlFor={htmlFor} className="text-sm font-medium">
+      {children}
+      {optional && <span className="ml-1 text-xs font-normal text-muted-foreground">(opcional)</span>}
+    </Label>
+  );
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p role="alert" className="text-xs text-destructive mt-1">
+      {message}
+    </p>
+  );
+}
+
 export function RegistrationForm() {
+  const [stepIndex, setStepIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const router = useRouter();
@@ -43,35 +149,43 @@ export function RegistrationForm() {
     register,
     handleSubmit,
     formState: { errors },
+    trigger,
+    control,
+    getValues,
   } = useForm<RegistroFormData>({
     resolver: zodResolver(registroSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
   });
+
+  const currentStep = STEPS[stepIndex];
+  const isLastStep = stepIndex === STEPS.length - 1;
+  const progressValue = ((stepIndex + 1) / STEPS.length) * 100;
+
+  const goNext = async () => {
+    const valid = await trigger(currentStep.fields, { shouldFocus: true });
+    if (!valid) return;
+    setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
+  };
+
+  const goBack = () => setStepIndex((i) => Math.max(i - 1, 0));
 
   const onSubmit = async (data: RegistroFormData) => {
     setIsLoading(true);
-
     try {
-      // El BFF revalida con registroSchema (defensa en profundidad) y normaliza
-      // el salario (string con coma → string con punto). El form envía tal cual lo
-      // que Zod ya validó: salario como string opcional.
+      // El BFF revalida con registroSchema y normaliza salario (coma → punto).
       const response = await fetch('/api/auth/registro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-
       const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Error al procesar solicitud');
-      }
-
+      if (!response.ok) throw new Error(result.message || 'Error al procesar solicitud');
       setIsSuccess(true);
       toast.success('Solicitud enviada correctamente');
-
     } catch (error) {
-      console.error('Registro error:', error);
-      const message = error instanceof Error ? sanitizeHTML(error.message) : 'Error de conexión';
+      const message =
+        error instanceof Error ? sanitizeHTML(error.message) : 'Error de conexión';
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -86,16 +200,17 @@ export function RegistrationForm() {
             <div className="flex justify-center">
               <CheckCircle className="h-16 w-16 text-green-500" />
             </div>
-            <CardTitle className="text-xl">¡Solicitud Enviada!</CardTitle>
+            <CardTitle className="text-xl">¡Solicitud enviada!</CardTitle>
             <CardDescription>
-              Tu solicitud de registro ha sido enviada exitosamente.<br />
+              Tu solicitud de registro fue enviada correctamente.
+              <br />
               Un administrador la revisará y recibirás un correo cuando sea aprobada.
             </CardDescription>
             <Button
               onClick={() => router.push('/login')}
               className="w-full bg-green-600 hover:bg-green-700 mt-4"
             >
-              Volver al Login
+              Volver al login
             </Button>
           </div>
         </CardContent>
@@ -103,456 +218,563 @@ export function RegistrationForm() {
     );
   }
 
+  const Icon = currentStep.icon;
+
   return (
     <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader className="space-y-1">
-        <div className="flex justify-center mb-2">
+      <CardHeader className="space-y-3">
+        <div className="flex justify-center mb-1">
           <div className="p-3 rounded-full bg-blue-100">
-            <FileText className="h-8 w-8 text-blue-600" />
+            <Icon className="h-7 w-7 text-blue-600" />
           </div>
         </div>
         <CardTitle className="text-2xl text-center font-bold text-gray-900">
-          Crear Cuenta de Socio
+          Crear cuenta de socio
         </CardTitle>
         <CardDescription className="text-center">
-          Completa todos los campos para solicitar tu cuenta de socio
+          Paso {stepIndex + 1} de {STEPS.length}: {currentStep.title}
         </CardDescription>
-        <div className="flex justify-center">
+
+        <div className="flex justify-center pt-1">
           <Badge variant="outline" className="text-amber-600 bg-amber-50 border-amber-200">
             Pendiente de aprobación
           </Badge>
         </div>
+
+        {/* Progress bar */}
+        <div className="pt-2 space-y-2">
+          <ProgressBar value={progressValue} />
+          <div className="hidden sm:flex justify-between gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+            {STEPS.map((s, i) => (
+              <span
+                key={s.id}
+                className={i === stepIndex ? 'font-semibold text-foreground' : ''}
+              >
+                {s.title.split(' ')[0]}
+              </span>
+            ))}
+          </div>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+
+      <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="bg-blue-50 p-3 rounded-lg flex items-center gap-2">
-            <User className="h-4 w-4 text-blue-600" />
-            <span className="text-sm font-medium text-blue-800">Datos Personales</span>
-          </div>
+          {/* ============ PASO 1: PERSONAL ============ */}
+          {currentStep.id === 'personal' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2 space-y-2">
+                  <FieldLabel htmlFor="nombreCompleto">Nombre completo</FieldLabel>
+                  <Input
+                    id="nombreCompleto"
+                    type="text"
+                    placeholder="Juan Pérez García"
+                    autoComplete="name"
+                    disabled={isLoading}
+                    aria-invalid={!!errors.nombreCompleto}
+                    {...register('nombreCompleto')}
+                  />
+                  <FieldError message={errors.nombreCompleto?.message} />
+                </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="nombreCompleto">Nombre Completo</Label>
-              <Input
-                id="nombreCompleto"
-                type="text"
-                placeholder="Juan Pérez García"
-                autoComplete="name"
-                disabled={isLoading}
-                {...register('nombreCompleto')}
-                aria-invalid={!!errors.nombreCompleto}
-              />
-              {errors.nombreCompleto && (
-                <p role="alert" className="text-xs text-red-500">{errors.nombreCompleto.message}</p>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="tipoDocumento">Tipo de documento</FieldLabel>
+                  <Controller
+                    control={control}
+                    name="tipoDocumento"
+                    render={({ field }) => (
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value ?? ''}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger id="tipoDocumento" aria-invalid={!!errors.tipoDocumento}>
+                          <SelectValue placeholder="Selecciona..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIPOS_DOCUMENTO.map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {labelFor(t)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  <FieldError message={errors.tipoDocumento?.message} />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="tipoDocumento">Tipo de Documento</Label>
-              <select
-                id="tipoDocumento"
-                disabled={isLoading}
-                {...register('tipoDocumento')}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                aria-invalid={!!errors.tipoDocumento}
-              >
-                <option value="">Seleccione...</option>
-                {TIPOS_DOCUMENTO.map((tipo) => (
-                  <option key={tipo} value={tipo}>{getLabelText(tipo)}</option>
-                ))}
-              </select>
-              {errors.tipoDocumento && (
-                <p role="alert" className="text-xs text-red-500">{errors.tipoDocumento.message}</p>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="cedula">Cédula</FieldLabel>
+                  <Input
+                    id="cedula"
+                    type="text"
+                    placeholder="V-12345678"
+                    autoComplete="off"
+                    disabled={isLoading}
+                    aria-invalid={!!errors.cedula}
+                    {...register('cedula')}
+                  />
+                  <FieldError message={errors.cedula?.message} />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="cedula">Cédula de Identidad</Label>
-              <Input
-                id="cedula"
-                type="text"
-                placeholder="V-12345678"
-                autoComplete="off"
-                disabled={isLoading}
-                {...register('cedula')}
-                aria-invalid={!!errors.cedula}
-              />
-              {errors.cedula && (
-                <p role="alert" className="text-xs text-red-500">{errors.cedula.message}</p>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="fechaNacimiento">Fecha de nacimiento</FieldLabel>
+                  <Input
+                    id="fechaNacimiento"
+                    type="date"
+                    disabled={isLoading}
+                    aria-invalid={!!errors.fechaNacimiento}
+                    {...register('fechaNacimiento')}
+                  />
+                  <FieldError message={errors.fechaNacimiento?.message} />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="fechaNacimiento">Fecha de Nacimiento</Label>
-              <Input
-                id="fechaNacimiento"
-                type="date"
-                disabled={isLoading}
-                {...register('fechaNacimiento')}
-                aria-invalid={!!errors.fechaNacimiento}
-              />
-              {errors.fechaNacimiento && (
-                <p role="alert" className="text-xs text-red-500">{errors.fechaNacimiento.message}</p>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="genero">Género</FieldLabel>
+                  <Controller
+                    control={control}
+                    name="genero"
+                    render={({ field }) => (
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value ?? ''}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger id="genero" aria-invalid={!!errors.genero}>
+                          <SelectValue placeholder="Selecciona..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GENEROS.map((g) => (
+                            <SelectItem key={g} value={g}>
+                              {labelFor(g)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  <FieldError message={errors.genero?.message} />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="genero">Género</Label>
-              <select
-                id="genero"
-                disabled={isLoading}
-                {...register('genero')}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                aria-invalid={!!errors.genero}
-              >
-                <option value="">Seleccione...</option>
-                {GENEROS.map((gen) => (
-                  <option key={gen} value={gen}>{getLabelText(gen)}</option>
-                ))}
-              </select>
-              {errors.genero && (
-                <p role="alert" className="text-xs text-red-500">{errors.genero.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="estadoCivil">Estado Civil</Label>
-              <select
-                id="estadoCivil"
-                disabled={isLoading}
-                {...register('estadoCivil')}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                aria-invalid={!!errors.estadoCivil}
-              >
-                <option value="">Seleccione...</option>
-                {ESTADOS_CIVILES.map((est) => (
-                  <option key={est} value={est}>{getLabelText(est)}</option>
-                ))}
-              </select>
-              {errors.estadoCivil && (
-                <p role="alert" className="text-xs text-red-500">{errors.estadoCivil.message}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-blue-50 p-3 rounded-lg flex items-center gap-2">
-            <Phone className="h-4 w-4 text-blue-600" />
-            <span className="text-sm font-medium text-blue-800">Información de Contacto</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="correoElectronico">Correo Electrónico</Label>
-              <Input
-                id="correoElectronico"
-                type="email"
-                placeholder="juan@ejemplo.com"
-                autoComplete="email"
-                disabled={isLoading}
-                {...register('correoElectronico')}
-                aria-invalid={!!errors.correoElectronico}
-              />
-              {errors.correoElectronico && (
-                <p role="alert" className="text-xs text-red-500">{errors.correoElectronico.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="telefono">Teléfono</Label>
-              <Input
-                id="telefono"
-                type="tel"
-                placeholder="04121234567"
-                autoComplete="tel"
-                disabled={isLoading}
-                {...register('telefono')}
-                aria-invalid={!!errors.telefono}
-              />
-              {errors.telefono && (
-                <p role="alert" className="text-xs text-red-500">{errors.telefono.message}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-blue-50 p-3 rounded-lg flex items-center gap-2">
-            <Building className="h-4 w-4 text-blue-600" />
-            <span className="text-sm font-medium text-blue-800">Información Laboral</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="empresa">Empresa</Label>
-              <Input
-                id="empresa"
-                type="text"
-                placeholder="Nombre de tu empresa"
-                autoComplete="organization"
-                disabled={isLoading}
-                {...register('empresa')}
-                aria-invalid={!!errors.empresa}
-              />
-              {errors.empresa && (
-                <p role="alert" className="text-xs text-red-500">{errors.empresa.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="rifEmpresa">RIF Empresa</Label>
-              <Input
-                id="rifEmpresa"
-                type="text"
-                placeholder="J-123456789-0"
-                autoComplete="off"
-                disabled={isLoading}
-                {...register('rifEmpresa')}
-                aria-invalid={!!errors.rifEmpresa}
-              />
-              {errors.rifEmpresa && (
-                <p role="alert" className="text-xs text-red-500">{errors.rifEmpresa.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="departamento">Departamento</Label>
-              <Input
-                id="departamento"
-                type="text"
-                placeholder="Recursos Humanos"
-                autoComplete="organization-title"
-                disabled={isLoading}
-                {...register('departamento')}
-                aria-invalid={!!errors.departamento}
-              />
-              {errors.departamento && (
-                <p role="alert" className="text-xs text-red-500">{errors.departamento.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cargo">Cargo</Label>
-              <Input
-                id="cargo"
-                type="text"
-                placeholder="Analista de Sistemas"
-                autoComplete="organization-title"
-                disabled={isLoading}
-                {...register('cargo')}
-                aria-invalid={!!errors.cargo}
-              />
-              {errors.cargo && (
-                <p role="alert" className="text-xs text-red-500">{errors.cargo.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="salario">Salario (Bs)</Label>
-              <Input
-                id="salario"
-                type="text"
-                placeholder="1,500.00"
-                autoComplete="off"
-                disabled={isLoading}
-                {...register('salario')}
-                aria-invalid={!!errors.salario}
-              />
-              {errors.salario && (
-                <p role="alert" className="text-xs text-red-500">{errors.salario.message}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-blue-50 p-3 rounded-lg flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-blue-600" />
-            <span className="text-sm font-medium text-blue-800">Dirección de Residencia</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="direccionEstado">Estado</Label>
-              <select
-                id="direccionEstado"
-                disabled={isLoading}
-                {...register('direccionEstado')}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">Seleccione...</option>
-                {ESTADOS_VENEZUELA.map((estado) => (
-                  <option key={estado} value={estado}>{estado}</option>
-                ))}
-              </select>
-              {errors.direccionEstado && (
-                <p role="alert" className="text-xs text-red-500">{errors.direccionEstado.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="direccionCiudad">Ciudad</Label>
-              <Input
-                id="direccionCiudad"
-                type="text"
-                placeholder="Caracas"
-                autoComplete="address-level2"
-                disabled={isLoading}
-                {...register('direccionCiudad')}
-                aria-invalid={!!errors.direccionCiudad}
-              />
-              {errors.direccionCiudad && (
-                <p role="alert" className="text-xs text-red-500">{errors.direccionCiudad.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="direccionMunicipio">Municipio</Label>
-              <Input
-                id="direccionMunicipio"
-                type="text"
-                placeholder="Libertador"
-                autoComplete="address-level3"
-                disabled={isLoading}
-                {...register('direccionMunicipio')}
-                aria-invalid={!!errors.direccionMunicipio}
-              />
-              {errors.direccionMunicipio && (
-                <p role="alert" className="text-xs text-red-500">{errors.direccionMunicipio.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="direccionCalle">Calle / Avenida / Casa</Label>
-              <Input
-                id="direccionCalle"
-                type="text"
-                placeholder="Av. Principal, Casa #123"
-                autoComplete="street-address"
-                disabled={isLoading}
-                {...register('direccionCalle')}
-                aria-invalid={!!errors.direccionCalle}
-              />
-              {errors.direccionCalle && (
-                <p role="alert" className="text-xs text-red-500">{errors.direccionCalle.message}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-blue-50 p-3 rounded-lg flex items-center gap-2">
-            <Phone className="h-4 w-4 text-blue-600" />
-            <span className="text-sm font-medium text-blue-800">Contacto de Emergencia</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="emergenciaNombre">Nombre Completo</Label>
-              <Input
-                id="emergenciaNombre"
-                type="text"
-                placeholder="María García"
-                autoComplete="off"
-                disabled={isLoading}
-                {...register('emergenciaNombre')}
-                aria-invalid={!!errors.emergenciaNombre}
-              />
-              {errors.emergenciaNombre && (
-                <p role="alert" className="text-xs text-red-500">{errors.emergenciaNombre.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="emergenciaTelefono">Teléfono</Label>
-              <Input
-                id="emergenciaTelefono"
-                type="tel"
-                placeholder="04121234567"
-                autoComplete="off"
-                disabled={isLoading}
-                {...register('emergenciaTelefono')}
-                aria-invalid={!!errors.emergenciaTelefono}
-              />
-              {errors.emergenciaTelefono && (
-                <p role="alert" className="text-xs text-red-500">{errors.emergenciaTelefono.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="emergenciaParentesco">Parentesco</Label>
-              <Input
-                id="emergenciaParentesco"
-                type="text"
-                placeholder="Cónyuge"
-                autoComplete="off"
-                disabled={isLoading}
-                {...register('emergenciaParentesco')}
-                aria-invalid={!!errors.emergenciaParentesco}
-              />
-              {errors.emergenciaParentesco && (
-                <p role="alert" className="text-xs text-red-500">{errors.emergenciaParentesco.message}</p>
-              )}
-            </div>
-          </div>
-
-          <Separator className="my-4" />
-
-          <div className="space-y-4">
-            <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 border border-yellow-200">
-              <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-              <div className="space-y-2">
-                <p className="text-sm text-yellow-800 font-medium">Tu solicitud estará pendiente de aprobación</p>
-                <p className="text-xs text-yellow-700">Un administrador la revisará y recibirás un correo cuando sea aprobada.</p>
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="estadoCivil">Estado civil</FieldLabel>
+                  <Controller
+                    control={control}
+                    name="estadoCivil"
+                    render={({ field }) => (
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value ?? ''}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger id="estadoCivil" aria-invalid={!!errors.estadoCivil}>
+                          <SelectValue placeholder="Selecciona..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ESTADOS_CIVILES.map((e) => (
+                            <SelectItem key={e} value={e}>
+                              {labelFor(e)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  <FieldError message={errors.estadoCivil?.message} />
+                </div>
               </div>
             </div>
+          )}
 
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="aceptaTerminos"
-                  {...register('aceptaTerminos')}
-                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+          {/* ============ PASO 2: CONTACTO + DIRECCIÓN ============ */}
+          {currentStep.id === 'contacto' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="correoElectronico">Correo electrónico</FieldLabel>
+                  <Input
+                    id="correoElectronico"
+                    type="email"
+                    placeholder="juan@ejemplo.com"
+                    autoComplete="email"
+                    disabled={isLoading}
+                    aria-invalid={!!errors.correoElectronico}
+                    {...register('correoElectronico')}
+                  />
+                  <FieldError message={errors.correoElectronico?.message} />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="telefono">Teléfono</FieldLabel>
+                  <Input
+                    id="telefono"
+                    type="tel"
+                    placeholder="04121234567"
+                    autoComplete="tel"
+                    disabled={isLoading}
+                    aria-invalid={!!errors.telefono}
+                    {...register('telefono')}
+                  />
+                  <FieldError message={errors.telefono?.message} />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="direccionEstado" optional>
+                    Estado
+                  </FieldLabel>
+                  <Controller
+                    control={control}
+                    name="direccionEstado"
+                    render={({ field }) => (
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value ?? ''}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger id="direccionEstado">
+                          <SelectValue placeholder="Selecciona estado..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ESTADOS_VENEZUELA.map((e) => (
+                            <SelectItem key={e} value={e}>
+                              {e}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  <FieldError message={errors.direccionEstado?.message} />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="direccionCiudad" optional>
+                    Ciudad
+                  </FieldLabel>
+                  <Input
+                    id="direccionCiudad"
+                    type="text"
+                    placeholder="Caracas"
+                    autoComplete="address-level2"
+                    disabled={isLoading}
+                    {...register('direccionCiudad')}
+                  />
+                  <FieldError message={errors.direccionCiudad?.message} />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="direccionMunicipio" optional>
+                    Municipio
+                  </FieldLabel>
+                  <Input
+                    id="direccionMunicipio"
+                    type="text"
+                    placeholder="Libertador"
+                    autoComplete="address-level3"
+                    disabled={isLoading}
+                    {...register('direccionMunicipio')}
+                  />
+                  <FieldError message={errors.direccionMunicipio?.message} />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="direccionCalle" optional>
+                    Calle / Avenida / Casa
+                  </FieldLabel>
+                  <Input
+                    id="direccionCalle"
+                    type="text"
+                    placeholder="Av. Principal, Casa #123"
+                    autoComplete="street-address"
+                    disabled={isLoading}
+                    {...register('direccionCalle')}
+                  />
+                  <FieldError message={errors.direccionCalle?.message} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============ PASO 3: LABORAL ============ */}
+          {currentStep.id === 'laboral' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2 space-y-2">
+                  <FieldLabel htmlFor="empresa">Empresa</FieldLabel>
+                  <Input
+                    id="empresa"
+                    type="text"
+                    placeholder="Nombre de tu empresa"
+                    autoComplete="organization"
+                    disabled={isLoading}
+                    aria-invalid={!!errors.empresa}
+                    {...register('empresa')}
+                  />
+                  <FieldError message={errors.empresa?.message} />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="rifEmpresa" optional>
+                    RIF Empresa
+                  </FieldLabel>
+                  <Input
+                    id="rifEmpresa"
+                    type="text"
+                    placeholder="J-123456789-0"
+                    autoComplete="off"
+                    disabled={isLoading}
+                    {...register('rifEmpresa')}
+                  />
+                  <FieldError message={errors.rifEmpresa?.message} />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="departamento" optional>
+                    Departamento
+                  </FieldLabel>
+                  <Input
+                    id="departamento"
+                    type="text"
+                    placeholder="Recursos Humanos"
+                    autoComplete="organization-title"
+                    disabled={isLoading}
+                    {...register('departamento')}
+                  />
+                  <FieldError message={errors.departamento?.message} />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="cargo" optional>
+                    Cargo
+                  </FieldLabel>
+                  <Input
+                    id="cargo"
+                    type="text"
+                    placeholder="Analista de sistemas"
+                    autoComplete="organization-title"
+                    disabled={isLoading}
+                    {...register('cargo')}
+                  />
+                  <FieldError message={errors.cargo?.message} />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="salario" optional>
+                    Salario mensual (Bs)
+                  </FieldLabel>
+                  <Input
+                    id="salario"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="1500.00"
+                    autoComplete="off"
+                    disabled={isLoading}
+                    {...register('salario')}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Usa punto o coma para los decimales (ej. 1500.00 o 1500,00).
+                  </p>
+                  <FieldError message={errors.salario?.message} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============ PASO 4: EMERGENCIA ============ */}
+          {currentStep.id === 'emergencia' && (
+            <div className="space-y-4">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>¿Por qué te pedimos esto?</AlertTitle>
+                <AlertDescription>
+                  En caso de una emergencia que te impida operar tu cuenta, contactaremos
+                  a esta persona. Es opcional pero recomendado.
+                </AlertDescription>
+              </Alert>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2 space-y-2">
+                  <FieldLabel htmlFor="emergenciaNombre" optional>
+                    Nombre completo del contacto
+                  </FieldLabel>
+                  <Input
+                    id="emergenciaNombre"
+                    type="text"
+                    placeholder="María García"
+                    autoComplete="off"
+                    disabled={isLoading}
+                    {...register('emergenciaNombre')}
+                  />
+                  <FieldError message={errors.emergenciaNombre?.message} />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="emergenciaTelefono" optional>
+                    Teléfono
+                  </FieldLabel>
+                  <Input
+                    id="emergenciaTelefono"
+                    type="tel"
+                    placeholder="04121234567"
+                    autoComplete="off"
+                    disabled={isLoading}
+                    {...register('emergenciaTelefono')}
+                  />
+                  <FieldError message={errors.emergenciaTelefono?.message} />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="emergenciaParentesco" optional>
+                    Parentesco
+                  </FieldLabel>
+                  <Input
+                    id="emergenciaParentesco"
+                    type="text"
+                    placeholder="Cónyuge, hijo/a, padre/madre…"
+                    autoComplete="off"
+                    disabled={isLoading}
+                    {...register('emergenciaParentesco')}
+                  />
+                  <FieldError message={errors.emergenciaParentesco?.message} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============ PASO 5: CONFIRMACIÓN ============ */}
+          {currentStep.id === 'confirmacion' && (
+            <div className="space-y-4">
+              <Alert className="border-yellow-200 bg-yellow-50">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <AlertTitle className="text-yellow-900">Tu solicitud quedará pendiente de aprobación</AlertTitle>
+                <AlertDescription className="text-yellow-800">
+                  Un administrador la revisará y recibirás un correo cuando sea aprobada
+                  o si necesitamos información adicional.
+                </AlertDescription>
+              </Alert>
+
+              {/* Resumen rápido */}
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-1 text-sm">
+                <p className="font-medium">Resumen</p>
+                <p>
+                  <span className="text-muted-foreground">Nombre:</span>{' '}
+                  {getValues('nombreCompleto') || '—'}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Cédula:</span>{' '}
+                  {getValues('cedula') || '—'}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Correo:</span>{' '}
+                  {getValues('correoElectronico') || '—'}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Empresa:</span>{' '}
+                  {getValues('empresa') || '—'}
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <Controller
+                  control={control}
+                  name="aceptaTerminos"
+                  render={({ field }) => (
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id="aceptaTerminos"
+                        checked={field.value === true}
+                        onCheckedChange={(c) => field.onChange(c === true)}
+                        disabled={isLoading}
+                        aria-invalid={!!errors.aceptaTerminos}
+                      />
+                      <Label htmlFor="aceptaTerminos" className="text-sm leading-tight">
+                        Acepto los{' '}
+                        <a href="/terminos" className="text-blue-600 hover:underline">
+                          términos y condiciones
+                        </a>
+                        .
+                      </Label>
+                    </div>
+                  )}
                 />
-                <Label htmlFor="aceptaTerminos" className="text-sm">
-                  Acepto los <a href="/terminos" className="text-blue-600 hover:underline">términos y condiciones</a>
-                </Label>
-              </div>
-              {errors.aceptaTerminos && (
-                <p role="alert" className="text-xs text-red-500">{errors.aceptaTerminos.message}</p>
-              )}
+                <FieldError message={errors.aceptaTerminos?.message} />
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="aceptaLopdp"
-                  {...register('aceptaLopdp')}
-                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                <Controller
+                  control={control}
+                  name="aceptaLopdp"
+                  render={({ field }) => (
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id="aceptaLopdp"
+                        checked={field.value === true}
+                        onCheckedChange={(c) => field.onChange(c === true)}
+                        disabled={isLoading}
+                        aria-invalid={!!errors.aceptaLopdp}
+                      />
+                      <Label htmlFor="aceptaLopdp" className="text-sm leading-tight">
+                        Acepto la{' '}
+                        <a href="/lopdp" className="text-blue-600 hover:underline">
+                          política de protección de datos personales
+                        </a>{' '}
+                        (LOPDP).
+                      </Label>
+                    </div>
+                  )}
                 />
-                <Label htmlFor="aceptaLopdp" className="text-sm">
-                  Acepto la <a href="/lopdp" className="text-blue-600 hover:underline">política de protección de datos personales</a> (LOPDP)
-                </Label>
+                <FieldError message={errors.aceptaLopdp?.message} />
               </div>
-              {errors.aceptaLopdp && (
-                <p role="alert" className="text-xs text-red-500">{errors.aceptaLopdp.message}</p>
-              )}
             </div>
-          </div>
+          )}
 
-          <Button
-            type="submit"
-            className="w-full bg-green-600 hover:bg-green-700"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Enviando...
-              </>
-            ) : (
-              'Enviar Solicitud'
+          {/* ============ NAVEGACIÓN ============ */}
+          <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
+            {stepIndex > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={goBack}
+                disabled={isLoading}
+                className="sm:w-32"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Anterior
+              </Button>
             )}
-          </Button>
+
+            {!isLastStep ? (
+              <Button
+                type="button"
+                onClick={goNext}
+                disabled={isLoading}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                Continuar
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enviando…
+                  </>
+                ) : (
+                  'Enviar solicitud'
+                )}
+              </Button>
+            )}
+          </div>
         </form>
 
-        <div className="mt-6 text-center text-sm text-gray-500">
+        <div className="mt-6 text-center text-sm text-muted-foreground">
           ¿Ya tienes cuenta?{' '}
           <a href="/login" className="text-green-600 hover:underline">
-            Inicia Sesión
+            Inicia sesión
           </a>
         </div>
       </CardContent>
