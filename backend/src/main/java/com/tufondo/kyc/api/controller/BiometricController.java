@@ -103,6 +103,30 @@ public class BiometricController {
             sig = http.getHeader("x-signature");
         }
 
+        // ─── LOGGING TEMPORAL DE DIAGNÓSTICO ─────────────────────────────────
+        // Habilitar mientras estamos depurando el mismatch de firma con Didit.
+        // Hay que removerlo en producción real porque el body puede contener PII.
+        try {
+            String bodyStr = new String(rawBody, java.nio.charset.StandardCharsets.UTF_8);
+            // Hash del raw body (no es secret, solo para identificar mismo cuerpo entre runs).
+            String bodyHash = java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(rawBody));
+            StringBuilder hdrs = new StringBuilder();
+            java.util.Enumeration<String> names = http.getHeaderNames();
+            while (names != null && names.hasMoreElements()) {
+                String n = names.nextElement();
+                String low = n.toLowerCase();
+                if (low.startsWith("x-") || low.equals("content-type") || low.equals("content-length")) {
+                    hdrs.append(n).append("=").append(http.getHeader(n)).append("; ");
+                }
+            }
+            log.warn("[DIDIT-DEBUG] webhook recibido bytes={} sha256(body)={} headers=[{}]",
+                    rawBody.length, bodyHash, hdrs);
+            // Body completo (puede ser ~20KB) loggeado aparte para no truncarlo.
+            log.warn("[DIDIT-DEBUG] RAW_BODY: {}", bodyStr);
+        } catch (Exception ignored) { }
+        // ─────────────────────────────────────────────────────────────────────
+
         procesarWebhookUseCase.ejecutar(rawBody, sig, timestamp);
         return ResponseEntity.ok().build();
     }
