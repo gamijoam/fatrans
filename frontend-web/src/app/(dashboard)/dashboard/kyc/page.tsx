@@ -10,6 +10,7 @@ import {
   Check, X, Loader2, Calendar, Image as ImageIcon, Send
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { BiometricCapture } from '@/components/features/kyc/biometric-capture';
 
 interface DocumentoEstado {
   id: string;
@@ -212,6 +213,16 @@ export default function DashboardKYCPagina() {
         </Card>
       ) : (
         <>
+          {/* Captura biométrica (passive liveness + face match + OCR cédula vía Didit).
+              Lo mostramos como paso previo a los documentos manuales — si el socio
+              pasa la biometría, el analista tiene mucho más contexto al revisar.
+              El componente maneja internamente: consentimiento LOPDP, abrir widget,
+              estado del intento. Solo se muestra mientras el KYC esté en estado
+              PENDIENTE o EN_REVISION (no tiene sentido si ya está APROBADO). */}
+          {(estadoKYC.estado === 'PENDIENTE' || estadoKYC.estado === 'EN_REVISION') && (
+            <BiometricCapture onCompleted={cargarEstado} />
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
               <Card>

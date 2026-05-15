@@ -1,6 +1,5 @@
 package com.tufondo.kyc.application.usecase;
 
-import com.tufondo.kyc.domain.exception.KYCException;
 import com.tufondo.kyc.domain.model.VerificacionBiometrica;
 import com.tufondo.kyc.domain.model.VerificacionKYC;
 import com.tufondo.kyc.domain.model.enums.EstadoBiometria;
@@ -35,10 +34,19 @@ public class ProcesarWebhookBiometricoUseCase {
         BiometricVerificatorPort.BiometricWebhookResult result =
                 biometricPort.procesarWebhook(rawBody, signatureHeader, timestampHeader);
 
-        VerificacionBiometrica intento = biometricaRepository
-                .findByProveedorSessionId(biometricPort.getProveedor(), result.sessionId())
-                .orElseThrow(() -> new KYCException(
-                        "No existe intento biométrico para sessionId=" + result.sessionId()));
+        // Si la sesión no existe en nuestra BD (e.g. fue creada fuera del flow normal,
+        // o un Test Webhook de Didit con session_id sintético), no es un error:
+        // devolvemos sin hacer nada para que Didit no reintente indefinidamente.
+        // Loggeamos para auditoría, pero el HTTP queda 200 (no 500).
+        java.util.Optional<VerificacionBiometrica> intentoOpt = biometricaRepository
+                .findByProveedorSessionId(biometricPort.getProveedor(), result.sessionId());
+        if (intentoOpt.isEmpty()) {
+            log.warn("Webhook ignorado: no existe intento biométrico para sessionId={} (provider={}). " +
+                    "Esto es normal para Test Webhooks o sesiones creadas fuera del flujo.",
+                    result.sessionId(), biometricPort.getProveedor());
+            return;
+        }
+        VerificacionBiometrica intento = intentoOpt.get();
 
         // Idempotencia: si ya está en estado final, no reaplicar.
         if (intento.getEstado() == com.tufondo.kyc.domain.model.enums.EstadoIntentoBiometrico.APROBADA

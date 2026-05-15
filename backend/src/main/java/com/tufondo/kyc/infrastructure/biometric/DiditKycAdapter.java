@@ -189,14 +189,7 @@ public class DiditKycAdapter implements BiometricVerificatorPort {
             expectedSignature = hmacSha256Hex(props.getWebhookSecret(), canonical);
             String provided = normalizeSignature(signatureHeader.substring("v2:".length()));
             if (!constantTimeEquals(expectedSignature, provided)) {
-                // Logging diagnóstico para debug: dump del canonical body (primeros 400
-                // chars) + firma esperada y recibida. Útil cuando Didit y nosotros
-                // canonicalizamos distinto. Eliminar este log en cuanto la verificación
-                // funcione (el body puede contener PII en producción real).
-                String canonicalStr = new String(canonical, java.nio.charset.StandardCharsets.UTF_8);
-                String preview = canonicalStr.length() > 400 ? canonicalStr.substring(0, 400) + "…" : canonicalStr;
-                log.warn("Webhook Didit firma V2 inválida (timestamp={}). expected={} provided={} canonical_preview={}",
-                        timestampHeader, expectedSignature, provided, preview);
+                log.warn("Webhook Didit firma V2 inválida (timestamp={})", timestampHeader);
                 throw new KYCException("Firma de webhook inválida");
             }
         } else {
