@@ -118,12 +118,27 @@ public class DiditKycAdapter implements BiometricVerificatorPort {
             body.put("callback", callback);
         }
 
+        // Serializamos manualmente con nuestro ObjectMapper local y enviamos como
+        // String. RestTemplate normalmente delega a los HttpMessageConverters de
+        // Spring para serializar Map<String,Object> → JSON, pero esos converters
+        // pueden estar configurados a nivel global con filtros como JsonInclude.NON_NULL
+        // o naming strategies (e.g. SNAKE_CASE) que reescriben las keys del body
+        // antes de salir — Didit recibe entonces el body sin `workflow_id` (o con
+        // `workflowId` camelCase) y rechaza con 400. Forzar serialización local
+        // garantiza bytes idénticos a los que un curl manual enviaría.
+        String jsonBody;
+        try {
+            jsonBody = objectMapper.writeValueAsString(body);
+        } catch (Exception e) {
+            throw new KYCException("Error serializando request a Didit: " + e.getMessage());
+        }
+
         HttpHeaders headers = baseHeaders();
         try {
             ResponseEntity<JsonNode> response = restTemplate.exchange(
                     props.getBaseUrl() + "/session/",
                     HttpMethod.POST,
-                    new HttpEntity<>(body, headers),
+                    new HttpEntity<>(jsonBody, headers),
                     JsonNode.class
             );
             JsonNode payload = response.getBody();
@@ -138,9 +153,14 @@ public class DiditKycAdapter implements BiometricVerificatorPort {
             }
             log.info("Didit session created. socioId={} sessionId={}", request.socioId(), sessionId);
             return new BiometricSessionResponse(sessionId, workflowId, widgetUrl, widgetToken);
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            // 4xx/5xx con cuerpo de respuesta — Didit nos dice qué campo falta,
+            // logueamos eso para diagnóstico (no incluye apiKey, solo nuestra request).
+            log.error("Didit session error: HTTP {} body={}",
+                    e.getStatusCode().value(), e.getResponseBodyAsString());
+            throw new KYCException("Error iniciando sesión biométrica con el proveedor");
         } catch (RestClientException e) {
-            // No logueamos el body ni headers (puede contener apiKey reflejada en algunos errores).
-            log.error("Didit session error: {}", e.getMessage());
+            log.error("Didit session error (network/transport): {}", e.getMessage());
             throw new KYCException("Error iniciando sesión biométrica con el proveedor");
         }
     }
