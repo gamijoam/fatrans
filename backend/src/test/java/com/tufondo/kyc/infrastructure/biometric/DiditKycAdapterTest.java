@@ -116,6 +116,67 @@ class DiditKycAdapterTest {
         assertThat(result.outcome()).isEqualTo(BiometricVerificatorPort.BiometricOutcome.RECHAZADO);
     }
 
+    @Test
+    @DisplayName("Acepta firma X-Signature-V2: HMAC sobre JSON canonicalizado (sort keys + whole-number floats)")
+    void aceptaFirmaV2Canonicalizada() throws Exception {
+        // Payload con claves desordenadas y un float whole-number (1641038400.0).
+        // El raw body NO tiene el formato canónico — Didit firma el canónico.
+        byte[] rawBody = """
+                {
+                  "status": "Approved",
+                  "session_id": "%s",
+                  "timestamp": 1641038400.0,
+                  "decision": {
+                    "session_id": "%s",
+                    "status": "Approved",
+                    "face_matches": [{"score": 95.26, "status": "Approved"}],
+                    "liveness_checks": [{"score": 99.03, "status": "Approved", "method": "FLASHING"}]
+                  }
+                }
+                """.formatted(SESSION_ID, SESSION_ID).getBytes(StandardCharsets.UTF_8);
+
+        // Canonicalizar manualmente igual que el adapter, firmar el resultado.
+        byte[] canonical = adapter.canonicalizeJson(rawBody);
+        String signature = "v2:" + hmacHex(SECRET, canonical);
+        String timestamp = String.valueOf(Instant.now().getEpochSecond());
+
+        BiometricVerificatorPort.BiometricWebhookResult result =
+                adapter.procesarWebhook(rawBody, signature, timestamp);
+
+        assertThat(result.sessionId()).isEqualTo(SESSION_ID);
+        assertThat(result.outcome()).isEqualTo(BiometricVerificatorPort.BiometricOutcome.APROBADO);
+        // Scores se leen de los arrays anidados — normalizan de 0-100 a 0-1.
+        assertThat(result.faceMatchScore()).isEqualByComparingTo("0.9526");
+        assertThat(result.livenessScore()).isEqualByComparingTo("0.9903");
+    }
+
+    @Test
+    @DisplayName("Rechaza firma V2 cuando el JSON canonicalizado no coincide con la firma enviada")
+    void rechazaFirmaV2Invalida() {
+        byte[] rawBody = ("{\"session_id\":\"" + SESSION_ID + "\",\"status\":\"Approved\"}")
+                .getBytes(StandardCharsets.UTF_8);
+        // Firma calculada sobre el raw body (no canonicalizado) — esa NO es V2.
+        String signature = "v2:" + hmacHex(SECRET, rawBody);
+        String timestamp = String.valueOf(Instant.now().getEpochSecond());
+
+        assertThatThrownBy(() -> adapter.procesarWebhook(rawBody, signature, timestamp))
+                .isInstanceOf(KYCException.class)
+                .hasMessageContaining("Firma de webhook inválida");
+    }
+
+    @Test
+    @DisplayName("Canonicalización: keys se ordenan alfabéticamente y whole-number floats se serializan como int")
+    void canonicalizacionCorrecta() throws Exception {
+        byte[] input = "{\"b\":2,\"a\":1.0,\"c\":{\"y\":\"x\",\"x\":3.5}}"
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] output = adapter.canonicalizeJson(input);
+        String result = new String(output, StandardCharsets.UTF_8);
+
+        // Keys ordenadas alfabéticamente (a, b, c) y dentro de c (x, y).
+        // 1.0 → 1 (whole-number a Long). 3.5 → 3.5 (mantiene float).
+        assertThat(result).isEqualTo("{\"a\":1,\"b\":2,\"c\":{\"x\":3.5,\"y\":\"x\"}}");
+    }
+
     /** Helper local: computa HMAC-SHA256 en hex (igual lógica que el adapter). */
     private String hmacHex(String secret, byte[] body) {
         try {

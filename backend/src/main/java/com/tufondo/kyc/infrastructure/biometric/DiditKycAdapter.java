@@ -2,6 +2,10 @@ package com.tufondo.kyc.infrastructure.biometric;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.LongNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tufondo.kyc.domain.exception.KYCException;
 import com.tufondo.kyc.domain.model.port.BiometricVerificatorPort;
 import lombok.extern.slf4j.Slf4j;
@@ -22,8 +26,11 @@ import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -123,25 +130,60 @@ public class DiditKycAdapter implements BiometricVerificatorPort {
         }
     }
 
+    /**
+     * Procesa un webhook de Didit. Soporta DOS esquemas de firma:
+     *
+     * <ol>
+     *   <li><b>X-Signature-V2</b> (preferido) — HMAC-SHA256 sobre el JSON
+     *       <em>canonicalizado</em>: parse, ordenar keys recursivamente, convertir
+     *       floats whole-number a enteros, re-encodear sin escape Unicode.
+     *       Esta firma sobrevive a middleware que re-encoda JSON (Cloudflare).</li>
+     *   <li><b>X-Signature</b> (legacy) — HMAC-SHA256 sobre el raw body literal.
+     *       Frágil con caracteres especiales pero más rápida. Solo fallback.</li>
+     * </ol>
+     *
+     * Si vienen ambos headers preferimos V2. Si la firma elegida no valida,
+     * rechazamos sin caer al otro esquema (no aporta seguridad probar dos).
+     */
     @Override
     public BiometricWebhookResult procesarWebhook(byte[] rawBody, String signatureHeader, String timestampHeader) {
         ensureEnabled();
-
-        if (signatureHeader == null || signatureHeader.isBlank()) {
-            throw new KYCException("Webhook sin firma: rechazado");
-        }
         if (props.getWebhookSecret() == null || props.getWebhookSecret().isBlank()) {
             throw new KYCException("DIDIT_WEBHOOK_SECRET no configurado");
         }
 
-        // Anti-replay: el timestamp debe estar dentro de la ventana de tolerancia.
+        // Anti-replay: timestamp dentro de ventana (aplica a ambas firmas).
         validateTimestamp(timestampHeader);
 
-        // Verificación HMAC-SHA256 del body crudo con la clave compartida.
-        String expectedSignature = hmacSha256Hex(props.getWebhookSecret(), rawBody);
-        if (!constantTimeEquals(expectedSignature, normalizeSignature(signatureHeader))) {
-            log.warn("Webhook Didit firma inválida (timestamp={})", timestampHeader);
-            throw new KYCException("Firma de webhook inválida");
+        if (signatureHeader == null || signatureHeader.isBlank()) {
+            throw new KYCException("Webhook sin firma: rechazado");
+        }
+
+        // El controller debe haber elegido el header correcto antes de delegar.
+        // signatureHeader puede ser "v2:<hex>" o solo "<hex>" (raw). Convención
+        // interna: si arranca con "v2:" usamos canonicalización V2; si no, simple.
+        String expectedSignature;
+        if (signatureHeader.startsWith("v2:")) {
+            byte[] canonical;
+            try {
+                canonical = canonicalizeJson(rawBody);
+            } catch (Exception e) {
+                log.error("Webhook payload no es JSON parseable: {}", e.getMessage());
+                throw new KYCException("Webhook payload inválido");
+            }
+            expectedSignature = hmacSha256Hex(props.getWebhookSecret(), canonical);
+            String provided = normalizeSignature(signatureHeader.substring("v2:".length()));
+            if (!constantTimeEquals(expectedSignature, provided)) {
+                log.warn("Webhook Didit firma V2 inválida (timestamp={})", timestampHeader);
+                throw new KYCException("Firma de webhook inválida");
+            }
+        } else {
+            // Firma simple — HMAC sobre raw body literal.
+            expectedSignature = hmacSha256Hex(props.getWebhookSecret(), rawBody);
+            if (!constantTimeEquals(expectedSignature, normalizeSignature(signatureHeader))) {
+                log.warn("Webhook Didit firma simple inválida (timestamp={})", timestampHeader);
+                throw new KYCException("Firma de webhook inválida");
+            }
         }
 
         try {
@@ -151,15 +193,20 @@ public class DiditKycAdapter implements BiometricVerificatorPort {
             JsonNode decision = payload.path("decision");
 
             BiometricOutcome outcome = mapStatus(status);
-            BigDecimal livenessScore = readScore(decision, "liveness", "score");
-            BigDecimal faceMatchScore = readScore(decision, "face_match", "score");
-            BigDecimal documentOcrScore = readScore(decision, "id_verification", "confidence_score");
+            // Didit envía resultados en sub-arrays (face_matches, liveness_checks,
+            // id_verifications). Tomamos el primer elemento de cada uno.
+            BigDecimal livenessScore = readArrayScore(decision, "liveness_checks", "score");
+            BigDecimal faceMatchScore = readArrayScore(decision, "face_matches", "score");
+            BigDecimal documentOcrScore = readArrayScore(decision, "id_verifications", "front_image_camera_front_face_match_score");
 
             String motivoFallo = null;
             String tipoAtaque = null;
             if (outcome == BiometricOutcome.RECHAZADO) {
-                motivoFallo = textOrNull(decision, "warnings");
-                tipoAtaque = textOrNull(decision.path("liveness"), "attack_type");
+                JsonNode firstLiveness = firstElement(decision.path("liveness_checks"));
+                if (firstLiveness != null) {
+                    tipoAtaque = textOrNull(firstLiveness, "method");
+                    motivoFallo = textOrNull(firstLiveness, "warnings");
+                }
             }
 
             return new BiometricWebhookResult(
@@ -170,6 +217,67 @@ public class DiditKycAdapter implements BiometricVerificatorPort {
             log.error("Error parseando webhook Didit: {}", e.getMessage());
             throw new KYCException("Webhook payload inválido");
         }
+    }
+
+    /**
+     * Canonicaliza un payload JSON de Didit para validación X-Signature-V2:
+     * <ul>
+     *   <li>Parse JSON</li>
+     *   <li>Para cada objeto: ordenar entries alfabéticamente por key, recursivo</li>
+     *   <li>Para cada número: si es un float "whole number" (sin parte decimal),
+     *       lo convertimos a {@link LongNode} para serializar como entero</li>
+     *   <li>Re-encodear sin escape de Unicode (Jackson default) ni espacios</li>
+     * </ul>
+     */
+    byte[] canonicalizeJson(byte[] rawBody) throws java.io.IOException {
+        JsonNode root = objectMapper.readTree(rawBody);
+        JsonNode canonical = canonicalizeNode(root);
+        return objectMapper.writeValueAsBytes(canonical);
+    }
+
+    private JsonNode canonicalizeNode(JsonNode node) {
+        if (node.isObject()) {
+            ObjectNode sorted = JsonNodeFactory.instance.objectNode();
+            List<String> names = new ArrayList<>();
+            node.fieldNames().forEachRemaining(names::add);
+            Collections.sort(names);
+            for (String name : names) {
+                sorted.set(name, canonicalizeNode(node.get(name)));
+            }
+            return sorted;
+        }
+        if (node.isArray()) {
+            ArrayNode arr = JsonNodeFactory.instance.arrayNode();
+            for (JsonNode child : node) {
+                arr.add(canonicalizeNode(child));
+            }
+            return arr;
+        }
+        if (node.isFloatingPointNumber()) {
+            double d = node.doubleValue();
+            // Floats que son enteros se serializan como Long (Didit convention).
+            if (!Double.isNaN(d) && !Double.isInfinite(d) && d == Math.floor(d)
+                    && d >= Long.MIN_VALUE && d <= Long.MAX_VALUE) {
+                return new LongNode((long) d);
+            }
+        }
+        return node;
+    }
+
+    private JsonNode firstElement(JsonNode array) {
+        if (array == null || !array.isArray() || array.size() == 0) return null;
+        return array.get(0);
+    }
+
+    private BigDecimal readArrayScore(JsonNode parent, String arrayField, String scoreField) {
+        if (parent == null) return null;
+        JsonNode first = firstElement(parent.path(arrayField));
+        if (first == null) return null;
+        JsonNode v = first.path(scoreField);
+        if (v.isMissingNode() || v.isNull() || !v.isNumber()) return null;
+        double raw = v.asDouble();
+        if (raw > 1.0) raw = raw / 100.0;  // normalizar a 0-1
+        return BigDecimal.valueOf(raw);
     }
 
     @Override
