@@ -64,6 +64,23 @@ storage:
     kyc: bucket-kyc
 
 # ============================================
+# KYC BIOMÉTRICO - PROVEEDOR DIDIT
+# ============================================
+# Habilitar solo cuando se configuren las env vars; deshabilitado por defecto
+# permite que la app arranque sin credenciales (los endpoints biométricos
+# devuelven KYCException explícita).
+fatrans:
+  kyc:
+    didit:
+      enabled: ${DIDIT_ENABLED:false}
+      api-key: ${DIDIT_API_KEY:}
+      webhook-secret: ${DIDIT_WEBHOOK_SECRET:}
+      workflow-id: ${DIDIT_WORKFLOW_ID:}
+      base-url: ${DIDIT_BASE_URL:https://verification.didit.me/v2}
+      callback-url: ${DIDIT_CALLBACK_URL:}
+      webhook-timestamp-tolerance-seconds: 300
+
+# ============================================
 # MÓDULO DOCUMENTOS PDF - CONFIGURACIÓN
 # ============================================
 documentospdf:

@@ -128,6 +128,7 @@ public class VerificacionKYCRepositoryImpl implements VerificacionKYCRepository 
             .fechaRevision(entity.getFechaRevision())
             .comentariosRevision(entity.getComentariosRevision())
             .motivoRechazo(entity.getMotivoRechazo())
+            .estadoBiometria(entity.getEstadoBiometria())
             .createdAt(entity.getCreatedAt())
             .updatedAt(entity.getUpdatedAt())
             .build();
@@ -147,6 +148,7 @@ public class VerificacionKYCRepositoryImpl implements VerificacionKYCRepository 
             .fechaRevision(domain.getFechaRevision())
             .comentariosRevision(domain.getComentariosRevision())
             .motivoRechazo(domain.getMotivoRechazo())
+            .estadoBiometria(domain.getEstadoBiometria())
             .createdAt(domain.getCreatedAt())
             .updatedAt(domain.getUpdatedAt())
             .build();
