@@ -67,6 +67,11 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/socios/solicitud").permitAll()
+                // Webhook biométrico del proveedor KYC (Didit). NO usa JWT — la
+                // autenticación es por firma HMAC verificada dentro del adapter
+                // (`DiditKycAdapter#procesarWebhook`). Si exigimos JWT aquí, Didit
+                // recibe 401 y nunca confirma el resultado de las verificaciones.
+                .requestMatchers("/api/v1/kyc/biometric/webhook").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/favicon.ico").permitAll()
                 .anyRequest().authenticated()
