@@ -1,6 +1,7 @@
 // com.tufondo.kyc.infrastructure.persistence.entity.VerificacionKYCEntity
 package com.tufondo.kyc.infrastructure.persistence.entity;
 
+import com.tufondo.kyc.domain.model.enums.EstadoBiometria;
 import com.tufondo.kyc.domain.model.enums.EstadoVerificacion;
 import com.tufondo.kyc.domain.model.enums.NivelVerificacion;
 import jakarta.persistence.*;
@@ -64,6 +65,15 @@ public class VerificacionKYCEntity {
 
     @Column(name = "motivo_rechazo", columnDefinition = "TEXT")
     private String motivoRechazo;
+
+    /**
+     * Cache del resultado biométrico (Didit/AWS) — mantiene el listado del admin
+     * rápido sin JOIN con biometric_verification. Se actualiza por el use case
+     * que procesa el webhook del proveedor.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_biometria", nullable = false, length = 30)
+    private EstadoBiometria estadoBiometria;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

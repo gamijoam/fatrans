@@ -98,6 +98,14 @@ public class RevisarDocumentosUseCase {
                 "La verificacion no esta en estado de revision");
         }
 
+        // Regla de negocio: no se puede aprobar documentalmente si la biometría
+        // no pasó. El analista debe pedir al socio repetir la captura biométrica.
+        if (verificacion.getEstadoBiometria() != com.tufondo.kyc.domain.model.enums.EstadoBiometria.APROBADA) {
+            throw new com.tufondo.kyc.domain.exception.VerificacionNoEditableException(
+                "No se puede aprobar la verificacion: el flujo biometrico no esta aprobado " +
+                "(estado actual: " + verificacion.getEstadoBiometria() + ")");
+        }
+
         EstadoVerificacion estadoAnterior = verificacion.getEstado();
 
         verificacion.setEstado(EstadoVerificacion.APROBADO);
