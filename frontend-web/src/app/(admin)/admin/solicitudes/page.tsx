@@ -16,17 +16,41 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Check, X, Clock, User, Phone, Mail, Building } from 'lucide-react';
+import { Loader2, Check, X, Clock, User, Phone, Mail, Building, Eye, MapPin, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Solicitud {
   id: string;
+  // --- Datos personales ---
   nombreCompleto: string;
+  tipoDocumento?: 'CEDULA' | 'CEDULA_EXTRANJERO' | 'PASAPORTE' | 'RIF';
   cedula: string;
+  fechaNacimiento?: string;
+  genero?: 'MASCULINO' | 'FEMENINO' | 'OTRO';
+  estadoCivil?: 'SOLTERO' | 'CASADO' | 'DIVORCIADO' | 'VIUDO' | 'UNION_LIBRE';
+  // --- Contacto ---
   correoElectronico: string;
   telefono: string;
+  // --- Laboral ---
   empresa: string;
-  estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+  rifEmpresa?: string;
+  departamento?: string;
+  cargo?: string;
+  salario?: number | string;
+  // --- Dirección ---
+  direccionEstado?: string;
+  direccionCiudad?: string;
+  direccionMunicipio?: string;
+  direccionCalle?: string;
+  // --- Emergencia ---
+  emergenciaNombre?: string;
+  emergenciaTelefono?: string;
+  emergenciaParentesco?: string;
+  // --- Consentimientos ---
+  aceptaTerminos?: boolean;
+  aceptaLopdp?: boolean;
+  // --- Trazabilidad ---
+  estado: 'PENDIENTE' | 'APROBADO' | 'APROBADA' | 'RECHAZADO' | 'RECHAZADA';
   fechaSolicitud: string;
   fechaRevision?: string;
   revisadoPor?: string;
@@ -40,6 +64,8 @@ export default function SolicitudesPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rejectMotivo, setRejectMotivo] = useState('');
+  /** Solicitud cuyo detalle completo se está viendo en el modal "Ver detalle". */
+  const [detailSolicitud, setDetailSolicitud] = useState<Solicitud | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElementos, setTotalElementos] = useState(0);
@@ -211,6 +237,16 @@ export default function SolicitudesPage() {
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               size="sm"
+                              variant="outline"
+                              onClick={() => setDetailSolicitud(solicitud)}
+                              disabled={isProcessing}
+                              aria-label="Ver detalle"
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Ver detalle
+                            </Button>
+                            <Button
+                              size="sm"
                               variant="default"
                               className="bg-green-600 hover:bg-green-700"
                               onClick={() => handleAprobar(solicitud.id)}
@@ -300,6 +336,123 @@ export default function SolicitudesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal "Ver detalle": muestra TODOS los campos de la solicitud para que el
+          admin pueda revisar con contexto antes de aprobar/rechazar. */}
+      <Dialog open={!!detailSolicitud} onOpenChange={(open) => !open && setDetailSolicitud(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalle de la solicitud</DialogTitle>
+            <DialogDescription>
+              {detailSolicitud?.nombreCompleto} — {detailSolicitud?.cedula}
+            </DialogDescription>
+          </DialogHeader>
+
+          {detailSolicitud && (
+            <div className="space-y-5 py-2 text-sm">
+              <DetalleSeccion icon={<User className="h-4 w-4" />} titulo="Datos personales">
+                <DetalleCampo label="Nombre completo" value={detailSolicitud.nombreCompleto} />
+                <DetalleCampo label="Tipo de documento" value={detailSolicitud.tipoDocumento} />
+                <DetalleCampo label="Cédula / documento" value={detailSolicitud.cedula} />
+                <DetalleCampo label="Fecha de nacimiento" value={detailSolicitud.fechaNacimiento} />
+                <DetalleCampo label="Género" value={detailSolicitud.genero} />
+                <DetalleCampo label="Estado civil" value={detailSolicitud.estadoCivil} />
+              </DetalleSeccion>
+
+              <DetalleSeccion icon={<Mail className="h-4 w-4" />} titulo="Contacto">
+                <DetalleCampo label="Correo electrónico" value={detailSolicitud.correoElectronico} />
+                <DetalleCampo label="Teléfono" value={detailSolicitud.telefono} />
+              </DetalleSeccion>
+
+              <DetalleSeccion icon={<Building className="h-4 w-4" />} titulo="Información laboral">
+                <DetalleCampo label="Empresa" value={detailSolicitud.empresa} />
+                <DetalleCampo label="RIF empresa" value={detailSolicitud.rifEmpresa} />
+                <DetalleCampo label="Departamento" value={detailSolicitud.departamento} />
+                <DetalleCampo label="Cargo" value={detailSolicitud.cargo} />
+                <DetalleCampo
+                  label="Salario (Bs)"
+                  value={
+                    detailSolicitud.salario != null && detailSolicitud.salario !== ''
+                      ? String(detailSolicitud.salario)
+                      : undefined
+                  }
+                />
+              </DetalleSeccion>
+
+              <DetalleSeccion icon={<MapPin className="h-4 w-4" />} titulo="Dirección de residencia">
+                <DetalleCampo label="Estado" value={detailSolicitud.direccionEstado} />
+                <DetalleCampo label="Ciudad" value={detailSolicitud.direccionCiudad} />
+                <DetalleCampo label="Municipio" value={detailSolicitud.direccionMunicipio} />
+                <DetalleCampo label="Calle / dirección" value={detailSolicitud.direccionCalle} />
+              </DetalleSeccion>
+
+              <DetalleSeccion icon={<Phone className="h-4 w-4" />} titulo="Contacto de emergencia">
+                <DetalleCampo label="Nombre" value={detailSolicitud.emergenciaNombre} />
+                <DetalleCampo label="Teléfono" value={detailSolicitud.emergenciaTelefono} />
+                <DetalleCampo label="Parentesco" value={detailSolicitud.emergenciaParentesco} />
+              </DetalleSeccion>
+
+              <DetalleSeccion icon={<ShieldCheck className="h-4 w-4" />} titulo="Consentimientos legales">
+                <DetalleCampo
+                  label="Acepta términos"
+                  value={detailSolicitud.aceptaTerminos === true ? 'Sí' : detailSolicitud.aceptaTerminos === false ? 'No' : undefined}
+                />
+                <DetalleCampo
+                  label="Acepta LOPDP"
+                  value={detailSolicitud.aceptaLopdp === true ? 'Sí' : detailSolicitud.aceptaLopdp === false ? 'No' : undefined}
+                />
+              </DetalleSeccion>
+
+              <DetalleSeccion icon={<Clock className="h-4 w-4" />} titulo="Trazabilidad de revisión">
+                <DetalleCampo label="Estado" value={detailSolicitud.estado} />
+                <DetalleCampo label="Fecha solicitud" value={detailSolicitud.fechaSolicitud} />
+                <DetalleCampo label="Fecha revisión" value={detailSolicitud.fechaRevision} />
+                <DetalleCampo label="Revisado por" value={detailSolicitud.revisadoPor} />
+                <DetalleCampo label="Comentario" value={detailSolicitud.comentario} />
+                <DetalleCampo label="Motivo de rechazo" value={detailSolicitud.motivoRechazo} />
+              </DetalleSeccion>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailSolicitud(null)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* --- Helpers locales para el modal de detalle --- */
+
+function DetalleSeccion({
+  icon,
+  titulo,
+  children,
+}: {
+  icon: React.ReactNode;
+  titulo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
+        <span className="text-blue-600">{icon}</span>
+        <span className="font-semibold">{titulo}</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 pl-6">{children}</div>
+    </div>
+  );
+}
+
+function DetalleCampo({ label, value }: { label: string; value?: string | null }) {
+  const display = value == null || value === '' ? '—' : value;
+  return (
+    <div className="flex flex-col">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-sm break-words">{display}</span>
     </div>
   );
 }
