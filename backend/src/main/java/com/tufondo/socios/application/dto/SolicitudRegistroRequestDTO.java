@@ -95,4 +95,15 @@ public class SolicitudRegistroRequestDTO {
     @NotNull(message = "Debe aceptar la política de protección de datos")
     @AssertTrue(message = "Debe aceptar la política de protección de datos personales")
     private Boolean aceptaLopdp;
+
+    // ---- Metadatos opcionales de auditoría LOPDP ----
+    // Provienen del BFF (que ya captura x-forwarded-for + user-agent).
+    // El controller usa estos valores como fuente preferida y, si vienen vacíos,
+    // hace fallback a HttpServletRequest. El consentLopdpTimestamp NO viaja
+    // desde el cliente: lo sella el backend (Instant.now()) cuando aceptaLopdp == true.
+    @Size(max = 45, message = "La IP de registro debe tener máximo 45 caracteres")
+    private String ipRegistro;
+
+    @Size(max = 500, message = "El User-Agent debe tener máximo 500 caracteres")
+    private String userAgentRegistro;
 }

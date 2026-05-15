@@ -11,6 +11,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -18,11 +19,14 @@ import java.util.UUID;
 /**
  * Entity JPA para Solicitud de Registro de Socio.
  */
+/**
+ * Los índices son gestionados por la migración Flyway V11
+ * (`idx_solicitud_registro_estado_fecha` cubre estado + fecha_solicitud DESC).
+ * No se declaran @Index aquí para evitar duplicación cuando se migre
+ * `ddl-auto` de `update` a `validate`.
+ */
 @Entity
-@Table(name = "solicitud_registro", indexes = {
-    @Index(name = "idx_solicitud_estado", columnList = "estado"),
-    @Index(name = "idx_solicitud_fecha", columnList = "fecha_solicitud DESC")
-})
+@Table(name = "solicitud_registro")
 public class SolicitudRegistroEntity {
 
     @Id
@@ -117,6 +121,16 @@ public class SolicitudRegistroEntity {
     @Column(name = "acepta_lopdp", nullable = false)
     private Boolean aceptaLopdp;
 
+    // ---- Auditoría LOPDP (defensa legal Venezuela) ----
+    @Column(name = "ip_registro", length = 45)
+    private String ipRegistro;
+
+    @Column(name = "user_agent_registro", length = 500)
+    private String userAgentRegistro;
+
+    @Column(name = "consent_lopdp_timestamp")
+    private Instant consentLopdpTimestamp;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -186,6 +200,12 @@ public class SolicitudRegistroEntity {
     public void setAceptaTerminos(Boolean aceptaTerminos) { this.aceptaTerminos = aceptaTerminos; }
     public Boolean getAceptaLopdp() { return aceptaLopdp; }
     public void setAceptaLopdp(Boolean aceptaLopdp) { this.aceptaLopdp = aceptaLopdp; }
+    public String getIpRegistro() { return ipRegistro; }
+    public void setIpRegistro(String ipRegistro) { this.ipRegistro = ipRegistro; }
+    public String getUserAgentRegistro() { return userAgentRegistro; }
+    public void setUserAgentRegistro(String userAgentRegistro) { this.userAgentRegistro = userAgentRegistro; }
+    public Instant getConsentLopdpTimestamp() { return consentLopdpTimestamp; }
+    public void setConsentLopdpTimestamp(Instant consentLopdpTimestamp) { this.consentLopdpTimestamp = consentLopdpTimestamp; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
@@ -224,6 +244,9 @@ public class SolicitudRegistroEntity {
         public SolicitudRegistroEntityBuilder motivoRechazo(String v) { e.motivoRechazo = v; return this; }
         public SolicitudRegistroEntityBuilder aceptaTerminos(Boolean v) { e.aceptaTerminos = v; return this; }
         public SolicitudRegistroEntityBuilder aceptaLopdp(Boolean v) { e.aceptaLopdp = v; return this; }
+        public SolicitudRegistroEntityBuilder ipRegistro(String v) { e.ipRegistro = v; return this; }
+        public SolicitudRegistroEntityBuilder userAgentRegistro(String v) { e.userAgentRegistro = v; return this; }
+        public SolicitudRegistroEntityBuilder consentLopdpTimestamp(Instant v) { e.consentLopdpTimestamp = v; return this; }
         public SolicitudRegistroEntityBuilder createdAt(LocalDateTime v) { e.createdAt = v; return this; }
         public SolicitudRegistroEntityBuilder updatedAt(LocalDateTime v) { e.updatedAt = v; return this; }
         public SolicitudRegistroEntity build() { return e; }

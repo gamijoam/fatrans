@@ -8,6 +8,7 @@ import com.tufondo.socios.domain.model.enums.TipoDocumento;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -47,6 +48,10 @@ public class SolicitudRegistro {
     private String motivoRechazo;
     private Boolean aceptaTerminos;
     private Boolean aceptaLopdp;
+    // ---- Auditoría LOPDP ----
+    private String ipRegistro;
+    private String userAgentRegistro;
+    private Instant consentLopdpTimestamp;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -111,6 +116,12 @@ public class SolicitudRegistro {
     public void setAceptaTerminos(Boolean aceptaTerminos) { this.aceptaTerminos = aceptaTerminos; }
     public Boolean getAceptaLopdp() { return aceptaLopdp; }
     public void setAceptaLopdp(Boolean aceptaLopdp) { this.aceptaLopdp = aceptaLopdp; }
+    public String getIpRegistro() { return ipRegistro; }
+    public void setIpRegistro(String ipRegistro) { this.ipRegistro = ipRegistro; }
+    public String getUserAgentRegistro() { return userAgentRegistro; }
+    public void setUserAgentRegistro(String userAgentRegistro) { this.userAgentRegistro = userAgentRegistro; }
+    public Instant getConsentLopdpTimestamp() { return consentLopdpTimestamp; }
+    public void setConsentLopdpTimestamp(Instant consentLopdpTimestamp) { this.consentLopdpTimestamp = consentLopdpTimestamp; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
@@ -191,6 +202,9 @@ public class SolicitudRegistro {
         public SolicitudRegistroBuilder motivoRechazo(String v) { s.motivoRechazo = v; return this; }
         public SolicitudRegistroBuilder aceptaTerminos(Boolean v) { s.aceptaTerminos = v; return this; }
         public SolicitudRegistroBuilder aceptaLopdp(Boolean v) { s.aceptaLopdp = v; return this; }
+        public SolicitudRegistroBuilder ipRegistro(String v) { s.ipRegistro = v; return this; }
+        public SolicitudRegistroBuilder userAgentRegistro(String v) { s.userAgentRegistro = v; return this; }
+        public SolicitudRegistroBuilder consentLopdpTimestamp(Instant v) { s.consentLopdpTimestamp = v; return this; }
         public SolicitudRegistroBuilder createdAt(LocalDateTime v) { s.createdAt = v; return this; }
         public SolicitudRegistroBuilder updatedAt(LocalDateTime v) { s.updatedAt = v; return this; }
         public SolicitudRegistro build() { return s; }
