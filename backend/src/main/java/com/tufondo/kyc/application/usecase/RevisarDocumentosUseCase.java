@@ -39,11 +39,13 @@ public class RevisarDocumentosUseCase {
         VerificacionKYC verificacion = verificacionRepository.findById(verificacionId)
             .orElseThrow(() -> new com.tufondo.kyc.domain.exception.VerificacionNotFoundException(verificacionId));
 
-        // Validar que la verificacion esta en estado de revision (mitigar IDOR)
-        if (verificacion.getEstado() != EstadoVerificacion.EN_REVISION) {
-            throw new com.tufondo.kyc.domain.exception.AccesoNoAutorizadoException(
-                "Verificacion no disponible para revision. Estado actual: " + verificacion.getEstado());
-        }
+        // NOTA: aquí teníamos una guarda `estado != EN_REVISION → 403`,
+        // pero rompía el caso de uso de ver detalle de un KYC ya APROBADO
+        // o RECHAZADO desde el panel admin (historial / auditoría). El
+        // `@PreAuthorize` del controller ya restringe el endpoint a roles
+        // autorizados (ANALISTA_KYC, ADMIN, SUPER_ADMIN), así que la
+        // restricción semántica de "solo en revisión" debe vivir en los
+        // endpoints que MUTAN (aprobar/rechazar), no en el GET de detalle.
 
         List<DocumentoIdentidad> documentos = documentoRepository.findByVerificacionId(verificacionId);
 
