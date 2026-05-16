@@ -36,13 +36,20 @@ interface EstadoKYC {
   documentos: DocumentoEstado[];
   comentarioRevision: string | null;
   motivoRechazo: string | null;
+  /** Estado biométrico (Didit) — usado para ocultar documentos ya capturados
+      por la verificación facial y para reflejar el estado del widget en la UI. */
+  estadoBiometria: 'NO_INICIADA' | 'EN_PROGRESO' | 'APROBADA' | 'RECHAZADA' | 'EXPIRADA' | null;
 }
 
+/** Todos los documentos que el KYC puede requerir. El subset visible depende
+    del estado biométrico — ver `documentosVisibles` abajo. Cuando la biometría
+    está APROBADA, los documentos con `cubrePorBiometria=true` se ocultan porque
+    Didit ya capturó esa información (cédula anverso/reverso + selfie). */
 const TIPOS_DOCUMENTO = [
-  { tipo: 'CEDULA_ANVERSO', label: 'Cédula - Anverso', required: true },
-  { tipo: 'CEDULA_REVERSO', label: 'Cédula - Reverso', required: true },
-  { tipo: 'SELFIE_CEDULA', label: 'Selfie con Cédula', required: true },
-  { tipo: 'COMPROBANTE_DOMICILIO', label: 'Comprobante de Domicilio', required: true },
+  { tipo: 'CEDULA_ANVERSO', label: 'Cédula - Anverso', required: true, cubrePorBiometria: true },
+  { tipo: 'CEDULA_REVERSO', label: 'Cédula - Reverso', required: true, cubrePorBiometria: true },
+  { tipo: 'SELFIE_CEDULA', label: 'Selfie con Cédula', required: true, cubrePorBiometria: true },
+  { tipo: 'COMPROBANTE_DOMICILIO', label: 'Comprobante de Domicilio', required: true, cubrePorBiometria: false },
 ];
 
 export default function DashboardKYCPagina() {
@@ -197,6 +204,15 @@ export default function DashboardKYCPagina() {
       (consentimiento → ready → in_progress → submitted). */
   const puedeBiometrica = estadoKYC && estadoKYC.estado !== 'APROBADO';
 
+  /** Si la biometría ya pasó, Didit ya capturó cédula + selfie. Ocultamos los
+      3 documentos correspondientes en "Paso 2" y dejamos solo los que NO cubre
+      la biometría (comprobante de domicilio). Evita que el socio resuba algo
+      que ya tenemos validado por el proveedor. */
+  const biometriaAprobada = estadoKYC?.estadoBiometria === 'APROBADA';
+  const documentosVisibles = biometriaAprobada
+    ? TIPOS_DOCUMENTO.filter(d => !d.cubrePorBiometria)
+    : TIPOS_DOCUMENTO;
+
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-4xl mx-auto">
       {/* Header simplificado: el shell ya muestra "Verificación KYC" arriba,
@@ -289,21 +305,32 @@ export default function DashboardKYCPagina() {
                 <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
                   Paso 1 · Verificación biométrica
                 </h2>
-                <span className="text-xs text-gray-400">(recomendado)</span>
+                {!biometriaAprobada && (
+                  <span className="text-xs text-gray-400">(recomendado)</span>
+                )}
               </div>
-              <BiometricCapture onCompleted={cargarEstado} />
+              <BiometricCapture
+                onCompleted={cargarEstado}
+                estadoBackend={estadoKYC.estadoBiometria}
+              />
             </div>
           )}
 
-          {/* Documentos manuales: complemento del paso biométrico — el analista
-              siempre revisa la cédula contra los datos del socio aunque la
-              biométrica haya pasado. */}
+          {/* Documentos manuales: complemento del paso biométrico — si la
+              biometría está APROBADA, solo pedimos los documentos que Didit
+              NO captura (comprobante de domicilio). El resto se considera
+              cubierto por la verificación biométrica. */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2 px-1">
+            <div className="flex items-center gap-2 px-1 flex-wrap">
               <Upload className="h-4 w-4 text-green-600" />
               <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
                 Paso 2 · Documentos
               </h2>
+              {biometriaAprobada && (
+                <span className="text-xs text-gray-500">
+                  · cédula y selfie ya cubiertos por la verificación facial
+                </span>
+              )}
             </div>
             <Card>
               <CardContent className="p-4 lg:p-6">
@@ -321,7 +348,7 @@ export default function DashboardKYCPagina() {
                   }}
                 />
                 <div className="space-y-3">
-                  {TIPOS_DOCUMENTO.map((doc) => {
+                  {documentosVisibles.map((doc) => {
                     const uploaded = estadoKYC.documentos?.find(d => d.tipo === doc.tipo);
                     return (
                       <div

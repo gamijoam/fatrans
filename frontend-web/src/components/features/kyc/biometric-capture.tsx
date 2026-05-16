@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -12,8 +12,16 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Loader2, Camera, ShieldCheck, AlertCircle, ExternalLink } from 'lucide-react';
+import { Loader2, Camera, ShieldCheck, AlertCircle, CheckCircle2, ExternalLink, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
+
+/** Estado biométrico del backend — coincide con el enum `EstadoBiometria` Java. */
+type EstadoBiometricoBackend =
+  | 'NO_INICIADA'
+  | 'EN_PROGRESO'
+  | 'APROBADA'
+  | 'RECHAZADA'
+  | 'EXPIRADA';
 
 /**
  * Captura biométrica del KYC — proxy hacia el widget de Didit (passive liveness +
@@ -29,14 +37,55 @@ import { toast } from 'sonner';
  *     por webhook y actualiza el estado. La UI sondea (o se refresca al volver) y
  *     muestra "Verificación en revisión".
  */
+/**
+ * Mapea el estado biométrico que viene del backend al step interno de UI.
+ *  - `APROBADA`         → muestra confirmación (no pedir verificación de nuevo).
+ *  - `RECHAZADA`        → muestra mensaje de rechazo + permite reintentar.
+ *  - `EN_PROGRESO`      → asumimos que ya envió y está esperando webhook.
+ *  - `NO_INICIADA`/null → muestra consent (flujo normal).
+ *  - `EXPIRADA`         → permite reintentar (vuelve a consent).
+ */
+function deriveStepFromBackend(estado: EstadoBiometricoBackend | null | undefined):
+  'consent' | 'ready' | 'in_progress' | 'submitted' | 'aprobado' | 'rechazado' {
+  switch (estado) {
+    case 'APROBADA':
+      return 'aprobado';
+    case 'RECHAZADA':
+      return 'rechazado';
+    case 'EN_PROGRESO':
+      return 'in_progress';
+    case 'EXPIRADA':
+    case 'NO_INICIADA':
+    case null:
+    case undefined:
+    default:
+      return 'consent';
+  }
+}
+
 export function BiometricCapture({
   onCompleted,
+  estadoBackend,
 }: {
   onCompleted?: () => void;
+  /** Estado biométrico actual según el backend — el componente lo usa para
+      decidir si mostrar consent / abrir verificación / mostrar "ya aprobada". */
+  estadoBackend?: EstadoBiometricoBackend | null;
 }) {
-  const [step, setStep] = useState<'consent' | 'ready' | 'in_progress' | 'submitted'>('consent');
+  const [step, setStep] = useState<'consent' | 'ready' | 'in_progress' | 'submitted' | 'aprobado' | 'rechazado'>(
+    () => deriveStepFromBackend(estadoBackend)
+  );
   const [aceptado, setAceptado] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Si el backend nos avisa que el estado cambió (porque hicimos refetch
+  // después del webhook), sincronizamos el step. No tocamos los estados
+  // intermedios `ready`/`in_progress`/`submitted` porque esos son locales —
+  // solo nos importa pasar a `aprobado`/`rechazado` cuando llegan del server.
+  useEffect(() => {
+    if (estadoBackend === 'APROBADA') setStep('aprobado');
+    else if (estadoBackend === 'RECHAZADA') setStep('rechazado');
+  }, [estadoBackend]);
 
   const handleAceptarConsentimiento = async () => {
     if (!aceptado) {
@@ -201,6 +250,38 @@ export function BiometricCapture({
               Puedes cerrar esta página — la decisión llegará por correo.
             </AlertDescription>
           </Alert>
+        )}
+
+        {/* Estados terminales que vienen del backend (webhook ya procesado). */}
+        {step === 'aprobado' && (
+          <Alert className="border-green-200 bg-green-50">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <AlertTitle className="text-green-900">Verificación biométrica aprobada</AlertTitle>
+            <AlertDescription className="text-green-800 text-sm">
+              Ya pasaste la verificación facial. No necesitas hacerla de nuevo.
+              La cédula y el selfie quedaron registrados.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {step === 'rechazado' && (
+          <>
+            <Alert className="border-red-200 bg-red-50">
+              <XCircle className="h-4 w-4 text-red-600" />
+              <AlertTitle className="text-red-900">Verificación biométrica rechazada</AlertTitle>
+              <AlertDescription className="text-red-800 text-sm">
+                No pudimos confirmar tu identidad con el selfie y la cédula.
+                Podés intentarlo de nuevo o subir los documentos manualmente abajo.
+              </AlertDescription>
+            </Alert>
+            <Button
+              onClick={() => setStep('consent')}
+              variant="outline"
+              className="w-full"
+            >
+              Reintentar verificación
+            </Button>
+          </>
         )}
       </CardContent>
     </Card>
