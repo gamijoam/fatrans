@@ -46,14 +46,18 @@ class DiditKycAdapterTest {
     @Test
     @DisplayName("Acepta un webhook con firma HMAC correcta y timestamp dentro de ventana")
     void aceptaWebhookValido() {
+        // Payload con el formato real que Didit v3 envía: scores dentro de
+        // arrays `liveness_checks` / `face_matches`. El test original usaba
+        // un formato viejo con `liveness` objeto, que dejaba los scores en
+        // null y rompía las aserciones.
         byte[] body = ("""
                 {
                   "session_id": "%s",
                   "status": "APPROVED",
                   "decision": {
-                    "liveness": { "score": 0.95, "attack_type": null },
-                    "face_match": { "score": 0.91 },
-                    "id_verification": { "confidence_score": 0.88 }
+                    "liveness_checks": [{"score": 95.0, "status": "Approved", "method": "FLASHING"}],
+                    "face_matches": [{"score": 91.0, "status": "Approved"}],
+                    "id_verifications": [{"front_image_camera_front_face_match_score": 88.0}]
                   }
                 }
                 """.formatted(SESSION_ID)).getBytes(StandardCharsets.UTF_8);
@@ -65,6 +69,7 @@ class DiditKycAdapterTest {
 
         assertThat(result.sessionId()).isEqualTo(SESSION_ID);
         assertThat(result.outcome()).isEqualTo(BiometricVerificatorPort.BiometricOutcome.APROBADO);
+        // Adapter normaliza scores 0-100 a 0-1.
         assertThat(result.livenessScore()).isEqualByComparingTo("0.95");
         assertThat(result.faceMatchScore()).isEqualByComparingTo("0.91");
     }
@@ -98,7 +103,12 @@ class DiditKycAdapterTest {
     @DisplayName("Rechaza un webhook sin firma")
     void rechazaSinFirma() {
         byte[] body = "{}".getBytes();
-        assertThatThrownBy(() -> adapter.procesarWebhook(body, null, "0"))
+        // Usamos timestamp ACTUAL para que pase la validación temporal y
+        // así el adapter llegue al check "sin firma". Antes usábamos "0"
+        // (epoch 1970) que disparaba el error de ventana temporal primero
+        // y enmascaraba el caso que queremos verificar.
+        String timestamp = String.valueOf(Instant.now().getEpochSecond());
+        assertThatThrownBy(() -> adapter.procesarWebhook(body, null, timestamp))
                 .isInstanceOf(KYCException.class)
                 .hasMessageContaining("sin firma");
     }
@@ -151,12 +161,17 @@ class DiditKycAdapterTest {
     }
 
     @Test
-    @DisplayName("Rechaza firma V2 cuando el JSON canonicalizado no coincide con la firma enviada")
+    @DisplayName("Rechaza firma V2 cuando la firma fue calculada con otro secreto")
     void rechazaFirmaV2Invalida() {
-        byte[] rawBody = ("{\"session_id\":\"" + SESSION_ID + "\",\"status\":\"Approved\"}")
+        // Usamos un payload simple cuya canonicalización SÍ difiere del raw
+        // (claves desordenadas + número whole float) y firmamos con OTRO
+        // secreto. Cualquiera de las dos diferencias por sí sola hace que la
+        // firma no matchee, garantizando rechazo. El test anterior firmaba
+        // el raw body, pero como su payload era ya canónico, los bytes
+        // canonical y raw eran idénticos y la firma matcheaba.
+        byte[] rawBody = ("{\"status\":\"Approved\",\"session_id\":\"" + SESSION_ID + "\",\"score\":1.0}")
                 .getBytes(StandardCharsets.UTF_8);
-        // Firma calculada sobre el raw body (no canonicalizado) — esa NO es V2.
-        String signature = "v2:" + hmacHex(SECRET, rawBody);
+        String signature = "v2:" + hmacHex("OTRO-SECRETO", rawBody);
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
 
         assertThatThrownBy(() -> adapter.procesarWebhook(rawBody, signature, timestamp))
