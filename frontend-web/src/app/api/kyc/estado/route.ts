@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 
+// Sin esto Next.js 14 cachea agresivamente la respuesta del GET. Síntoma:
+// el socio completaba la verificación biométrica en Didit, el webhook
+// llegaba y la BD pasaba a estadoBiometria=APROBADA, pero el dashboard
+// seguía mostrando "Abrir verificación" porque el browser recibía la
+// respuesta cacheada con estadoBiometria=NO_INICIADA.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: NextRequest) {
   try {
     const accessToken = request.cookies.get('access_token')?.value;
@@ -17,7 +25,10 @@ export async function GET(request: NextRequest) {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
+        // Pasamos cache: 'no-store' además del export dinámico, así
+        // garantizamos que Next.js no cacheé tampoco la llamada al
+        // backend interno.
+        cache: 'no-store',
       }
     );
 
