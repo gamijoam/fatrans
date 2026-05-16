@@ -213,6 +213,14 @@ export default function DashboardKYCPagina() {
     ? TIPOS_DOCUMENTO.filter(d => !d.cubrePorBiometria)
     : TIPOS_DOCUMENTO;
 
+  /** El backend siempre cuenta 4 documentos requeridos. Si la biometría
+      aprobó, sumamos los 3 que cubre Didit como ya validados — la barra
+      de progreso refleja el avance real considerando la biometría. */
+  const docsCubiertosPorBiometria = biometriaAprobada
+    ? TIPOS_DOCUMENTO.filter(d => d.cubrePorBiometria).length
+    : 0;
+  const docsValidosCalculados = (estadoKYC?.documentosValidos ?? 0) + docsCubiertosPorBiometria;
+
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-4xl mx-auto">
       {/* Header simplificado: el shell ya muestra "Verificación KYC" arriba,
@@ -256,13 +264,20 @@ export default function DashboardKYCPagina() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Documentos</p>
-                  <p className="font-medium">{estadoKYC.documentosValidos} / {estadoKYC.documentosRequeridos} válidos</p>
+                  <p className="font-medium">
+                    {docsValidosCalculados} / {estadoKYC.documentosRequeridos} válidos
+                    {biometriaAprobada && (
+                      <span className="text-xs text-gray-500 font-normal ml-1">
+                        ({docsCubiertosPorBiometria} por biometría)
+                      </span>
+                    )}
+                  </p>
                 </div>
               </div>
 
               <ProgressBar
                 value={estadoKYC.documentosRequeridos > 0
-                  ? (estadoKYC.documentosValidos / estadoKYC.documentosRequeridos) * 100
+                  ? (docsValidosCalculados / estadoKYC.documentosRequeridos) * 100
                   : 0}
                 className="h-2"
               />
