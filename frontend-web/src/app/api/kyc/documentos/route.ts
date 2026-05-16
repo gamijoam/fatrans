@@ -58,9 +58,13 @@ export async function POST(request: NextRequest) {
     );
 
     if (!backendResponse.ok) {
-      const errorData = await backendResponse.json().catch(() => ({}));
+      const errorData: { message?: string; mensaje?: string } =
+        await backendResponse.json().catch(() => ({}));
+      // Backend usa `mensaje` (KYCException) o `message` (validación Jakarta).
+      // Probamos ambos para que el toast muestre la causa real, no un genérico.
+      const msg = errorData.message || errorData.mensaje || 'Error al subir documento';
       return NextResponse.json(
-        { message: errorData.message || 'Error al subir documento' },
+        { message: msg },
         { status: backendResponse.status }
       );
     }
