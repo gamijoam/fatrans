@@ -44,6 +44,11 @@ public class MultipartContentTypeNormalizerFilter implements Filter {
     private static final String CHARSET_PATTERN = ";\\s*charset=[^;\\s]+";
 
     @Override
+    public void init(jakarta.servlet.FilterConfig filterConfig) {
+        log.info("MultipartContentTypeNormalizerFilter inicializado");
+    }
+
+    @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
         if (!(request instanceof HttpServletRequest httpRequest)) {
@@ -52,11 +57,15 @@ public class MultipartContentTypeNormalizerFilter implements Filter {
         }
 
         String contentType = httpRequest.getContentType();
+        // log.warn temporal para diagnóstico — bajar a debug cuando se confirme.
+        if (contentType != null && contentType.startsWith(MULTIPART_PREFIX)) {
+            log.warn("[multipart-filter] uri={} Content-Type recibido: {}", httpRequest.getRequestURI(), contentType);
+        }
         if (contentType != null
                 && contentType.startsWith(MULTIPART_PREFIX)
                 && contentType.toLowerCase().contains("charset=")) {
             String saneado = contentType.replaceAll(CHARSET_PATTERN, "");
-            log.debug("Multipart Content-Type saneado: {} -> {}", contentType, saneado);
+            log.warn("[multipart-filter] saneando: {} -> {}", contentType, saneado);
             chain.doFilter(new SaneadoContentTypeRequest(httpRequest, saneado),
                     (HttpServletResponse) response);
         } else {
