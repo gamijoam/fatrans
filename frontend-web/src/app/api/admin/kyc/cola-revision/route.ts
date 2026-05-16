@@ -3,6 +3,11 @@ import { validateAdminAccess } from '@/lib/auth/admin-validation';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 
+// Next.js 14 cachea route handlers GET por defecto. Forzamos dynamic +
+// `cache: 'no-store'` en el fetch para que cada cambio de filtro del admin
+// dispare una nueva request al backend, no devuelva resultados viejos.
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const accessToken = request.cookies.get('access_token')?.value;
@@ -32,6 +37,7 @@ export async function GET(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
+        cache: 'no-store',
       }
     );
 

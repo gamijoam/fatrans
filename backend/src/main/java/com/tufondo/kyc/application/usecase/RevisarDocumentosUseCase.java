@@ -17,6 +17,7 @@ import com.tufondo.kyc.domain.repository.DocumentoIdentidadRepository;
 import com.tufondo.kyc.domain.repository.VerificacionKYCRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -39,11 +40,13 @@ public class RevisarDocumentosUseCase {
         VerificacionKYC verificacion = verificacionRepository.findById(verificacionId)
             .orElseThrow(() -> new com.tufondo.kyc.domain.exception.VerificacionNotFoundException(verificacionId));
 
-        // Validar que la verificacion esta en estado de revision (mitigar IDOR)
-        if (verificacion.getEstado() != EstadoVerificacion.EN_REVISION) {
-            throw new com.tufondo.kyc.domain.exception.AccesoNoAutorizadoException(
-                "Verificacion no disponible para revision. Estado actual: " + verificacion.getEstado());
-        }
+        // NOTA: aquí teníamos una guarda `estado != EN_REVISION → 403`,
+        // pero rompía el caso de uso de ver detalle de un KYC ya APROBADO
+        // o RECHAZADO desde el panel admin (historial / auditoría). El
+        // `@PreAuthorize` del controller ya restringe el endpoint a roles
+        // autorizados (ANALISTA_KYC, ADMIN, SUPER_ADMIN), así que la
+        // restricción semántica de "solo en revisión" debe vivir en los
+        // endpoints que MUTAN (aprobar/rechazar), no en el GET de detalle.
 
         List<DocumentoIdentidad> documentos = documentoRepository.findByVerificacionId(verificacionId);
 
@@ -89,6 +92,17 @@ public class RevisarDocumentosUseCase {
             .build();
     }
 
+    /**
+     * Aprueba una verificación KYC.
+     *
+     * `@Transactional` es CRÍTICO: el método actualiza primero el estado del
+     * KYC y luego el estado de cada documento individual. Sin transacción, si
+     * el save del documento falla (como ocurrió con el bug @Version null en
+     * DocumentoIdentidadEntity), el KYC quedaba APROBADO pero los docs en
+     * PENDIENTE — inconsistencia visible al usuario. Con @Transactional toda
+     * la operación es atómica.
+     */
+    @Transactional
     public RevisionDecisionResponse aprobar(UUID verificacionId, AprobarVerificacionRequest request, String analistaId) {
         VerificacionKYC verificacion = verificacionRepository.findById(verificacionId)
             .orElseThrow(() -> new com.tufondo.kyc.domain.exception.VerificacionNotFoundException(verificacionId));
@@ -130,6 +144,7 @@ public class RevisarDocumentosUseCase {
             .build();
     }
 
+    @Transactional
     public RevisionDecisionResponse rechazar(UUID verificacionId, RechazarVerificacionRequest request, String analistaId) {
         VerificacionKYC verificacion = verificacionRepository.findById(verificacionId)
             .orElseThrow(() -> new com.tufondo.kyc.domain.exception.VerificacionNotFoundException(verificacionId));
@@ -167,6 +182,7 @@ public class RevisarDocumentosUseCase {
             .build();
     }
 
+    @Transactional
     public RevisionDecisionResponse solicitarInfo(UUID verificacionId, SolicitarInfoRequest request, String analistaId) {
         VerificacionKYC verificacion = verificacionRepository.findById(verificacionId)
             .orElseThrow(() -> new com.tufondo.kyc.domain.exception.VerificacionNotFoundException(verificacionId));
