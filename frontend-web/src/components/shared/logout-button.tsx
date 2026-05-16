@@ -52,7 +52,16 @@ export function LogoutButton({ variant = 'default', className }: LogoutButtonPro
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <button className={cn(triggerStyles, className)}>
+        {/* onMouseDown stopPropagation: cuando este botón vive dentro de un
+            dropdown con `handleClickOutside` (perfil admin/socio), el
+            mousedown disparaba el cierre del dropdown ANTES de que el Dialog
+            de Radix pudiera montar — el Dialog nunca aparecía y el logout
+            "no funcionaba". Frenando la propagación, el handleClickOutside
+            del padre no ve el evento y el Dialog se abre normalmente. */}
+        <button
+          className={cn(triggerStyles, className)}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <LogOut className="h-4 w-4" />
           <span>Cerrar Sesión</span>
         </button>

@@ -138,9 +138,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          {/* Logout */}
+          {/* Logout — variant="ghost" para texto blanco sobre fondo oscuro del
+              sidebar. El "default" usa text-gray-700 que se invisibilizaba
+              contra #0F2744. */}
           <div className="p-3 border-t border-white/10">
-            <LogoutButton />
+            <LogoutButton variant="ghost" />
           </div>
         </aside>
 
@@ -188,7 +190,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               </nav>
 
               <div className="mt-4">
-                <LogoutButton />
+                <LogoutButton variant="ghost" />
               </div>
             </aside>
           </div>
