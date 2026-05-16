@@ -8,9 +8,7 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -39,8 +37,7 @@ import java.util.Enumeration;
  * Se aplica con orden HIGHEST_PRECEDENCE para garantizar que corra antes de
  * cualquier filter de Spring Security o de Tomcat que parsee el body.
  */
-@Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Slf4j
 public class MultipartContentTypeNormalizerFilter implements Filter {
 
     private static final String MULTIPART_PREFIX = "multipart/form-data";
@@ -59,6 +56,7 @@ public class MultipartContentTypeNormalizerFilter implements Filter {
                 && contentType.startsWith(MULTIPART_PREFIX)
                 && contentType.toLowerCase().contains("charset=")) {
             String saneado = contentType.replaceAll(CHARSET_PATTERN, "");
+            log.debug("Multipart Content-Type saneado: {} -> {}", contentType, saneado);
             chain.doFilter(new SaneadoContentTypeRequest(httpRequest, saneado),
                     (HttpServletResponse) response);
         } else {
