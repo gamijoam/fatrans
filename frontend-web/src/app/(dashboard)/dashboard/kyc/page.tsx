@@ -125,11 +125,17 @@ export default function DashboardKYCPagina() {
   };
 
   const handleEnviarRevision = async () => {
+    if (!estadoKYC?.verificacionId) {
+      toast.error('No hay verificación activa');
+      return;
+    }
     setEnviando(true);
     try {
       const res = await fetch('/api/kyc/enviar', {
         method: 'POST',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verificacionId: estadoKYC.verificacionId }),
       });
 
       if (res.ok) {

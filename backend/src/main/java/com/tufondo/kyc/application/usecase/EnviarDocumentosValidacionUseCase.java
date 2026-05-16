@@ -5,6 +5,7 @@ import com.tufondo.kyc.application.dto.request.EnviarDocumentosRequest;
 import com.tufondo.kyc.application.dto.response.EnviarDocumentosResponse;
 import com.tufondo.kyc.domain.model.DocumentoIdentidad;
 import com.tufondo.kyc.domain.model.VerificacionKYC;
+import com.tufondo.kyc.domain.model.enums.EstadoBiometria;
 import com.tufondo.kyc.domain.model.enums.EstadoVerificacion;
 import com.tufondo.kyc.domain.repository.DocumentoIdentidadRepository;
 import com.tufondo.kyc.domain.repository.VerificacionKYCRepository;
@@ -46,11 +47,28 @@ public class EnviarDocumentosValidacionUseCase {
         // 4. Obtener documentos
         List<DocumentoIdentidad> documentos = documentoRepository.findByVerificacionId(request.getVerificacionId());
 
-        // 5. Validar documentos completos segun nivel
+        // 5. Validar documentos completos segun nivel.
+        //
+        // Si la biometría (Didit) está APROBADA, ya capturó 3 documentos
+        // físicos: CEDULA_ANVERSO, CEDULA_REVERSO y SELFIE_CEDULA. Descontamos
+        // esos 3 del total requerido — el socio solo tiene que subir el
+        // resto (e.g. COMPROBANTE_DOMICILIO en nivel BÁSICO).
+        //
+        // Misma lógica que el frontend aplica para ocultar los documentos
+        // redundantes en `dashboard/kyc/page.tsx` (`documentosVisibles`).
+        // Sin esta corrección, el use case rechazaba "Faltan documentos.
+        // Requeridos: 4, Subidos: 1" aunque biometría hubiera cubierto 3.
         int docsRequeridos = verificacion.getNivel().getCantidadDocumentosRequeridos();
-        if (documentos.size() < docsRequeridos) {
+        int docsCubiertosPorBiometria =
+                verificacion.getEstadoBiometria() == EstadoBiometria.APROBADA ? 3 : 0;
+        int docsRequeridosAjustado = Math.max(0, docsRequeridos - docsCubiertosPorBiometria);
+        if (documentos.size() < docsRequeridosAjustado) {
             throw new com.tufondo.kyc.domain.exception.DocumentosIncompletosException(
-                "Faltan documentos. Requeridos: " + docsRequeridos + ", Subidos: " + documentos.size());
+                "Faltan documentos. Requeridos: " + docsRequeridosAjustado
+                    + ", Subidos: " + documentos.size()
+                    + (docsCubiertosPorBiometria > 0
+                        ? " (la biometría cubrió " + docsCubiertosPorBiometria + " documentos)"
+                        : ""));
         }
 
         // 6. Validar que todos estan Pendiente (no rechazados sin reenvio)
