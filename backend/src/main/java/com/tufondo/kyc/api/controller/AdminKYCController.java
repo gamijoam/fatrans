@@ -55,20 +55,19 @@ public class AdminKYCController {
             @RequestParam(required = false) NivelVerificacion nivel,
             @RequestParam(defaultValue = "EN_REVISION") EstadoVerificacion estado) {
 
-        List<VerificacionKYC> verificaciones;
-
-        if (nivel != null) {
-            verificaciones = verificacionRepository.findByEstado(estado).stream()
-                .filter(v -> v.getNivel() == nivel)
-                .skip((long) page * size)
-                .limit(size)
-                .collect(Collectors.toList());
-        } else {
-            verificaciones = verificacionRepository.findByRevisionPendienteOrderByFechaAsc().stream()
-                .skip((long) page * size)
-                .limit(size)
-                .collect(Collectors.toList());
-        }
+        // Filtra por el parámetro `estado` recibido. La rama anterior llamaba
+        // a `findByRevisionPendienteOrderByFechaAsc()` cuando no había filtro
+        // de nivel — pero ese método HARDCODEA EstadoVerificacion.EN_REVISION,
+        // ignorando el parámetro. Eso hacía que el filtro "Aprobados" del
+        // admin devolviera `cola: []` aunque `totalElementos > 0` (porque
+        // `countByEstado` sí respeta el filtro). Ahora usamos siempre
+        // `findByEstado(estado)` y solo aplicamos el filtro de nivel si
+        // viene seteado.
+        List<VerificacionKYC> verificaciones = verificacionRepository.findByEstado(estado).stream()
+            .filter(v -> nivel == null || v.getNivel() == nivel)
+            .skip((long) page * size)
+            .limit(size)
+            .collect(Collectors.toList());
 
         List<ColaRevisionResponse.ColaItemResponse> cola = verificaciones.stream()
             .map(this::toColaItem)
