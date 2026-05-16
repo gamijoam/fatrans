@@ -5,17 +5,11 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 /**
  * BFF: sube un documento KYC al backend Java.
  *
- * IMPORTANTE — bug de Spring + undici:
- * Cuando usamos `body: FormData` en Node fetch, undici construye un
- * Content-Type como `multipart/form-data;boundary=...;charset=UTF-8`. Spring
- * Boot 3 rechaza ese Content-Type porque el `charset=UTF-8` no está
- * contemplado en su `StandardMultipartHttpServletRequest` — devuelve un 500
- * con "Content-Type ... is not supported". El RFC 7578 permite el charset
- * en teoría, pero Spring lo trata como inválido.
- *
- * Solución: armamos el cuerpo multipart manualmente con un boundary
- * controlado y mandamos el Content-Type sin charset. Así Spring lo parsea
- * correctamente sin tocar la config del backend.
+ * Nota: undici (HTTP client de Node fetch) agrega automáticamente
+ * `;charset=UTF-8` al Content-Type cuando el body es FormData. El backend
+ * tiene un filter (`MultipartContentTypeNormalizerFilter`) que sanea ese
+ * Content-Type antes del MultipartResolver, así que acá solo armamos un
+ * FormData estándar y dejamos que undici haga lo suyo.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -35,29 +29,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Boundary único — usamos Math.random porque crypto.randomBytes requiere
-    // import async en edge runtime; el boundary no necesita ser secreto, solo
-    // único dentro del request.
-    const boundary = `----fatrans-${Math.random().toString(36).slice(2)}${Date.now()}`;
-    const archivoBuffer = Buffer.from(await archivo.arrayBuffer());
-
-    const preamble = Buffer.from(
-      `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="tipoDocumento"\r\n\r\n` +
-      `${tipoDocumento}\r\n` +
-      `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="archivo"; filename="${archivo.name || 'archivo'}"\r\n` +
-      `Content-Type: ${archivo.type || 'application/octet-stream'}\r\n\r\n`,
-      'utf-8'
-    );
-    const closing = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8');
-    const bodyBuffer = Buffer.concat([preamble, archivoBuffer, closing]);
-    // CRÍTICO: pasamos el body como Uint8Array (binario), NO como Buffer.
-    // Cuando undici recibe un Buffer, lo interpreta como texto y agrega
-    // automáticamente `;charset=UTF-8` al Content-Type. Spring entonces ve
-    // `multipart/form-data;boundary=...;charset=UTF-8` y lo rechaza. Con
-    // Uint8Array undici lo trata como binary stream y NO toca el header.
-    const bodyBinary = new Uint8Array(bodyBuffer);
+    const backendFormData = new FormData();
+    backendFormData.append('tipoDocumento', tipoDocumento);
+    backendFormData.append('archivo', archivo);
 
     const backendResponse = await fetch(
       `${BACKEND_URL}/api/v1/kyc/documentos`,
@@ -65,12 +39,8 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          'Content-Length': bodyBinary.byteLength.toString(),
         },
-        body: bodyBinary,
-        // @ts-expect-error — duplex es undici-specific (Node 18+), TS no lo tipa.
-        duplex: 'half',
+        body: backendFormData,
       }
     );
 
