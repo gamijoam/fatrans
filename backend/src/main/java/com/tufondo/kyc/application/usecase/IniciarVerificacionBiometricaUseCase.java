@@ -60,6 +60,9 @@ public class IniciarVerificacionBiometricaUseCase {
                         "El socio no tiene una verificación KYC activa"));
 
         // 4. Crear sesión con el proveedor.
+        // Didit puede cachear la sesión por (workflow_id, vendor_data) y devolver
+        // el MISMO session_id en llamadas sucesivas — si el socio ya tiene una
+        // sesión en progreso. Por eso paso 5 maneja idempotencia.
         String nombreCompleto = (socio.getPrimerNombre() + " " + socio.getPrimerApellido()).trim();
         BiometricVerificatorPort.BiometricSessionResponse session = biometricPort.iniciarSesion(
                 new BiometricVerificatorPort.BiometricSessionRequest(
@@ -67,25 +70,40 @@ public class IniciarVerificacionBiometricaUseCase {
                 )
         );
 
-        // 5. Persistir intento PENDIENTE.
-        VerificacionBiometrica intento = VerificacionBiometrica.builder()
-                .verificacionKycId(kyc.getId())
-                .socioId(socioId)
-                .proveedor(biometricPort.getProveedor())
-                .proveedorSessionId(session.sessionId())
-                .proveedorWorkflowId(session.workflowId())
-                .estado(EstadoIntentoBiometrico.PENDIENTE)
-                .fechaInicio(LocalDateTime.now())
-                // Los artefactos se borran a los 90 días por política LOPDP.
-                .fechaExpiracionArtefactos(LocalDateTime.now().plusDays(90))
-                .ipCliente(ipCliente)
-                .userAgent(userAgent)
-                .build();
-        VerificacionBiometrica guardado = biometricaRepository.save(intento);
+        // 5. Idempotencia: si ya tenemos persistido un intento con esa session_id
+        // (porque Didit devolvió la misma sesión cacheada), lo reutilizamos en
+        // lugar de hacer INSERT — el unique constraint
+        // `uq_biometric_proveedor_session` (proveedor, proveedor_session_id) nos
+        // protegería igualmente, pero produce un 500 feo al usuario.
+        java.util.Optional<VerificacionBiometrica> existente =
+                biometricaRepository.findByProveedorSessionId(biometricPort.getProveedor(), session.sessionId());
+        VerificacionBiometrica guardado;
+        if (existente.isPresent()) {
+            guardado = existente.get();
+            log.info("Reusando intento biométrico existente. socioId={} sessionId={} intentoId={}",
+                    socioId, session.sessionId(), guardado.getId());
+        } else {
+            VerificacionBiometrica intento = VerificacionBiometrica.builder()
+                    .verificacionKycId(kyc.getId())
+                    .socioId(socioId)
+                    .proveedor(biometricPort.getProveedor())
+                    .proveedorSessionId(session.sessionId())
+                    .proveedorWorkflowId(session.workflowId())
+                    .estado(EstadoIntentoBiometrico.PENDIENTE)
+                    .fechaInicio(LocalDateTime.now())
+                    // Los artefactos se borran a los 90 días por política LOPDP.
+                    .fechaExpiracionArtefactos(LocalDateTime.now().plusDays(90))
+                    .ipCliente(ipCliente)
+                    .userAgent(userAgent)
+                    .build();
+            guardado = biometricaRepository.save(intento);
+        }
 
-        // 6. Marcar la KYC como EN_PROGRESO en el cache.
-        kyc.setEstadoBiometria(EstadoBiometria.EN_PROGRESO);
-        verificacionKYCRepository.save(kyc);
+        // 6. Marcar la KYC como EN_PROGRESO en el cache (idempotente).
+        if (kyc.getEstadoBiometria() != EstadoBiometria.EN_PROGRESO) {
+            kyc.setEstadoBiometria(EstadoBiometria.EN_PROGRESO);
+            verificacionKYCRepository.save(kyc);
+        }
 
         log.info("Sesión biométrica iniciada. socioId={} sessionId={} proveedor={}",
                 socioId, session.sessionId(), biometricPort.getProveedor());
