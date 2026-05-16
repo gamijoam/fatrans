@@ -18,4 +18,11 @@ public interface StoragePort {
     String generatePresignedUrl(String path, int expirationMinutes);
 
     boolean exists(String path);
+
+    /**
+     * Descarga el contenido del archivo. Usado por el endpoint del backend
+     * que sirve documentos al frontend admin sin exponer URLs del MinIO
+     * interno (`fatrans-minio:9000` no resuelve desde el browser).
+     */
+    byte[] download(String path);
 }

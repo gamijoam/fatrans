@@ -72,12 +72,30 @@ public class DocumentoIdentidadRepositoryImpl implements DocumentoIdentidadRepos
     @Override
     public DocumentoIdentidad save(DocumentoIdentidad documento) {
         DocumentoIdentidadEntity entity = toEntity(documento);
+        // Si el entity ya existe en BD, rescatamos el `version` (@Version para
+        // optimistic locking) y el createdAt original. El domain DocumentoIdentidad
+        // no expone esos campos —son detalles de persistencia—, así que sin
+        // esto Hibernate ve `version=null` en un detached entity y falla con
+        // "uninitialized version value". Mismo patrón que aplicamos en
+        // VerificacionKYCRepositoryImpl.save(). Esto ocurre típicamente cuando
+        // el admin aprueba/rechaza un documento (cambio de estado), no en el
+        // INSERT inicial.
+        if (entity.getId() != null) {
+            Optional<DocumentoIdentidadEntity> existingOpt = jpaRepository.findById(entity.getId());
+            if (existingOpt.isPresent()) {
+                DocumentoIdentidadEntity existing = existingOpt.get();
+                entity.setVersion(existing.getVersion());
+                if (entity.getCreatedAt() == null) {
+                    entity.setCreatedAt(existing.getCreatedAt());
+                }
+            }
+        }
         if (entity.getCreatedAt() == null) {
             entity.setCreatedAt(LocalDateTime.now());
         }
         entity.setUpdatedAt(LocalDateTime.now());
-        entity = jpaRepository.save(entity);
-        return toDomain(entity);
+        DocumentoIdentidadEntity saved = jpaRepository.save(entity);
+        return toDomain(saved);
     }
 
     @Override

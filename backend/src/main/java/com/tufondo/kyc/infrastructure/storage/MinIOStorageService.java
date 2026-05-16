@@ -110,6 +110,31 @@ public class MinIOStorageService implements StoragePort {
     }
 
     @Override
+    public byte[] download(String path) {
+        try {
+            // El path persistido en BD viene con prefijo "{bucket}/" porque
+            // el upload lo guarda así. Lo removemos antes de pedir el objeto.
+            String objectPath = path.startsWith(bucketName + "/")
+                    ? path.substring(bucketName.length() + 1)
+                    : path;
+            String normalizedPath = normalizePath(objectPath);
+            if (normalizedPath.contains("..")) {
+                throw new SecurityException("Path traversal attempt detected");
+            }
+            try (var stream = minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(normalizedPath)
+                            .build())) {
+                return stream.readAllBytes();
+            }
+        } catch (Exception e) {
+            log.error("Error downloading file from MinIO: {}", e.getMessage(), e);
+            throw new RuntimeException("Error downloading file: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public boolean exists(String path) {
         try {
             String normalizedPath = normalizePath(path);

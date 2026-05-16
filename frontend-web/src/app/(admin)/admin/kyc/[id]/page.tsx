@@ -227,13 +227,18 @@ export default function AdminKYCDetallePagina() {
                       >
                         {doc.estado}
                       </Badge>
-                      {doc.urlVisualizacion && (
-                        <Button size="sm" variant="outline" asChild>
-                          <a href={doc.urlVisualizacion} target="_blank" rel="noopener noreferrer">
-                            Ver
-                          </a>
-                        </Button>
-                      )}
+                      {/* Usamos el endpoint BFF en lugar de la pre-signed URL
+                          del backend (apunta a MinIO interno, no resuelve desde
+                          el browser). El BFF stream el archivo con auth admin. */}
+                      <Button size="sm" variant="outline" asChild>
+                        <a
+                          href={`/api/admin/kyc/documentos/${doc.id}/descargar`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Ver
+                        </a>
+                      </Button>
                     </div>
                   ))}
                 </div>

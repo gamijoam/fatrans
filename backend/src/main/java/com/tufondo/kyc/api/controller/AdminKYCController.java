@@ -4,14 +4,19 @@ package com.tufondo.kyc.api.controller;
 import com.tufondo.kyc.application.dto.response.ColaRevisionResponse;
 import com.tufondo.kyc.application.dto.response.EstadisticasKYCResponse;
 import com.tufondo.kyc.application.dto.response.HistorialKYCResponse;
+import com.tufondo.kyc.domain.model.DocumentoIdentidad;
 import com.tufondo.kyc.domain.model.VerificacionKYC;
 import com.tufondo.kyc.domain.model.enums.EstadoVerificacion;
 import com.tufondo.kyc.domain.model.enums.NivelVerificacion;
+import com.tufondo.kyc.domain.model.port.StoragePort;
+import com.tufondo.kyc.domain.repository.DocumentoIdentidadRepository;
 import com.tufondo.kyc.domain.repository.VerificacionKYCRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -35,6 +40,8 @@ import java.util.stream.Collectors;
 public class AdminKYCController {
 
     private final VerificacionKYCRepository verificacionRepository;
+    private final DocumentoIdentidadRepository documentoRepository;
+    private final StoragePort storagePort;
 
     /**
      * GET /kyc/cola-revision - Cola de Revision
@@ -229,5 +236,37 @@ public class AdminKYCController {
         } else {
             return (minutos / 1440) + " dias";
         }
+    }
+
+    /**
+     * GET /kyc/admin/documentos/{documentoId}/descargar
+     *
+     * Sirve el archivo binario desde MinIO al admin. NO usamos pre-signed
+     * URLs porque MinIO está en la red interna de Docker (`fatrans-minio:9000`)
+     * y ese hostname no resuelve desde el browser. El backend hace el bridge:
+     * recibe la request del admin (vía Cloudflare → backend público), lee el
+     * archivo de MinIO con su client interno, y lo stream como respuesta.
+     */
+    @GetMapping("/admin/documentos/{documentoId}/descargar")
+    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN', 'SUPER_ADMIN')")
+    @Operation(summary = "Descargar un documento KYC (admin/analista)")
+    public ResponseEntity<byte[]> descargarDocumentoAdmin(@PathVariable UUID documentoId) {
+        DocumentoIdentidad doc = documentoRepository.findById(documentoId)
+            .orElseThrow(() -> new com.tufondo.kyc.domain.exception.KYCException(
+                "Documento no encontrado: " + documentoId));
+
+        byte[] contenido = storagePort.download(doc.getUrlAlmacenamiento());
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(doc.getMimeType()));
+        // inline → el browser intenta renderizar (PDF nativo, imagen).
+        // attachment → fuerza descarga. Preferimos inline para la review.
+        headers.setContentDisposition(
+            org.springframework.http.ContentDisposition.inline()
+                .filename(doc.getNombreOriginal())
+                .build());
+        headers.setContentLength(contenido.length);
+
+        return ResponseEntity.ok().headers(headers).body(contenido);
     }
 }
