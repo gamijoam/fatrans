@@ -59,6 +59,11 @@ public class ConsultarEstadoKYCUseCase {
             .documentos(docs)
             .comentarioRevision(verificacion.getComentariosRevision())
             .motivoRechazo(verificacion.getMotivoRechazo())
+            // Cache del estado biométrico (Didit). Si el webhook ya marcó la
+            // captura como APROBADA, el frontend usa esto para ocultar el
+            // widget de Didit (no pedir verificación de nuevo) y para auto-
+            // marcar los documentos que Didit ya capturó (cédula + selfie).
+            .estadoBiometria(verificacion.getEstadoBiometria())
             .build();
     }
 

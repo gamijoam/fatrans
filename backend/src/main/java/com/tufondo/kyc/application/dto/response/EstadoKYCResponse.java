@@ -1,6 +1,7 @@
 // com.tufondo.kyc.application.dto.response.EstadoKYCResponse
 package com.tufondo.kyc.application.dto.response;
 
+import com.tufondo.kyc.domain.model.enums.EstadoBiometria;
 import com.tufondo.kyc.domain.model.enums.EstadoDocumento;
 import com.tufondo.kyc.domain.model.enums.EstadoVerificacion;
 import com.tufondo.kyc.domain.model.enums.NivelVerificacion;
@@ -35,6 +36,14 @@ public class EstadoKYCResponse {
     private List<DocumentoEstadoResponse> documentos;
     private String comentarioRevision;
     private String motivoRechazo;
+
+    /**
+     * Cache del resultado biométrico (Didit). Se expone al frontend para que la
+     * UI sepa si el socio ya pasó la captura de selfie + cédula sin tener que
+     * consultar otro endpoint. Si el adapter biométrico está deshabilitado,
+     * queda en {@code NO_INICIADA}.
+     */
+    private EstadoBiometria estadoBiometria;
 
     @Data
     @NoArgsConstructor
