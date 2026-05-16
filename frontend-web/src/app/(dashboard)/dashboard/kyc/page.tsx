@@ -160,9 +160,17 @@ export default function DashboardKYCPagina() {
       return;
     }
 
+    if (!estadoKYC?.verificacionId) {
+      toast.error('No hay verificación activa');
+      return;
+    }
+
     setSubiendoDocumento(tipo);
     try {
+      // Mandamos verificacionId al BFF porque el backend lo necesita en el
+      // payload JSON que arma el BFF (el endpoint no acepta multipart).
       const formData = new FormData();
+      formData.append('verificacionId', estadoKYC.verificacionId);
       formData.append('tipoDocumento', tipo);
       formData.append('archivo', file);
 

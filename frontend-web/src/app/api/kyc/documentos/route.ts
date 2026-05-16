@@ -5,17 +5,12 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 /**
  * BFF: sube un documento KYC al backend Java.
  *
- * IMPORTANTE — bug de Spring + undici:
- * Cuando usamos `body: FormData` en Node fetch, undici construye un
- * Content-Type como `multipart/form-data;boundary=...;charset=UTF-8`. Spring
- * Boot 3 rechaza ese Content-Type porque el `charset=UTF-8` no está
- * contemplado en su `StandardMultipartHttpServletRequest` — devuelve un 500
- * con "Content-Type ... is not supported". El RFC 7578 permite el charset
- * en teoría, pero Spring lo trata como inválido.
- *
- * Solución: armamos el cuerpo multipart manualmente con un boundary
- * controlado y mandamos el Content-Type sin charset. Así Spring lo parsea
- * correctamente sin tocar la config del backend.
+ * El backend NO acepta multipart — recibe `SubirDocumentoRequest` JSON con
+ * el archivo en base64 (campo `archivoBase64`). El frontend nos manda el
+ * archivo como multipart porque es ergonómico para el `<input type="file">`,
+ * así que acá hacemos la conversión: leemos el File, lo codificamos a base64,
+ * y armamos el JSON con todos los campos que el backend valida (verificacionId,
+ * tipoDocumento, archivoBase64, nombreOriginal, tamanoBytes, mimeType).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -26,32 +21,29 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const tipoDocumento = formData.get('tipoDocumento') as string;
+    const verificacionId = formData.get('verificacionId') as string;
     const archivo = formData.get('archivo') as File;
 
-    if (!tipoDocumento || !archivo) {
+    if (!tipoDocumento || !archivo || !verificacionId) {
       return NextResponse.json(
-        { message: 'Faltan campos requeridos' },
+        { message: 'Faltan campos: verificacionId, tipoDocumento y archivo son requeridos' },
         { status: 400 }
       );
     }
 
-    // Boundary único — usamos Math.random porque crypto.randomBytes requiere
-    // import async en edge runtime; el boundary no necesita ser secreto, solo
-    // único dentro del request.
-    const boundary = `----fatrans-${Math.random().toString(36).slice(2)}${Date.now()}`;
-    const archivoBuffer = Buffer.from(await archivo.arrayBuffer());
+    // Convertimos el archivo a base64. Node Buffer.toString('base64') es la
+    // forma estándar — no usamos atob/btoa (esos rompen con binarios > UTF-8).
+    const arrayBuffer = await archivo.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
 
-    const preamble = Buffer.from(
-      `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="tipoDocumento"\r\n\r\n` +
-      `${tipoDocumento}\r\n` +
-      `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="archivo"; filename="${archivo.name || 'archivo'}"\r\n` +
-      `Content-Type: ${archivo.type || 'application/octet-stream'}\r\n\r\n`,
-      'utf-8'
-    );
-    const closing = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8');
-    const body = Buffer.concat([preamble, archivoBuffer, closing]);
+    const payload = {
+      verificacionId,
+      tipoDocumento,
+      archivoBase64: base64,
+      nombreOriginal: archivo.name || 'archivo',
+      tamanoBytes: archivo.size,
+      mimeType: archivo.type || 'application/octet-stream',
+    };
 
     const backendResponse = await fetch(
       `${BACKEND_URL}/api/v1/kyc/documentos`,
@@ -59,11 +51,9 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          // Sin charset — Spring lo necesita así.
-          'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          'Content-Length': body.length.toString(),
+          'Content-Type': 'application/json',
         },
-        body: body as unknown as BodyInit,
+        body: JSON.stringify(payload),
       }
     );
 
