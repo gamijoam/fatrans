@@ -51,7 +51,13 @@ export async function POST(request: NextRequest) {
       'utf-8'
     );
     const closing = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8');
-    const body = Buffer.concat([preamble, archivoBuffer, closing]);
+    const bodyBuffer = Buffer.concat([preamble, archivoBuffer, closing]);
+    // CRÍTICO: pasamos el body como Uint8Array (binario), NO como Buffer.
+    // Cuando undici recibe un Buffer, lo interpreta como texto y agrega
+    // automáticamente `;charset=UTF-8` al Content-Type. Spring entonces ve
+    // `multipart/form-data;boundary=...;charset=UTF-8` y lo rechaza. Con
+    // Uint8Array undici lo trata como binary stream y NO toca el header.
+    const bodyBinary = new Uint8Array(bodyBuffer);
 
     const backendResponse = await fetch(
       `${BACKEND_URL}/api/v1/kyc/documentos`,
@@ -59,11 +65,12 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          // Sin charset — Spring lo necesita así.
           'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          'Content-Length': body.length.toString(),
+          'Content-Length': bodyBinary.byteLength.toString(),
         },
-        body: body as unknown as BodyInit,
+        body: bodyBinary,
+        // @ts-expect-error — duplex es undici-specific (Node 18+), TS no lo tipa.
+        duplex: 'half',
       }
     );
 
