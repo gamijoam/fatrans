@@ -17,6 +17,7 @@ import com.tufondo.kyc.domain.repository.DocumentoIdentidadRepository;
 import com.tufondo.kyc.domain.repository.VerificacionKYCRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -91,6 +92,17 @@ public class RevisarDocumentosUseCase {
             .build();
     }
 
+    /**
+     * Aprueba una verificación KYC.
+     *
+     * `@Transactional` es CRÍTICO: el método actualiza primero el estado del
+     * KYC y luego el estado de cada documento individual. Sin transacción, si
+     * el save del documento falla (como ocurrió con el bug @Version null en
+     * DocumentoIdentidadEntity), el KYC quedaba APROBADO pero los docs en
+     * PENDIENTE — inconsistencia visible al usuario. Con @Transactional toda
+     * la operación es atómica.
+     */
+    @Transactional
     public RevisionDecisionResponse aprobar(UUID verificacionId, AprobarVerificacionRequest request, String analistaId) {
         VerificacionKYC verificacion = verificacionRepository.findById(verificacionId)
             .orElseThrow(() -> new com.tufondo.kyc.domain.exception.VerificacionNotFoundException(verificacionId));
@@ -132,6 +144,7 @@ public class RevisarDocumentosUseCase {
             .build();
     }
 
+    @Transactional
     public RevisionDecisionResponse rechazar(UUID verificacionId, RechazarVerificacionRequest request, String analistaId) {
         VerificacionKYC verificacion = verificacionRepository.findById(verificacionId)
             .orElseThrow(() -> new com.tufondo.kyc.domain.exception.VerificacionNotFoundException(verificacionId));
@@ -169,6 +182,7 @@ public class RevisarDocumentosUseCase {
             .build();
     }
 
+    @Transactional
     public RevisionDecisionResponse solicitarInfo(UUID verificacionId, SolicitarInfoRequest request, String analistaId) {
         VerificacionKYC verificacion = verificacionRepository.findById(verificacionId)
             .orElseThrow(() -> new com.tufondo.kyc.domain.exception.VerificacionNotFoundException(verificacionId));
