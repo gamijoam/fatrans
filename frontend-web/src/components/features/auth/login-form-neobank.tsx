@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { loginSchema } from '@/lib/utils/validators';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
@@ -45,8 +45,20 @@ export function LoginFormNeobank() {
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
   const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setUser = useAuthStore((state) => state.setUser);
   const setLoading = useAuthStore((state) => state.setLoading);
+
+  // Issue #221: si llegamos al login por idle timeout, avisar al usuario
+  useEffect(() => {
+    const reason = searchParams?.get('reason');
+    if (reason === 'inactivity') {
+      toast.info('Sesión cerrada por inactividad', {
+        description: 'Por tu seguridad, cerramos tu sesión tras varios minutos sin actividad.',
+        duration: 6000,
+      });
+    }
+  }, [searchParams]);
 
   const {
     register,
