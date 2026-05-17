@@ -18,16 +18,16 @@ export const metadata: Metadata = {
   applicationName: 'Fatrans',
   // Iconos servidos desde frontend-web/src/app/ (Next.js 14 los detecta
   // automáticamente: icon.png → favicon, apple-icon.png → iOS).
-  // Fallback explícito a /logo-fatrans.svg por si el navegador no lee
+  // Fallback explícito a /logo-fatrans.png por si el navegador no lee
   // los conventional icons.
   icons: {
     icon: [
-      { url: '/logo-fatrans.svg', type: 'image/png' },
+      { url: '/logo-fatrans.png', type: 'image/png' },
     ],
     apple: [
-      { url: '/logo-fatrans.svg', type: 'image/png' },
+      { url: '/logo-fatrans.png', type: 'image/png' },
     ],
-    shortcut: '/logo-fatrans.svg',
+    shortcut: '/logo-fatrans.png',
   },
   openGraph: {
     title: 'Fatrans · Asociación de Ahorro y Crédito',
