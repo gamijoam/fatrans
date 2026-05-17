@@ -16,20 +16,42 @@ import java.time.Instant;
 @Schema(description = "Manejo centralizado de excepciones")
 public class AuthExceptionHandler {
 
-    @ExceptionHandler(CredencialesInvalidasException.class)
-    @Schema(description = "Error cuando las credenciales son incorrectas")
-    public ResponseEntity<ErrorResponse> manejarCredencialesInvalidas(CredencialesInvalidasException ex) {
-        log.warn("Credenciales inválidas: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(new ErrorResponse("CREDENCIALES_INVALIDAS", ex.getMessage()));
-    }
+    /**
+     * Mensaje genérico anti-enumeración (issue #206).
+     *
+     * <p>Cualquier fallo relacionado con la identidad del usuario en flujos de
+     * autenticación devuelve el mismo cuerpo. Esto impide que un atacante
+     * distinga "usuario no existe" vs "password incorrecta" vs "sesión inválida"
+     * y enumere usuarios válidos del sistema.</p>
+     */
+    private static final String MENSAJE_CREDENCIALES_GENERICO =
+            "Credenciales inválidas. Verifica tu usuario y contraseña.";
 
-    @ExceptionHandler(UsuarioNoEncontradoException.class)
-    @Schema(description = "Error cuando el usuario no existe")
-    public ResponseEntity<ErrorResponse> manejarUsuarioNoEncontrado(UsuarioNoEncontradoException ex) {
-        log.warn("Usuario no encontrado: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponse("USUARIO_NO_ENCONTRADO", ex.getMessage()));
+    /**
+     * Handler unificado anti-enumeración para fallos de autenticación.
+     *
+     * <p>Agrupa tres excepciones que antes producían respuestas distinguibles:
+     * <ul>
+     *   <li>{@code CredencialesInvalidasException} → era 401 + mensaje específico</li>
+     *   <li>{@code UsuarioNoEncontradoException}  → era 404 + "Usuario no encontrado"</li>
+     *   <li>{@code SesionNoEncontradaException}   → era 404 + mensaje específico</li>
+     * </ul>
+     * Ahora todas devuelven exactamente el mismo body (mismo status, código y
+     * mensaje), eliminando el vector de enumeración de usuarios. La causa real
+     * se preserva en el log (warn) para detección forense.</p>
+     */
+    @ExceptionHandler({
+            CredencialesInvalidasException.class,
+            UsuarioNoEncontradoException.class,
+            SesionNoEncontradaException.class
+    })
+    @Schema(description = "Error genérico de credenciales/identidad (anti-enumeración)")
+    public ResponseEntity<ErrorResponse> manejarFalloCredenciales(RuntimeException ex) {
+        // Forensics: registramos la causa real internamente, no la propagamos al cliente.
+        log.warn("Login/credenciales fallido [{}]: {}",
+                ex.getClass().getSimpleName(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ErrorResponse("CREDENCIALES_INVALIDAS", MENSAJE_CREDENCIALES_GENERICO));
     }
 
     @ExceptionHandler(CuentaBloqueadaException.class)
@@ -64,13 +86,7 @@ public class AuthExceptionHandler {
                 .body(new ErrorResponse("TOKEN_INVALIDO", ex.getMessage()));
     }
 
-    @ExceptionHandler(SesionNoEncontradaException.class)
-    @Schema(description = "Error cuando la sesión no existe")
-    public ResponseEntity<ErrorResponse> manejarSesionNoEncontrada(SesionNoEncontradaException ex) {
-        log.warn("Sesión no encontrada: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponse("SESION_NO_ENCONTRADA", ex.getMessage()));
-    }
+    // Nota: SesionNoEncontradaException ahora se maneja en manejarFalloCredenciales (issue #206)
 
     @ExceptionHandler(SocioNoEncontradoException.class)
     @Schema(description = "Error cuando el socio no existe")

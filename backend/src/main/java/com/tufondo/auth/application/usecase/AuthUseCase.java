@@ -30,6 +30,19 @@ public class AuthUseCase {
     private static final int MAX_INTENTOS_FALLIDOS = 5;
     private static final int MINUTOS_BLOQUEO = 30;
 
+    /**
+     * Hash BCrypt válido de una password dummy (no usado para autenticar).
+     * Se evalúa contra {@link PasswordEncoder#matches} cuando el usuario NO existe,
+     * para que el tiempo de respuesta sea indistinguible del caso "password mala"
+     * (mitigación de enumeración por timing attack — issue #206).
+     *
+     * <p>El hash corresponde a la cadena fija "dummy-password-no-real" generada
+     * con BCrypt 10 rounds. Es seguro publicarlo: no autentica a ningún usuario
+     * real (no hay registro en BD con este hash).</p>
+     */
+    private static final String DUMMY_BCRYPT_HASH =
+            "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
     private final UsuarioRepository usuarioRepository;
     private final SesionRepository sesionRepository;
     private final JwtService jwtService;
@@ -47,6 +60,11 @@ public class AuthUseCase {
         }
 
         Usuario usuario = usuarioOpt.orElseThrow(() -> {
+            // Mitigación timing attack (issue #206): ejecutamos un BCrypt dummy para
+            // que el tiempo de respuesta sea similar al de un usuario existente con
+            // password mala. Sin esto, el atacante distingue "user no existe" en ms
+            // vs "password mala" en ~100ms (BCrypt es deliberadamente lento).
+            passwordEncoder.matches(request.password(), DUMMY_BCRYPT_HASH);
             auditService.logLoginFallido(request.identificador(), clientIp, "usuario_no_encontrado");
             return new CredencialesInvalidasException("Credenciales inválidas");
         });
