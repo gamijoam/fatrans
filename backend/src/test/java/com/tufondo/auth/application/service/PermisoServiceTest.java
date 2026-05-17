@@ -186,6 +186,28 @@ class PermisoServiceTest {
         }
 
         @Test
+        @DisplayName("Issue #207: esAnalistaCredito retorna true para ANALISTA_CREDITO")
+        void es_analista_credito_retorna_true() {
+            doReturn(true).when(authentication).isAuthenticated();
+            doReturn(authorities("ANALISTA_CREDITO")).when(authentication).getAuthorities();
+
+            assertThat(permisoService.esAnalistaCredito(authentication)).isTrue();
+        }
+
+        @Test
+        @DisplayName("Issue #207: esAnalistaCredito retorna false para otros roles")
+        void es_analista_credito_retorna_false_para_otros() {
+            doReturn(true).when(authentication).isAuthenticated();
+            doReturn(authorities("ADMIN")).when(authentication).getAuthorities();
+
+            // Aunque ADMIN > ANALISTA_CREDITO en la jerarquía de Spring (para
+            // @PreAuthorize), `esAnalistaCredito()` chequea el rol exacto, no la
+            // jerarquía. Esto es deliberado: si quieres saber si es admin, usa
+            // esAdmin(); este helper es para identificar al analista específicamente.
+            assertThat(permisoService.esAnalistaCredito(authentication)).isFalse();
+        }
+
+        @Test
         @DisplayName("Retorna lista vacía cuando auth null")
         void retorna_lista_vacia_cuando_auth_null() {
             List<Permiso> result = permisoService.obtenerPermisosDelUsuario(null);

@@ -87,6 +87,14 @@ public class PermisoService {
         return tieneRol(authentication, Rol.ANALISTA_KYC);
     }
 
+    /**
+     * Issue #207: rol dedicado a evaluar y aprobar créditos.
+     * Separation of Duties: este rol NO puede desembolsar, solo evaluar/aprobar.
+     */
+    public boolean esAnalistaCredito(Authentication authentication) {
+        return tieneRol(authentication, Rol.ANALISTA_CREDITO);
+    }
+
     public boolean esSistema(Authentication authentication) {
         return tieneRol(authentication, Rol.SISTEMA);
     }
