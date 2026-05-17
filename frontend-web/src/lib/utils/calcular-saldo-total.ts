@@ -31,6 +31,50 @@ export interface SaldoAgregado {
   totalUSD: number;
 }
 
+export interface SaldosPorMoneda {
+  ves: number;
+  usd: number;
+  /** Otras monedas detectadas que no pudimos clasificar (ej. EUR futuro). */
+  otras: Array<{ moneda: string; total: number }>;
+}
+
+/**
+ * Agrupa saldos por moneda SIN convertir entre ellas (issue #230 — fallback
+ * cuando la tasa BCV no está disponible).
+ *
+ * <p>Distinto de {@link calcularSaldoTotal}: este NO necesita tasa y NO
+ * agrega entre monedas. Se usa para mostrar al socio sus saldos lado-a-lado
+ * (estilo Wise/Revolut) cuando no podemos calcular un total agregado
+ * confiable.</p>
+ */
+export function calcularSaldosPorMoneda(
+  cuentas: ReadonlyArray<CuentaParaSaldo>
+): SaldosPorMoneda {
+  let ves = 0;
+  let usd = 0;
+  const otrasMap = new Map<string, number>();
+
+  for (const cuenta of cuentas ?? []) {
+    const saldo = Number(cuenta.saldoActual);
+    if (!Number.isFinite(saldo)) continue;
+
+    if (cuenta.moneda === 'VES') {
+      ves += saldo;
+    } else if (cuenta.moneda === 'USD') {
+      usd += saldo;
+    } else if (cuenta.moneda) {
+      otrasMap.set(cuenta.moneda, (otrasMap.get(cuenta.moneda) ?? 0) + saldo);
+    }
+  }
+
+  const otras = Array.from(otrasMap.entries()).map(([moneda, total]) => ({
+    moneda,
+    total,
+  }));
+
+  return { ves, usd, otras };
+}
+
 /**
  * @returns saldo agregado en VES y USD, o `null` si {@code tasaCambio} es null
  *          (en cuyo caso el caller debe mostrar loading).
