@@ -59,6 +59,29 @@ public class RolPermisoRepositoryImpl implements RolPermisoRepository {
             Permiso.VER_KYC_ESTADISTICAS, Permiso.VER_AUDITORIA
     );
 
+    /**
+     * Issue #207: ANALISTA_CREDITO — evalúa y aprueba/rechaza créditos.
+     *
+     * <p>Separation of Duties: NO incluye {@link Permiso#DESEMBOLSAR_CREDITO}.
+     * El desembolso (movimiento de fondos) queda separado del análisis
+     * crediticio para que la misma persona no pueda aprobar y ejecutar el
+     * pago. ADMIN/SISTEMA conservan el desembolso.</p>
+     *
+     * <p>Tiene visibilidad de cuentas/movimientos/documentos del socio
+     * para poder evaluar capacidad de pago.</p>
+     */
+    private static final List<Permiso> PERMISOS_ANALISTA_CREDITO = List.of(
+            Permiso.VER_DASHBOARD,
+            Permiso.GESTIONAR_CREDITOS,
+            Permiso.EVALUAR_CREDITO,
+            Permiso.APROBAR_CREDITO,
+            Permiso.RECHAZAR_CREDITO,
+            // NO: Permiso.DESEMBOLSAR_CREDITO (separation of duties)
+            Permiso.VER_AUDITORIA,
+            Permiso.VER_CUENTAS, Permiso.VER_MOVIMIENTOS, Permiso.VER_RENDIMIENTOS,
+            Permiso.VER_DOCUMENTOS, Permiso.DESCARGAR_DOCUMENTOS
+    );
+
     private static final List<Permiso> PERMISOS_SISTEMA = List.of(
             Permiso.GESTIONAR_CREDITOS, Permiso.EVALUAR_CREDITO, Permiso.APROBAR_CREDITO,
             Permiso.RECHAZAR_CREDITO, Permiso.DESEMBOLSAR_CREDITO,
@@ -154,6 +177,7 @@ public class RolPermisoRepositoryImpl implements RolPermisoRepository {
         inicializarRol(Rol.ADMIN, PERMISOS_ADMIN);
         inicializarRol(Rol.CAJERO, PERMISOS_CAJERO);
         inicializarRol(Rol.ANALISTA_KYC, PERMISOS_ANALISTA_KYC);
+        inicializarRol(Rol.ANALISTA_CREDITO, PERMISOS_ANALISTA_CREDITO);  // Issue #207
         inicializarRol(Rol.SISTEMA, PERMISOS_SISTEMA);
         inicializarRol(Rol.SUPER_ADMIN, PERMISOS_SUPER_ADMIN);
         log.info("Permisos default inicializados para todos los roles");
@@ -173,6 +197,7 @@ public class RolPermisoRepositoryImpl implements RolPermisoRepository {
             case ADMIN -> PERMISOS_ADMIN;
             case CAJERO -> PERMISOS_CAJERO;
             case ANALISTA_KYC -> PERMISOS_ANALISTA_KYC;
+            case ANALISTA_CREDITO -> PERMISOS_ANALISTA_CREDITO;  // Issue #207
             case SISTEMA -> PERMISOS_SISTEMA;
             case SUPER_ADMIN -> PERMISOS_SUPER_ADMIN;
         };

@@ -224,4 +224,101 @@ class RolPermisoRepositoryImplTest {
             assertThat(result).contains(Permiso.GESTIONAR_USUARIOS);
         }
     }
+
+    @Nested
+    @DisplayName("Issue #207 — Rol ANALISTA_CREDITO real (ya no fantasma)")
+    class AnalistaCreditoTests {
+
+        @Test
+        @DisplayName("ANALISTA_CREDITO existe en el enum Rol")
+        void analistaCreditoExisteEnEnum() {
+            // Test de compilación + runtime: si alguien borra el valor del
+            // enum, este test falla con `IllegalArgumentException`.
+            Rol rol = Rol.valueOf("ANALISTA_CREDITO");
+            assertThat(rol).isNotNull();
+            assertThat(rol.name()).isEqualTo("ANALISTA_CREDITO");
+        }
+
+        @Test
+        @DisplayName("ANALISTA_CREDITO tiene permisos default (no es un rol fantasma)")
+        void analistaCreditoTienePermisosDefault() {
+            when(jpaRepository.findByRol(Rol.ANALISTA_CREDITO)).thenReturn(List.of());
+
+            List<Permiso> permisos = repository.obtenerPermisosPorRol(Rol.ANALISTA_CREDITO);
+
+            assertThat(permisos).isNotEmpty();
+            assertThat(permisos).contains(
+                    Permiso.EVALUAR_CREDITO,
+                    Permiso.APROBAR_CREDITO,
+                    Permiso.RECHAZAR_CREDITO,
+                    Permiso.VER_DASHBOARD
+            );
+        }
+
+        @Test
+        @DisplayName("Separation of Duties: ANALISTA_CREDITO NO puede desembolsar")
+        void analistaCreditoNoPuedeDesembolsar() {
+            when(jpaRepository.findByRol(Rol.ANALISTA_CREDITO)).thenReturn(List.of());
+
+            boolean puede = repository.tienePermiso(Rol.ANALISTA_CREDITO,
+                    Permiso.DESEMBOLSAR_CREDITO);
+
+            assertThat(puede)
+                    .as("ANALISTA_CREDITO NO debe poder desembolsar — separation of duties " +
+                        "entre quien aprueba y quien ejecuta el movimiento de fondos.")
+                    .isFalse();
+        }
+
+        @Test
+        @DisplayName("ANALISTA_CREDITO tiene visibilidad de cuentas/movimientos para evaluar capacidad")
+        void analistaCreditoVeCuentas() {
+            when(jpaRepository.findByRol(Rol.ANALISTA_CREDITO)).thenReturn(List.of());
+
+            List<Permiso> permisos = repository.obtenerPermisosPorRol(Rol.ANALISTA_CREDITO);
+
+            assertThat(permisos).contains(
+                    Permiso.VER_CUENTAS,
+                    Permiso.VER_MOVIMIENTOS,
+                    Permiso.VER_RENDIMIENTOS,
+                    Permiso.VER_DOCUMENTOS
+            );
+        }
+
+        @Test
+        @DisplayName("ANALISTA_CREDITO NO debe tener permisos administrativos sensibles")
+        void analistaCreditoNoTienePermisosAdmin() {
+            when(jpaRepository.findByRol(Rol.ANALISTA_CREDITO)).thenReturn(List.of());
+
+            List<Permiso> permisos = repository.obtenerPermisosPorRol(Rol.ANALISTA_CREDITO);
+
+            // No debe poder crear usuarios, gestionar socios, gestionar tipos de
+            // crédito/cambio, etc.
+            assertThat(permisos)
+                    .doesNotContain(
+                            Permiso.CREAR_USUARIOS,
+                            Permiso.GESTIONAR_USUARIOS,
+                            Permiso.GESTIONAR_SOCIOS,
+                            Permiso.GESTIONAR_TIPOS_CREDITO,
+                            Permiso.GESTIONAR_TIPOS_CAMBIO,
+                            Permiso.REGISTRAR_DEPOSITOS,
+                            Permiso.REGISTRAR_RETIROS
+                    );
+        }
+
+        @Test
+        @DisplayName("inicializarPermisosDefault cubre TODOS los valores del enum (incluido ANALISTA_CREDITO)")
+        void inicializarCubreCadaRol() {
+            when(jpaRepository.existsByRolAndPermiso(any(), any())).thenReturn(false);
+
+            // No debe lanzar (significaría que getPermisosDefault olvidó un case del switch).
+            repository.inicializarPermisosDefault();
+
+            // Verifica explícitamente que cada rol del enum tiene al menos un save.
+            for (Rol rol : Rol.values()) {
+                verify(jpaRepository, atLeastOnce()).save(argThat(
+                        e -> e.getRol() == rol
+                ));
+            }
+        }
+    }
 }
