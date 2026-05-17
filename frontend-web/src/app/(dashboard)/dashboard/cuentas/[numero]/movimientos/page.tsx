@@ -112,6 +112,10 @@ export default function MovimientosPage() {
       } catch (err) {
         console.error('Error al cargar cuenta:', err);
         setError('Error al cargar los datos de la cuenta');
+      } finally {
+        // Issue #248: si NO se llama aquí, `loading` queda en true para
+        // siempre y la página se atasca en el spinner inicial.
+        setLoading(false);
       }
     }
 
