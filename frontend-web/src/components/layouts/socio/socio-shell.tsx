@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { ProtectedRoute } from '@/components/shared/protected-route';
 import { LogoutButton } from '@/components/shared/logout-button';
+import { IdleTimeoutWatcher } from '@/components/shared/idle-timeout-watcher';
 import {
   LayoutDashboard,
   Wallet,
@@ -71,6 +72,8 @@ export function SocioShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ProtectedRoute allowedRoles={['SOCIO', 'ADMIN', 'SUPER_ADMIN']}>
+      {/* Issue #221: auto-logout por inactividad (banking standard) */}
+      <IdleTimeoutWatcher idleMinutes={10} warningSeconds={60} />
       <div className="flex min-h-screen bg-slate-100">
         {/* Desktop Sidebar - Minimal & Clean */}
         <aside className="hidden lg:flex w-64 bg-white flex-col fixed h-full z-40 border-r border-slate-200">
