@@ -476,9 +476,9 @@ function Footer() {
           <div>
             <h4 className="font-semibold mb-4">Legal</h4>
             <ul className="space-y-2 text-sm text-slate-400">
-              <li><a href="#" className="hover:text-white transition">Términos de Servicio</a></li>
-              <li><a href="#" className="hover:text-white transition">Política de Privacidad</a></li>
-              <li><a href="#" className="hover:text-white transition">Cumplimiento LOPDP</a></li>
+              <li><a href="/terminos" className="hover:text-white transition">Términos de Servicio</a></li>
+              <li><a href="/lopdp" className="hover:text-white transition">Política de Privacidad (LOPDP)</a></li>
+              <li><a href="/cookies" className="hover:text-white transition">Política de Cookies</a></li>
             </ul>
           </div>
 
