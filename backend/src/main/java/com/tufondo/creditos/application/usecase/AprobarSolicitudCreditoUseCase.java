@@ -12,6 +12,7 @@ import com.tufondo.creditos.domain.model.enums.EstadoSolicitud;
 import com.tufondo.creditos.domain.repository.CuentaGarantiaRepository;
 import com.tufondo.creditos.domain.repository.SolicitudCreditoRepository;
 import com.tufondo.creditos.domain.repository.TipoCreditoRepository;
+import com.tufondo.notificaciones.application.service.NotificacionPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,8 @@ public class AprobarSolicitudCreditoUseCase {
     private final TipoCreditoRepository tipoCreditoRepository;
     private final CuentaGarantiaRepository cuentaGarantiaRepository;
     private final CreditosDTOMapper mapper;
+    // Issue #214 PR-C
+    private final NotificacionPublisher notificacionPublisher;
 
     @Transactional
     public Map<String, Object> ejecutar(String numeroSolicitud, AprobarRechazarRequest request) {
@@ -92,8 +95,16 @@ public class AprobarSolicitudCreditoUseCase {
         solicitud.setUpdatedAt(LocalDateTime.now());
         solicitudRepository.guardar(solicitud);
 
-        log.info("Solicitud {} aprobada - Colateral: {} - Tasa: {}", 
+        log.info("Solicitud {} aprobada - Colateral: {} - Tasa: {}",
             numeroSolicitud, colateralRequerido, tasaInteres);
+
+        // Issue #214 PR-C: notificar al socio. La SolicitudCredito no tiene
+        // moneda (asume VES); si el dominio agrega multi-moneda, actualizar aquí.
+        notificacionPublisher.notificarSocioCreditoAprobado(
+                solicitud.getSocioId(),
+                solicitud.getMontoSolicitado(),
+                "Bs",
+                numeroSolicitud);
 
         Map<String, Object> response = new HashMap<>();
         response.put("id", solicitud.getId().toString());
