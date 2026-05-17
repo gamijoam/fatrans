@@ -7,6 +7,7 @@ import { Loader2, Wallet, CreditCard, TrendingUp, Plus, ArrowUpRight, ArrowDownR
 import { Card, CardContent } from '@/components/ui/card';
 import { useTipoCambio } from '@/hooks/useTipoCambio';
 import { calcularSaldoTotal } from '@/lib/utils/calcular-saldo-total';
+import { parseCuentasResponse } from '@/lib/utils/parse-cuentas-response';
 
 interface CuentaAhorro {
   id: string;
@@ -218,7 +219,11 @@ export default function SocioDashboardPage() {
       const res = await fetch(`/api/cuentas/socio/${user.socioId}`);
       if (res.ok) {
         const data = await res.json();
-        setCuentas(Array.isArray(data) ? data : []);
+        // Issue #213 (sub-bug descubierto en QA): el backend retorna
+        // `{socioId, totalCuentas, cuentas: [...]}` (CuentasPorSocioResponse),
+        // no un array directo. El check anterior `Array.isArray(data) ? data : []`
+        // siempre dejaba la lista vacía aunque el socio tuviera cuentas.
+        setCuentas(parseCuentasResponse(data));
       }
     } catch (err) {
       console.error('Error:', err);
