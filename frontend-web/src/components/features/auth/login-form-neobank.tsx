@@ -12,6 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { sanitizeHTML } from '@/lib/utils/cn';
+import { Logo } from '@/components/branding/logo';
+import { LoadingLogo } from '@/components/branding/loading-logo';
 
 interface LoginFormData {
   identificador: string;
@@ -141,15 +143,24 @@ export function LoginFormNeobank() {
         <div className="absolute inset-0 bg-gradient-to-br from-blue-950/90 via-blue-950/85 to-slate-900/90" />
       </div>
 
+      {/* Overlay de carga: visible mientras isLoading=true.
+          El usuario ve el logo de Fatrans "respirando" con un anillo
+          verde girando — feedback inmediato de que la app está
+          procesando, no congelada. */}
+      {isLoading && <LoadingLogo variante="overlay" mensaje="Iniciando sesión..." />}
+
       {/* Login Card */}
       <div className="relative z-10 w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-2xl shadow-blue-950/50 overflow-hidden">
-          {/* Card Header */}
-          <div className="px-8 pt-10 pb-8 text-center border-b border-slate-100">
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">
+          {/* Card Header con logo institucional */}
+          <div className="px-8 pt-8 pb-6 text-center border-b border-slate-100">
+            <div className="flex justify-center mb-4">
+              <Logo size={88} priority />
+            </div>
+            <h1 className="text-xl font-bold text-slate-900">
               Acceso Seguro al Fondo
             </h1>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 mt-1">
               Ingresa tus credenciales para continuar
             </p>
           </div>
