@@ -21,6 +21,7 @@ import {
   Settings,
   LogOut,
   Shield,
+  HelpCircle,
 } from 'lucide-react';
 
 const menuItems = [
@@ -31,6 +32,7 @@ const menuItems = [
   { icon: Shield, label: 'KYC', href: '/dashboard/kyc' },
   { icon: FileText, label: 'Documentos', href: '/dashboard/documentos' },
   { icon: User, label: 'Mi Perfil', href: '/perfil' },
+  { icon: HelpCircle, label: 'Ayuda', href: '/dashboard/ayuda' },
 ];
 
 function AvatarSocio({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' }) {
