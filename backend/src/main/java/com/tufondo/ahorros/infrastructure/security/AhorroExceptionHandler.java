@@ -2,6 +2,7 @@
 package com.tufondo.ahorros.infrastructure.security;
 
 import com.tufondo.ahorros.domain.exception.*;
+import com.tufondo.compliance.application.service.LocdoftConsentimientoRequeridoException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -80,6 +81,26 @@ public class AhorroExceptionHandler {
     @ExceptionHandler(TasaInvalidaException.class)
     public ResponseEntity<Map<String, Object>> handleTasaInvalida(TasaInvalidaException ex) {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "TASA_INVALIDA", ex.getMessage());
+    }
+
+    /**
+     * Issue #218 PR-C — operación supera umbral LOCDOFT y el cliente no
+     * envió declaración jurada. Devuelve HTTP 422 con el código que el
+     * frontend usa para abrir el modal de declaración.
+     */
+    @ExceptionHandler(LocdoftConsentimientoRequeridoException.class)
+    public ResponseEntity<Map<String, Object>> handleLocdoftConsent(LocdoftConsentimientoRequeridoException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.UNPROCESSABLE_ENTITY.value());
+        body.put("error", LocdoftConsentimientoRequeridoException.CODE);
+        body.put("mensaje", ex.getMessage());
+        body.put("detalles", Map.of(
+                "montoSolicitado", ex.getMontoSolicitado(),
+                "moneda", ex.getMoneda(),
+                "umbral", ex.getUmbral()
+        ));
+        return new ResponseEntity<>(body, HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
     private ResponseEntity<Map<String, Object>> buildErrorResponse(HttpStatus status, String error, String message) {

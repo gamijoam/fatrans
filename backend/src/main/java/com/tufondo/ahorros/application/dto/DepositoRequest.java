@@ -31,4 +31,16 @@ public class DepositoRequest {
     
     @NotNull(message = "canalOrigen es requerido")
     private CanalOrigen canalOrigen;
+
+    // ==== LOCDOFT — declaración jurada para operaciones grandes (#218 PR-C) ====
+    //
+    // Si el monto supera el umbral configurado en `parametros_sistema`, el
+    // backend EXIGE que `confirmaOrigenLicito=true`. El frontend muestra un
+    // modal con la pregunta y, al confirmar, reintenta el POST con este flag.
+    // Si el monto NO supera el umbral, estos campos se ignoran.
+
+    private Boolean confirmaOrigenLicito;
+
+    @Size(max = 2000, message = "origenFondos no puede exceder 2000 caracteres")
+    private String origenFondos;
 }
