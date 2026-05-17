@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { calcularSaldoTotal, type CuentaParaSaldo, type TasaCambio } from './calcular-saldo-total';
+import {
+  calcularSaldoTotal,
+  calcularSaldosPorMoneda,
+  type CuentaParaSaldo,
+  type TasaCambio,
+} from './calcular-saldo-total';
 
 /**
  * Tests para issue #213: agregación de saldos multimoneda.
@@ -145,5 +150,99 @@ describe('calcularSaldoTotal (issue #213)', () => {
       expect(result).not.toBeNull();
       expect(result!.totalVES).toBe(100_000);
     });
+  });
+});
+
+/**
+ * Tests para issue #230 — fallback cuando la tasa BCV no está disponible.
+ * NO requiere tasa; agrupa saldos por moneda sin convertir entre ellas.
+ */
+describe('calcularSaldosPorMoneda (issue #230)', () => {
+  it('Issue #230 — réplica del QA reportado: cuentas Bs 12.450,50 + USD 500 sin tasa', () => {
+    const cuentas: CuentaParaSaldo[] = [
+      { moneda: 'VES', saldoActual: 12_450.5 },
+      { moneda: 'USD', saldoActual: 500 },
+    ];
+
+    const result = calcularSaldosPorMoneda(cuentas);
+
+    // CRÍTICO: los saldos NO se mezclan en un único número
+    expect(result.ves).toBe(12_450.5);
+    expect(result.usd).toBe(500);
+    expect(result.otras).toEqual([]);
+  });
+
+  it('cuentas vacías → todo en cero', () => {
+    const result = calcularSaldosPorMoneda([]);
+    expect(result.ves).toBe(0);
+    expect(result.usd).toBe(0);
+    expect(result.otras).toEqual([]);
+  });
+
+  it('solo cuentas VES → usd = 0', () => {
+    const result = calcularSaldosPorMoneda([
+      { moneda: 'VES', saldoActual: 100 },
+      { moneda: 'VES', saldoActual: 200 },
+    ]);
+    expect(result.ves).toBe(300);
+    expect(result.usd).toBe(0);
+  });
+
+  it('solo cuentas USD → ves = 0', () => {
+    const result = calcularSaldosPorMoneda([
+      { moneda: 'USD', saldoActual: 50 },
+      { moneda: 'USD', saldoActual: 75 },
+    ]);
+    expect(result.ves).toBe(0);
+    expect(result.usd).toBe(125);
+  });
+
+  it('Issue #230 — diferencia vs calcularSaldoTotal: NUNCA retorna null (no necesita tasa)', () => {
+    const cuentas: CuentaParaSaldo[] = [
+      { moneda: 'VES', saldoActual: 12_450.5 },
+      { moneda: 'USD', saldoActual: 500 },
+    ];
+
+    // calcularSaldoTotal SIN tasa → null (no podemos agregar)
+    const conTasa = calcularSaldoTotal(cuentas, null);
+    expect(conTasa).toBeNull();
+
+    // calcularSaldosPorMoneda SIN tasa → objeto válido (no agregamos, solo agrupamos)
+    const porMoneda = calcularSaldosPorMoneda(cuentas);
+    expect(porMoneda).not.toBeNull();
+    expect(porMoneda.ves).toBe(12_450.5);
+    expect(porMoneda.usd).toBe(500);
+  });
+
+  it('monedas no soportadas (EUR, BRL) van a `otras` agrupadas', () => {
+    const cuentas: CuentaParaSaldo[] = [
+      { moneda: 'VES', saldoActual: 100 },
+      { moneda: 'EUR', saldoActual: 50 },
+      { moneda: 'EUR', saldoActual: 30 },
+      { moneda: 'BRL', saldoActual: 200 },
+    ];
+
+    const result = calcularSaldosPorMoneda(cuentas);
+
+    expect(result.ves).toBe(100);
+    expect(result.usd).toBe(0);
+    expect(result.otras).toEqual(
+      expect.arrayContaining([
+        { moneda: 'EUR', total: 80 },
+        { moneda: 'BRL', total: 200 },
+      ])
+    );
+  });
+
+  it('NaN en saldo se ignora (no corrompe)', () => {
+    const cuentas: CuentaParaSaldo[] = [
+      { moneda: 'VES', saldoActual: 100 },
+      { moneda: 'VES', saldoActual: NaN },
+      { moneda: 'USD', saldoActual: 50 },
+    ];
+
+    const result = calcularSaldosPorMoneda(cuentas);
+    expect(result.ves).toBe(100);
+    expect(result.usd).toBe(50);
   });
 });

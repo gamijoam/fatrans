@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { Loader2, Wallet, CreditCard, TrendingUp, Plus, ArrowUpRight, ArrowDownRight, Truck, AlertTriangle, Shield, ChevronRight, FileText, Calendar } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useTipoCambio } from '@/hooks/useTipoCambio';
-import { calcularSaldoTotal } from '@/lib/utils/calcular-saldo-total';
+import { calcularSaldoTotal, calcularSaldosPorMoneda } from '@/lib/utils/calcular-saldo-total';
 import { parseCuentasResponse } from '@/lib/utils/parse-cuentas-response';
 
 interface CuentaAhorro {
@@ -239,9 +239,22 @@ export default function SocioDashboardPage() {
   }, [isLoading, user?.socioId, cargarCuentas]);
 
   // Issue #213: agregación correcta de saldos multimoneda.
-  // `null` cuando la tasa todavía no se cargó (mostramos skeleton, no número).
+  // `null` cuando la tasa todavía no se cargó (mostramos fallback, no número).
   const saldoAgregado = calcularSaldoTotal(cuentas, tasaActual);
   const saldoTotalListo = saldoAgregado !== null && !loadingTasa && !loadingCuentas;
+
+  // Issue #230: fallback transparente cuando no hay tasa BCV.
+  // Si la API de tipos-cambio no responde o devuelve vacío, agregamos a un
+  // total agregado sería engañoso. Mostramos los saldos por moneda separados.
+  const saldosPorMoneda = calcularSaldosPorMoneda(cuentas);
+  // Mostramos el fallback cuando: ya terminaron de cargar las cuentas, hay
+  // cuentas, pero la tasa no nos permite agregar (loading ya pasó pero saldoAgregado
+  // sigue null).
+  const debeMostrarFallback =
+    !loadingCuentas &&
+    !loadingTasa &&
+    cuentas.length > 0 &&
+    saldoAgregado === null;
 
   const mockActividad: Actividad[] = [
     { id: '1', tipo: 'DEPOSITO', descripcion: 'Depósito en efectivo', monto: 500000, fecha: '2026-04-28', icono: 'down' },
@@ -316,10 +329,14 @@ export default function SocioDashboardPage() {
             </div>
           </div>
 
-          {/* Issue #213: muestra saldo agregado en la moneda seleccionada.
-              Mientras la tasa BCV no se haya cargado, mostramos skeleton (NO un
-              número incorrecto). */}
+          {/* Issue #213/#230: tres estados posibles:
+                1. Cargando (cuentas o tasa) → skeleton (no número incorrecto).
+                2. Tasa disponible → saldo agregado con toggle Bs/USD.
+                3. Tasa NO disponible pero hay cuentas → fallback con saldos
+                   separados (estilo Wise/Revolut) en vez de skeleton infinito.
+          */}
           {saldoTotalListo && saldoAgregado ? (
+            // Caso 2: agregado correcto
             <p
               className="text-4xl lg:text-5xl font-bold tracking-tight mb-2"
               data-testid="saldo-total-agregado"
@@ -328,7 +345,33 @@ export default function SocioDashboardPage() {
                 ? formatCurrency(saldoAgregado.totalVES, 'VES')
                 : formatCurrency(saldoAgregado.totalUSD, 'USD')}
             </p>
+          ) : debeMostrarFallback ? (
+            // Caso 3: fallback transparente sin tasa
+            <div data-testid="saldo-total-fallback" className="mb-2">
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                {saldosPorMoneda.ves > 0 && (
+                  <span className="text-3xl lg:text-4xl font-bold tracking-tight">
+                    {formatCurrency(saldosPorMoneda.ves, 'VES')}
+                  </span>
+                )}
+                {saldosPorMoneda.ves > 0 && saldosPorMoneda.usd > 0 && (
+                  <span className="text-2xl text-white/40">·</span>
+                )}
+                {saldosPorMoneda.usd > 0 && (
+                  <span className="text-3xl lg:text-4xl font-bold tracking-tight">
+                    {formatCurrency(saldosPorMoneda.usd, 'USD')}
+                  </span>
+                )}
+                {/* Edge: si ambos son 0 pero hay cuentas con saldo en otras monedas */}
+                {saldosPorMoneda.ves === 0 && saldosPorMoneda.usd === 0 && (
+                  <span className="text-3xl lg:text-4xl font-bold tracking-tight">
+                    Sin saldo
+                  </span>
+                )}
+              </div>
+            </div>
           ) : (
+            // Caso 1: cargando
             <div
               data-testid="saldo-total-loading"
               aria-label="Cargando saldo total"
@@ -336,16 +379,19 @@ export default function SocioDashboardPage() {
             />
           )}
 
-          {/* Info de tasa usada para la conversión (transparencia) */}
-          {tasaActual && (
+          {/* Info debajo del saldo: tasa BCV cuando hay agregado, o aviso de fallback */}
+          {tasaActual && saldoAgregado && (
             <p className="text-xs text-white/50 mb-6">
               Tasa BCV {tasaActual.fecha}: 1 USD = Bs {tasaActual.tasaVenta.toFixed(2)} ·
               {' '}
-              {monedaVista === 'VES' && saldoAgregado
+              {monedaVista === 'VES'
                 ? <>Equivale a <span className="text-white/80">{formatCurrency(saldoAgregado.totalUSD, 'USD')}</span></>
-                : monedaVista === 'USD' && saldoAgregado
-                ? <>Equivale a <span className="text-white/80">{formatCurrency(saldoAgregado.totalVES, 'VES')}</span></>
-                : null}
+                : <>Equivale a <span className="text-white/80">{formatCurrency(saldoAgregado.totalVES, 'VES')}</span></>}
+            </p>
+          )}
+          {debeMostrarFallback && (
+            <p className="text-xs text-white/50 mb-6">
+              Tasa BCV no disponible — saldos mostrados por moneda
             </p>
           )}
 
