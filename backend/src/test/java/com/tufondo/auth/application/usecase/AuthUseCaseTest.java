@@ -31,6 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -158,6 +160,59 @@ class AuthUseCaseTest {
                 .isInstanceOf(CredencialesInvalidasException.class);
 
         verify(auditService).logLoginFallido(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Issue #206: login con usuario inexistente ejecuta dummy passwordEncoder.matches (anti timing-attack)")
+    void login_usuario_inexistente_ejecuta_dummy_password_matches() {
+        // Arrange: usuario no existe ni por nombre ni por correo
+        when(usuarioRepository.buscarPorNombreUsuario("admin_test"))
+                .thenReturn(Optional.empty());
+        when(usuarioRepository.buscarPorCorreoElectronico("admin_test"))
+                .thenReturn(Optional.empty());
+
+        // Act
+        assertThatThrownBy(() -> authUseCase.login(loginRequest))
+                .isInstanceOf(CredencialesInvalidasException.class)
+                .hasMessage("Credenciales inválidas");
+
+        // Assert: passwordEncoder.matches debe haberse ejecutado UNA vez con el hash
+        // dummy. Sin esto, el atacante distingue "user no existe" (rápido) vs
+        // "password mala" (lento por BCrypt) por timing.
+        verify(passwordEncoder).matches(eq("password123"), startsWith("$2"));
+    }
+
+    @Test
+    @DisplayName("Issue #206: mensaje de login fallido por usuario inexistente es idéntico al de password incorrecta")
+    void login_usuario_inexistente_y_password_mala_producen_mismo_mensaje() {
+        // Caso A: usuario no existe
+        when(usuarioRepository.buscarPorNombreUsuario("admin_test"))
+                .thenReturn(Optional.empty(), Optional.of(usuarioTest));  // 1ra llamada vacía, 2da con user
+        when(usuarioRepository.buscarPorCorreoElectronico("admin_test"))
+                .thenReturn(Optional.empty());
+        when(passwordEncoder.matches(eq("password123"), startsWith("$2"))).thenReturn(false);
+        when(passwordEncoder.matches("password123", "passwordhash")).thenReturn(false);
+
+        String msgUsuarioInexistente = null;
+        String msgPasswordMala = null;
+
+        try {
+            authUseCase.login(loginRequest);
+        } catch (CredencialesInvalidasException e) {
+            msgUsuarioInexistente = e.getMessage();
+        }
+
+        // Caso B: usuario existe pero password mala (segunda llamada al stub)
+        try {
+            authUseCase.login(loginRequest);
+        } catch (CredencialesInvalidasException e) {
+            msgPasswordMala = e.getMessage();
+        }
+
+        assertThat(msgUsuarioInexistente)
+                .as("Ambos casos deben tirar la misma excepción con el mismo mensaje (anti-enumeración)")
+                .isNotNull()
+                .isEqualTo(msgPasswordMala);
     }
 
     @Test
