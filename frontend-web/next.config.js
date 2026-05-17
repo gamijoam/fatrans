@@ -18,6 +18,13 @@ const nextConfig = {
   images: {
     domains: ['localhost', 'minio', 'fatrans.com.ve'],
     formats: ['image/webp', 'image/avif'],
+    // Permite SVG locales (logo institucional Fatrans). El CSP restrictivo
+    // evita ejecución de scripts embebidos en SVGs maliciosos. Solo se
+    // aceptan SVGs servidos desde nuestro propio /public — los uploads de
+    // usuario siguen rechazándose en otros endpoints (documentospdf, KYC).
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   async headers() {
     return [

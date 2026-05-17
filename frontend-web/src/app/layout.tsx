@@ -7,8 +7,34 @@ import { CookieConsentBanner } from '@/components/legal/cookie-consent-banner';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'FATTRANS - Fondo de Ahorro',
-  description: 'Plataforma digital de gestión de fondo de ahorro',
+  // Plantilla: cada page puede definir `title: "X"` y se renderiza como
+  // "X · Fatrans". Si una page no define title, queda el default.
+  title: {
+    default: 'Fatrans · Asociación de Ahorro y Crédito',
+    template: '%s · Fatrans',
+  },
+  description:
+    'Asociación de Ahorro y Crédito Fatrans (RIF J-50516835-5). Plataforma digital para socios del sector transporte: ahorro, créditos y servicios financieros en Venezuela.',
+  applicationName: 'Fatrans',
+  // Iconos servidos desde frontend-web/src/app/ (Next.js 14 los detecta
+  // automáticamente: icon.png → favicon, apple-icon.png → iOS).
+  // Fallback explícito a /logo-fatrans.svg por si el navegador no lee
+  // los conventional icons.
+  icons: {
+    icon: [
+      { url: '/logo-fatrans.svg', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/logo-fatrans.svg', type: 'image/png' },
+    ],
+    shortcut: '/logo-fatrans.svg',
+  },
+  openGraph: {
+    title: 'Fatrans · Asociación de Ahorro y Crédito',
+    description: 'Plataforma digital para socios del sector transporte venezolano.',
+    siteName: 'Fatrans',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({
