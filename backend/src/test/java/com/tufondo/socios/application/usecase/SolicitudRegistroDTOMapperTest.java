@@ -59,6 +59,7 @@ class SolicitudRegistroDTOMapperTest {
                 .emergenciaParentesco("Cónyuge")
                 .aceptaTerminos(true)
                 .aceptaLopdp(true)
+                .aceptaLocdoft(true)
                 .estado(EstadoSolicitud.APROBADA)
                 .fechaSolicitud(fechaSolicitud)
                 .fechaRevision(fechaRevision)

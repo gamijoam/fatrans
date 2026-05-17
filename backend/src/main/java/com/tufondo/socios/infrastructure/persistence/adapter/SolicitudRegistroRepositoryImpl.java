@@ -105,9 +105,11 @@ public class SolicitudRegistroRepositoryImpl implements SolicitudRegistroReposit
                 .motivoRechazo(domain.getMotivoRechazo())
                 .aceptaTerminos(domain.getAceptaTerminos())
                 .aceptaLopdp(domain.getAceptaLopdp())
+                .aceptaLocdoft(domain.getAceptaLocdoft())
                 .ipRegistro(domain.getIpRegistro())
                 .userAgentRegistro(domain.getUserAgentRegistro())
                 .consentLopdpTimestamp(domain.getConsentLopdpTimestamp())
+                .consentLocdoftTimestamp(domain.getConsentLocdoftTimestamp())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .build();
@@ -144,9 +146,11 @@ public class SolicitudRegistroRepositoryImpl implements SolicitudRegistroReposit
                 .motivoRechazo(entity.getMotivoRechazo())
                 .aceptaTerminos(entity.getAceptaTerminos())
                 .aceptaLopdp(entity.getAceptaLopdp())
+                .aceptaLocdoft(entity.getAceptaLocdoft())
                 .ipRegistro(entity.getIpRegistro())
                 .userAgentRegistro(entity.getUserAgentRegistro())
                 .consentLopdpTimestamp(entity.getConsentLopdpTimestamp())
+                .consentLocdoftTimestamp(entity.getConsentLocdoftTimestamp())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();

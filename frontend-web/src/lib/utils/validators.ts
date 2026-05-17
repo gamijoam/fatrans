@@ -167,6 +167,13 @@ export const registroSchema = z.object({
   aceptaLopdp: z.literal(true, {
     errorMap: () => ({ message: 'Debe aceptar la política de protección de datos' }),
   }),
+  // Issue #218 PR-B — declaración jurada LOCDOFT (origen lícito de fondos).
+  // Obligación de Ley Orgánica contra la Delincuencia Organizada y
+  // Financiamiento al Terrorismo. Los sujetos obligados (Fatrans lo es como
+  // fondo de ahorro) deben recolectar esta declaración al onboarding.
+  aceptaLocdoft: z.literal(true, {
+    errorMap: () => ({ message: 'Debe declarar que los fondos provienen de actividades lícitas (LOCDOFT)' }),
+  }),
 });
 
 export type RegistroFormData = z.infer<typeof registroSchema>;

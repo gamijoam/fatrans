@@ -69,6 +69,8 @@ public class SolicitudRegistroResponseDTO {
     // --- Consentimientos legales ---
     private Boolean aceptaTerminos;
     private Boolean aceptaLopdp;
+    /** Declaración LOCDOFT (#218 PR-B) — origen lícito de fondos. */
+    private Boolean aceptaLocdoft;
 
     // --- Estado y trazabilidad de revisión ---
     private EstadoSolicitud estado;

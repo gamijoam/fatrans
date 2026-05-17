@@ -65,11 +65,16 @@ public class CrearSolicitudRegistroUseCase {
                 .emergenciaParentesco(request.getEmergenciaParentesco())
                 .aceptaTerminos(request.getAceptaTerminos())
                 .aceptaLopdp(request.getAceptaLopdp())
+                .aceptaLocdoft(request.getAceptaLocdoft())
                 .ipRegistro(request.getIpRegistro())
                 .userAgentRegistro(request.getUserAgentRegistro())
                 // Sello de tiempo del consentimiento LOPDP: SOLO si el usuario aceptó.
                 // No confiamos en el cliente para esto — siempre Instant.now() server-side.
                 .consentLopdpTimestamp(Boolean.TRUE.equals(request.getAceptaLopdp()) ? Instant.now() : null)
+                // Sello de tiempo del consentimiento LOCDOFT (#218 PR-B). Mismo patrón.
+                // Trazabilidad legal: junto con ipRegistro + userAgentRegistro forma la
+                // prueba documental de la declaración jurada del origen de fondos.
+                .consentLocdoftTimestamp(Boolean.TRUE.equals(request.getAceptaLocdoft()) ? Instant.now() : null)
                 .estado(EstadoSolicitud.PENDIENTE)
                 .fechaSolicitud(LocalDateTime.now())
                 .build();

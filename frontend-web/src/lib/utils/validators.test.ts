@@ -18,6 +18,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test C.A.',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -35,6 +36,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test C.A.',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(false);
     });
@@ -56,6 +58,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -73,6 +76,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -90,6 +94,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(false);
     });
@@ -111,6 +116,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -128,6 +134,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -145,6 +152,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -162,6 +170,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(false);
     });
@@ -179,6 +188,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(false);
     });
@@ -200,6 +210,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -217,6 +228,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(false);
     });
@@ -247,6 +259,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
       empresa: 'Empresa Test',
       aceptaTerminos: true as const,
       aceptaLopdp: true as const,
+      aceptaLocdoft: true as const,
     };
 
     it('Issue #204: persona con exactamente 18 años recién cumplidos pasa', () => {
@@ -303,6 +316,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -320,6 +334,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(false);
     });
@@ -341,6 +356,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -358,6 +374,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -380,6 +397,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         rifEmpresa: 'J-123456789-0',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -398,6 +416,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         rifEmpresa: 'V-12345678',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -416,6 +435,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         rifEmpresa: '',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -437,6 +457,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -454,6 +475,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(false);
     });
@@ -471,6 +493,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -488,6 +511,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -505,6 +529,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(false);
     });
@@ -526,6 +551,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -543,6 +569,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: false,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(false);
     });
@@ -560,6 +587,43 @@ describe('registroSchema - Validaciones Issue #99', () => {
         empresa: 'Empresa Test',
         aceptaTerminos: true,
         aceptaLopdp: false,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    // Issue #218 PR-B — la declaración LOCDOFT es obligatoria
+    it('aceptaLocdoft false falla', () => {
+      const result = registroSchema.safeParse({
+        nombreCompleto: 'Juan Pérez',
+        tipoDocumento: 'CEDULA',
+        cedula: 'V-12345678',
+        fechaNacimiento: '1990-01-15',
+        genero: 'MASCULINO',
+        estadoCivil: 'SOLTERO',
+        correoElectronico: 'juan@test.com',
+        telefono: '04121234567',
+        empresa: 'Empresa Test',
+        aceptaTerminos: true,
+        aceptaLopdp: true,
+        aceptaLocdoft: false,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('aceptaLocdoft omitido falla (es obligatorio)', () => {
+      const result = registroSchema.safeParse({
+        nombreCompleto: 'Juan Pérez',
+        tipoDocumento: 'CEDULA',
+        cedula: 'V-12345678',
+        fechaNacimiento: '1990-01-15',
+        genero: 'MASCULINO',
+        estadoCivil: 'SOLTERO',
+        correoElectronico: 'juan@test.com',
+        telefono: '04121234567',
+        empresa: 'Empresa Test',
+        aceptaTerminos: true,
+        aceptaLopdp: true,
+        // aceptaLocdoft: omitido
       });
       expect(result.success).toBe(false);
     });
@@ -585,6 +649,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         direccionCalle: 'Av. Principal #123',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -603,6 +668,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         direccionEstado: 'Zulia',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });
@@ -627,6 +693,7 @@ describe('registroSchema - Validaciones Issue #99', () => {
         emergenciaParentesco: 'Cónyuge',
         aceptaTerminos: true,
         aceptaLopdp: true,
+        aceptaLocdoft: true,
       });
       expect(result.success).toBe(true);
     });

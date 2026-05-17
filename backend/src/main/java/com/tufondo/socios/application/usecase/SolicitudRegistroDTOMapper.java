@@ -51,6 +51,7 @@ public class SolicitudRegistroDTOMapper {
                 // Consentimientos
                 .aceptaTerminos(solicitud.getAceptaTerminos())
                 .aceptaLopdp(solicitud.getAceptaLopdp())
+                .aceptaLocdoft(solicitud.getAceptaLocdoft())
                 // Trazabilidad
                 .estado(solicitud.getEstado())
                 .fechaSolicitud(solicitud.getFechaSolicitud())

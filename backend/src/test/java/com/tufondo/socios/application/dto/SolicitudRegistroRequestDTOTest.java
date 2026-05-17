@@ -53,6 +53,7 @@ class SolicitudRegistroRequestDTOTest {
                 .emergenciaParentesco("Cónyuge")
                 .aceptaTerminos(true)
                 .aceptaLopdp(true)
+                .aceptaLocdoft(true)
                 .build();
     }
 
@@ -236,16 +237,40 @@ class SolicitudRegistroRequestDTOTest {
             assertThat(violations).contains("aceptaLopdp");
         }
 
+        // Issue #218 PR-B — la declaración LOCDOFT es obligatoria
+        @Test
+        @DisplayName("AceptaLocdoft false debe fallar")
+        void aceptaLocdoftFalse_Falla() {
+            SolicitudRegistroRequestDTO request = createValidRequest();
+            request.setAceptaLocdoft(false);
+            Set<String> violations = validator.validate(request).stream()
+                    .map(v -> v.getPropertyPath().toString())
+                    .collect(java.util.stream.Collectors.toSet());
+            assertThat(violations).contains("aceptaLocdoft");
+        }
+
+        @Test
+        @DisplayName("AceptaLocdoft null debe fallar")
+        void aceptaLocdoftNull_Falla() {
+            SolicitudRegistroRequestDTO request = createValidRequest();
+            request.setAceptaLocdoft(null);
+            Set<String> violations = validator.validate(request).stream()
+                    .map(v -> v.getPropertyPath().toString())
+                    .collect(java.util.stream.Collectors.toSet());
+            assertThat(violations).contains("aceptaLocdoft");
+        }
+
         @Test
         @DisplayName("Consentimientos null deben fallar")
         void consentimientosNull_Fallan() {
             SolicitudRegistroRequestDTO request = createValidRequest();
             request.setAceptaTerminos(null);
             request.setAceptaLopdp(null);
+            request.setAceptaLocdoft(null);
             Set<String> violations = validator.validate(request).stream()
                     .map(v -> v.getPropertyPath().toString())
                     .collect(java.util.stream.Collectors.toSet());
-            assertThat(violations).contains("aceptaTerminos", "aceptaLopdp");
+            assertThat(violations).contains("aceptaTerminos", "aceptaLopdp", "aceptaLocdoft");
         }
     }
 
