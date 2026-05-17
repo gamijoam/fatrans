@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,17 +9,16 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ArrowDownToLine, ArrowUpFromLine, ArrowRight, FileDown } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, ArrowRight, FileDown, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 /**
  * Modal de detalle de un movimiento (issue #220).
  *
- * Muestra todos los campos relevantes de un movimiento individual
- * agrupados en secciones (datos básicos, referencias, saldos, canal).
- *
- * Botón "Descargar comprobante" queda como placeholder deshabilitado
- * — el endpoint backend que genera el comprobante PDF se entregará en
- * un PR-B siguiente del mismo issue.
+ * Muestra todos los campos del movimiento agrupados en secciones (datos
+ * básicos, referencias, saldos, canal). El botón "Descargar comprobante"
+ * llama al BFF `/api/cuentas/{n}/movimientos/{op}/comprobante` que a su
+ * vez pide al backend regenerar el PDF on-demand (issue #220 PR-B).
  */
 
 export interface MovimientoDetail {
@@ -39,6 +39,8 @@ export interface MovimientoDetail {
 interface Props {
   movimiento: MovimientoDetail | null;
   moneda: string;
+  /** Número de cuenta para construir la URL del comprobante. */
+  numeroCuenta: string;
   onClose: () => void;
 }
 
@@ -103,11 +105,51 @@ const etiquetaEstado = (estado: string): { texto: string; clase: string } => {
   }
 };
 
-export function MovimientoDetailModal({ movimiento, moneda, onClose }: Props) {
+export function MovimientoDetailModal({ movimiento, moneda, numeroCuenta, onClose }: Props) {
   const open = movimiento !== null;
   const esDeposito = movimiento?.tipo === 'DEPOSITO';
   const delta = movimiento ? movimiento.saldoPosterior - movimiento.saldoAnterior : 0;
   const estadoUi = movimiento ? etiquetaEstado(movimiento.estado) : null;
+  const [descargando, setDescargando] = useState(false);
+
+  const handleDescargar = async () => {
+    if (!movimiento || descargando) return;
+    setDescargando(true);
+    try {
+      const res = await fetch(
+        `/api/cuentas/${encodeURIComponent(numeroCuenta)}/movimientos/${encodeURIComponent(movimiento.numeroOperacion)}/comprobante`,
+      );
+      if (!res.ok) {
+        let msg = `No se pudo descargar el comprobante (HTTP ${res.status})`;
+        try {
+          const body = await res.json();
+          if (body?.message) msg = body.message;
+        } catch {
+          /* respuesta sin body JSON */
+        }
+        toast.error(msg);
+        return;
+      }
+      // Disparar descarga del blob via <a download>
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Comprobante_${movimiento.numeroOperacion}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Liberar memoria del object URL tras un pequeño delay para que el navegador
+      // tenga tiempo de iniciar la descarga
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success('Comprobante descargado');
+    } catch (err) {
+      console.error('Error descargando comprobante:', err);
+      toast.error('Error de red al descargar el comprobante');
+    } finally {
+      setDescargando(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -236,12 +278,22 @@ export function MovimientoDetailModal({ movimiento, moneda, onClose }: Props) {
             <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row gap-2 sm:justify-end">
               <Button
                 variant="outline"
-                disabled
-                title="Disponible próximamente — pendiente endpoint backend (issue #220 PR-B)"
+                onClick={handleDescargar}
+                disabled={descargando}
+                aria-label={`Descargar comprobante PDF del movimiento ${movimiento.numeroOperacion}`}
                 className="gap-2"
               >
-                <FileDown className="w-4 h-4" aria-hidden="true" />
-                Descargar comprobante
+                {descargando ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                    Generando...
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="w-4 h-4" aria-hidden="true" />
+                    Descargar comprobante
+                  </>
+                )}
               </Button>
               <Button onClick={onClose} className="bg-[#16A34A] hover:bg-green-700">
                 Cerrar

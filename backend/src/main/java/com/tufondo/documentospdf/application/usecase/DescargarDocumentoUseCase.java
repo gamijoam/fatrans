@@ -93,6 +93,12 @@ public class DescargarDocumentoUseCase {
             case CONTRATO_ADHESION -> "bucket-contratos";
             case PAGARE -> "bucket-pagares";
             case TABLA_AMORTIZACION -> "bucket-creditos";
+            // COMPROBANTE_MOVIMIENTO (issue #220) NO se persiste — se regenera
+            // on-demand desde el movimiento. Si llega aquí, es un bug: un
+            // comprobante nunca debería estar guardado en la tabla documentos.
+            case COMPROBANTE_MOVIMIENTO -> throw new IllegalStateException(
+                    "COMPROBANTE_MOVIMIENTO no se persiste; este flujo solo aplica "
+                            + "a documentos almacenados. Use el endpoint /movimientos/{op}/comprobante.");
         };
     }
 }

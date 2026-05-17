@@ -45,6 +45,7 @@ public class AhorroController {
     private final RealizarRetiroUseCase realizarRetiroUseCase;
     private final ListarMovimientosUseCase listarMovimientosUseCase;
     private final ObtenerMovimientoDetalleUseCase obtenerMovimientoDetalleUseCase;
+    private final GenerarComprobanteMovimientoUseCase generarComprobanteMovimientoUseCase;
     private final CalcularRendimientoUseCase calcularRendimientoUseCase;
     private final ListarRendimientosUseCase listarRendimientosUseCase;
     private final CerrarCuentaUseCase cerrarCuentaUseCase;
@@ -173,6 +174,29 @@ public class AhorroController {
         MovimientoResponse response = obtenerMovimientoDetalleUseCase.ejecutar(
                 numeroCuenta, numeroOperacion, socioIdToken, isAdmin);
         return ResponseEntity.ok(response);
+    }
+
+    // 8b. GET /cuentas/{numeroCuenta}/movimientos/{numeroOperacion}/comprobante - Comprobante PDF (#220 PR-B)
+    @GetMapping("/{numeroCuenta}/movimientos/{numeroOperacion}/comprobante")
+    @Operation(summary = "Descargar comprobante PDF del movimiento")
+    public ResponseEntity<byte[]> descargarComprobanteMovimiento(
+            @PathVariable String numeroCuenta,
+            @PathVariable String numeroOperacion,
+            Authentication authentication) {
+        UUID socioIdToken = extraerSocioId(authentication);
+        boolean isAdmin = esAdmin(authentication);
+        byte[] pdfBytes = generarComprobanteMovimientoUseCase.ejecutar(
+                numeroCuenta, numeroOperacion, socioIdToken, isAdmin);
+
+        String filename = String.format("Comprobante_%s.pdf", numeroOperacion);
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE,
+                        org.springframework.http.MediaType.APPLICATION_PDF_VALUE)
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\"")
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL,
+                        "no-store, no-cache, must-revalidate, private")
+                .body(pdfBytes);
     }
 
     // 9. POST /cuentas/{numeroCuenta}/rendimientos/calcular - Calcular Rendimiento
