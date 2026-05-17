@@ -14,13 +14,17 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Adaptador para el puerto SocioQueryPort.
- * Provee datos del módulo Socios para el módulo Documentos PDF.
+ * Adaptador del puerto {@link SocioQueryPort}.
  *
- * NOTA: El método obtenerSocioIdPorCuenta() requiere la relación cuenta-socio
- * que actualmente no está expuesta. Sin embargo, el flujo actual de
- * GenerarEstadoCuentaUseCase obtiene el socioId directamente de
- * CuentaQueryPort.obtenerDatosCuenta(), por lo que este método no es necesario.
+ * <p>Provee datos del módulo Socios al módulo Documentos PDF (constancia
+ * de afiliación, contrato de adhesión, etc.) sin que ese módulo dependa
+ * del modelo de dominio interno de {@code socios}.</p>
+ *
+ * <p><strong>Historia (#199):</strong> este adapter tenía un método
+ * {@code obtenerSocioIdPorCuenta(UUID)} que era un stub sin callers
+ * reales (lanzaba {@code OperacionNoDisponibleException}). Se eliminó
+ * junto con la inner exception class — ver JavaDoc del puerto para la
+ * justificación arquitectónica.</p>
  */
 @Slf4j
 @Service
@@ -28,24 +32,6 @@ import java.util.UUID;
 public class SocioQueryPortAdapter implements SocioQueryPort {
 
     private final SocioJpaRepository socioJpaRepository;
-
-    /**
-     * Obtiene el socioId por cuentaId.
-     *
-     * NOTA: Este método requiere que el módulo Ahorros exponga la relación.
-     * El flujo actual de documentos obtiene socioId desde CuentaQueryPort,
-     * por lo que este método podría no ser necesario.
-     *
-     * @throws OperacionNoDisponibleException si la relación no está implementada
-     */
-    @Override
-    public UUID obtenerSocioIdPorCuenta(UUID cuentaId) {
-        log.warn("METODO NO IMPLEMENTADO: obtenerSocioIdPorCuenta({})", cuentaId);
-        log.warn("El flujo de generación de estados de cuenta obtiene socioId desde CuentaQueryPort");
-        throw new OperacionNoDisponibleException(
-                "No disponible: La relación cuenta-socio debe ser implementada por el módulo Ahorros. " +
-                "Use CuentaQueryPort.obtenerDatosCuenta() que ya retorna socioId.");
-    }
 
     @Override
     public boolean existeSocio(UUID socioId) {
@@ -109,14 +95,5 @@ public class SocioQueryPortAdapter implements SocioQueryPort {
             sb.append(" ").append(socio.getSegundoApellido());
         }
         return sb.toString().trim();
-    }
-
-    /**
-     * Excepción para operaciones no disponibles.
-     */
-    public static class OperacionNoDisponibleException extends RuntimeException {
-        public OperacionNoDisponibleException(String mensaje) {
-            super(mensaje);
-        }
     }
 }
