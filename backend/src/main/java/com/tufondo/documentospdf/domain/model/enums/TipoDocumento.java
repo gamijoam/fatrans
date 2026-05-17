@@ -11,7 +11,13 @@ public enum TipoDocumento {
     CONTRATO_ADHESION("Contrato de Adhesión", true),
     PAGARE("Pagaré de Crédito", true),
     TABLA_AMORTIZACION("Tabla de Amortización", false),
-    CARTA_BENEFICIARIOS("Carta de Beneficiarios", false);
+    CARTA_BENEFICIARIOS("Carta de Beneficiarios", false),
+    /**
+     * Comprobante on-demand de un movimiento individual (issue #220).
+     * NO se persiste en MinIO — se regenera cada vez desde el movimiento
+     * almacenado (que es la fuente de verdad inmutable, RN-006).
+     */
+    COMPROBANTE_MOVIMIENTO("Comprobante de Movimiento", false);
 
     private final String descripcion;
     private final boolean requiereFirmaDigital;

@@ -484,6 +484,7 @@ export default function MovimientosPage() {
       <MovimientoDetailModal
         movimiento={selectedMov}
         moneda={moneda}
+        numeroCuenta={numeroCuenta}
         onClose={() => setSelectedMov(null)}
       />
     </div>
