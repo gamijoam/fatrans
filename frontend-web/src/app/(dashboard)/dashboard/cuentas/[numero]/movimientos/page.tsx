@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { MovimientoDetailModal } from '@/components/features/cuentas/movimiento-detail-modal';
 
 interface Movimiento {
   id: string;
@@ -90,8 +91,16 @@ export default function MovimientosPage() {
   const [tipoFiltro, setTipoFiltro] = useState<string>('');
   const [fechaInicio, setFechaInicio] = useState<string>('');
   const [fechaFin, setFechaFin] = useState<string>('');
+  // Filtros de monto: aplicados client-side sobre la página actual. Si en el
+  // futuro se necesita filtrar sobre todo el histórico, mover a backend (PR-B
+  // del issue #220).
+  const [montoMinimo, setMontoMinimo] = useState<string>('');
+  const [montoMaximo, setMontoMaximo] = useState<string>('');
 
   const [totales, setTotales] = useState({ depositos: 0, retiros: 0 });
+
+  // Movimiento seleccionado para el modal de detalle (issue #220).
+  const [selectedMov, setSelectedMov] = useState<Movimiento | null>(null);
 
   useEffect(() => {
     if (!numeroCuenta || isLoading) return;
@@ -158,10 +167,36 @@ export default function MovimientosPage() {
     setTipoFiltro('');
     setFechaInicio('');
     setFechaFin('');
+    setMontoMinimo('');
+    setMontoMaximo('');
     setPage(0);
   };
 
   const moneda = cuenta?.moneda || 'VES';
+
+  // Filtro de monto client-side sobre la página actual.
+  // Justificación de scope: la página trae 10 movimientos por defecto,
+  // filtrar 10 en cliente es razonable y evita un round-trip extra.
+  // Si en el futuro se necesita filtrar sobre todo el histórico, se mueve
+  // a backend (PR-B del issue #220) extendiendo el endpoint de movimientos.
+  const movimientosFiltrados = useMemo(() => {
+    const min = montoMinimo ? parseFloat(montoMinimo) : null;
+    const max = montoMaximo ? parseFloat(montoMaximo) : null;
+    // Si ningún filtro de monto es válido, devolver el array original
+    if ((min === null || isNaN(min)) && (max === null || isNaN(max))) {
+      return movimientos;
+    }
+    return movimientos.filter((m) => {
+      const monto = Number(m.monto);
+      if (min !== null && !isNaN(min) && monto < min) return false;
+      if (max !== null && !isNaN(max) && monto > max) return false;
+      return true;
+    });
+  }, [movimientos, montoMinimo, montoMaximo]);
+
+  const hayFiltroMontoActivo =
+    (montoMinimo !== '' && !isNaN(parseFloat(montoMinimo))) ||
+    (montoMaximo !== '' && !isNaN(parseFloat(montoMaximo)));
 
   if (loading) {
     return (
@@ -209,7 +244,7 @@ export default function MovimientosPage() {
           <CardTitle className="text-lg">Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="tipo">Tipo de Movimiento</Label>
               <select
@@ -241,6 +276,37 @@ export default function MovimientosPage() {
                 value={fechaFin}
                 onChange={(e) => setFechaFin(e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="monto-minimo">Monto mínimo</Label>
+              <Input
+                id="monto-minimo"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                aria-describedby="monto-help"
+                value={montoMinimo}
+                onChange={(e) => setMontoMinimo(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="monto-maximo">Monto máximo</Label>
+              <Input
+                id="monto-maximo"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                placeholder="Sin límite"
+                aria-describedby="monto-help"
+                value={montoMaximo}
+                onChange={(e) => setMontoMaximo(e.target.value)}
+              />
+              <p id="monto-help" className="text-xs text-gray-500">
+                Filtra solo la página actual
+              </p>
             </div>
             <div className="flex items-end gap-2">
               <Button
@@ -302,15 +368,25 @@ export default function MovimientosPage() {
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-green-600" />
             </div>
-          ) : movimientos.length === 0 ? (
+          ) : movimientosFiltrados.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 mb-4">No hay movimientos que coincidan con los filtros</p>
+              <p className="text-gray-500 mb-4">
+                {hayFiltroMontoActivo && movimientos.length > 0
+                  ? 'Ningún movimiento de la página actual coincide con el filtro de monto. Intenta cambiar de página o ajustar el rango.'
+                  : 'No hay movimientos que coincidan con los filtros'}
+              </p>
               <Button variant="outline" onClick={limpiarFiltros}>
                 Limpiar filtros
               </Button>
             </div>
           ) : (
             <>
+              {hayFiltroMontoActivo && (
+                <p className="mb-3 text-xs text-gray-500" role="status">
+                  Mostrando {movimientosFiltrados.length} de {movimientos.length} movimientos
+                  de la página actual (filtro de monto aplicado en cliente).
+                </p>
+              )}
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -324,8 +400,21 @@ export default function MovimientosPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {movimientos.map((mov) => (
-                      <tr key={mov.id} className="border-b hover:bg-gray-50">
+                    {movimientosFiltrados.map((mov) => (
+                      <tr
+                        key={mov.id}
+                        className="border-b hover:bg-gray-50 cursor-pointer focus:outline-none focus:bg-gray-50"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Ver detalle del movimiento ${mov.numeroOperacion}`}
+                        onClick={() => setSelectedMov(mov)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedMov(mov);
+                          }
+                        }}
+                      >
                         <td className="py-3 px-3 text-sm">
                           <div>{formatFechaCorta(mov.fechaMovimiento)}</div>
                           <div className="text-gray-400 text-xs">{mov.numeroOperacion}</div>
@@ -391,6 +480,12 @@ export default function MovimientosPage() {
           )}
         </CardContent>
       </Card>
+
+      <MovimientoDetailModal
+        movimiento={selectedMov}
+        moneda={moneda}
+        onClose={() => setSelectedMov(null)}
+      />
     </div>
   );
 }
