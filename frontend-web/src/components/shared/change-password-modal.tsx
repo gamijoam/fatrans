@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2, Lock, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface ChangePasswordModalProps {
   open: boolean;
@@ -29,7 +30,11 @@ export function ChangePasswordModal({ open }: ChangePasswordModalProps) {
   const [timeRemaining, setTimeRemaining] = useState(SESSION_TIMEOUT_MS);
 
   const handleTimeout = useCallback(async () => {
-    alert('Sesión expirada. Por seguridad, debe cambiar su contraseña.');
+    // Issue #219: reemplaza `alert()` nativo por toast.
+    toast.error('Sesión expirada', {
+      description: 'Por seguridad, debes cambiar tu contraseña al iniciar sesión nuevamente.',
+      duration: 5000,
+    });
     await logout();
     window.location.href = '/login';
   }, [logout]);

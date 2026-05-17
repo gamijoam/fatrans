@@ -9,9 +9,10 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ProfileFormData } from '@/lib/utils/validators';
+import { enmascararCedula } from '@/lib/utils/enmascarar-cedula';
 
 interface SocioData {
   id: string;
@@ -62,6 +63,8 @@ export default function PerfilPage() {
   const [socio, setSocio] = useState<SocioData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  // Issue #219: toggle para mostrar/ocultar cédula completa (anti shoulder-surfing)
+  const [mostrarCedulaCompleta, setMostrarCedulaCompleta] = useState(false);
   const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
@@ -122,6 +125,12 @@ export default function PerfilPage() {
   const estadoBadgeVariant = socio.estado === 'ACTIVO' ? 'default' : 'secondary';
   const initials = `${socio.primerNombre[0] || ''}${socio.primerApellido[0] || ''}`.toUpperCase();
 
+  // Issue #219: cédula enmascarada con toggle (estilo banca)
+  const cedulaCompleta = `${socio.tipoDocumento}-${socio.numeroDocumento}`;
+  const cedulaParaMostrar = mostrarCedulaCompleta
+    ? cedulaCompleta
+    : enmascararCedula(cedulaCompleta);
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -144,9 +153,22 @@ export default function PerfilPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-sm space-y-2">
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-gray-500">Documento:</span>
-                <span className="font-medium">{socio.tipoDocumento} {socio.numeroDocumento}</span>
+                <span className="flex items-center gap-2">
+                  <span className="font-medium font-mono">{cedulaParaMostrar}</span>
+                  <button
+                    type="button"
+                    onClick={() => setMostrarCedulaCompleta((v) => !v)}
+                    className="text-gray-400 hover:text-gray-700 transition-colors p-1"
+                    aria-label={mostrarCedulaCompleta ? 'Ocultar cédula' : 'Mostrar cédula completa'}
+                    title={mostrarCedulaCompleta ? 'Ocultar cédula' : 'Mostrar cédula completa'}
+                  >
+                    {mostrarCedulaCompleta
+                      ? <EyeOff className="w-4 h-4" />
+                      : <Eye className="w-4 h-4" />}
+                  </button>
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Fecha Ingreso:</span>

@@ -3,7 +3,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
-import { Loader2, Wallet, CreditCard, Plus, ArrowUpRight, ArrowDownRight, Shield, FileText, Users, Calculator } from 'lucide-react';
+import {
+  Loader2, Wallet, CreditCard, Plus, ArrowUpRight, ArrowDownRight,
+  Shield, FileText, Users, Calculator, Eye, EyeOff,
+  AlertTriangle, Info, XOctagon, ChevronRight,
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useTipoCambio } from '@/hooks/useTipoCambio';
 import { calcularSaldoTotal, calcularSaldosPorMoneda } from '@/lib/utils/calcular-saldo-total';
@@ -19,7 +23,11 @@ import {
   type BeneficiarioApi,
 } from '@/lib/utils/parse-beneficiarios-response';
 import { decidirKycBanner, type KycBannerDecision } from '@/lib/utils/decidir-kyc-banner';
-import { AlertTriangle, Info, XOctagon, ChevronRight } from 'lucide-react';
+import {
+  leerSaldoOculto,
+  guardarSaldoOculto,
+  aplicarOcultarSaldo,
+} from '@/lib/utils/saldo-oculto-storage';
 
 interface CuentaAhorro {
   id: string;
@@ -269,6 +277,21 @@ export default function SocioDashboardPage() {
   // Toggle moneda de visualización (VES por defecto, mismo lado del país)
   const [monedaVista, setMonedaVista] = useState<'VES' | 'USD'>('VES');
 
+  // Issue #219: toggle ocultar saldo (persistido en localStorage)
+  // Empieza en `false` para que no haya mismatch SSR/CSR; en useEffect leemos
+  // el valor real del storage.
+  const [saldoOculto, setSaldoOculto] = useState<boolean>(false);
+  useEffect(() => {
+    setSaldoOculto(leerSaldoOculto());
+  }, []);
+  const toggleSaldoOculto = useCallback(() => {
+    setSaldoOculto((prev) => {
+      const nuevo = !prev;
+      guardarSaldoOculto(nuevo);
+      return nuevo;
+    });
+  }, []);
+
   // Issue #212: movimientos REALES (antes era `mockActividad` hardcoded)
   const [movimientos, setMovimientos] = useState<MovimientoApi[]>([]);
   const [loadingMovimientos, setLoadingMovimientos] = useState(true);
@@ -459,6 +482,15 @@ export default function SocioDashboardPage() {
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4 text-emerald-400" />
               <span className="text-xs font-medium text-white/60 uppercase tracking-wider">Saldo Total Disponible</span>
+              {/* Issue #219: toggle ocultar saldo (persistido) */}
+              <button
+                onClick={toggleSaldoOculto}
+                aria-label={saldoOculto ? 'Mostrar saldo' : 'Ocultar saldo'}
+                title={saldoOculto ? 'Mostrar saldo' : 'Ocultar saldo'}
+                className="text-white/60 hover:text-white transition-colors p-1"
+              >
+                {saldoOculto ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
             {/* Issue #213: toggle moneda de visualización */}
             <div
@@ -496,22 +528,25 @@ export default function SocioDashboardPage() {
                    separados (estilo Wise/Revolut) en vez de skeleton infinito.
           */}
           {saldoTotalListo && saldoAgregado ? (
-            // Caso 2: agregado correcto
+            // Caso 2: agregado correcto (con toggle ocultar #219)
             <p
               className="text-4xl lg:text-5xl font-bold tracking-tight mb-2"
               data-testid="saldo-total-agregado"
             >
-              {monedaVista === 'VES'
-                ? formatCurrency(saldoAgregado.totalVES, 'VES')
-                : formatCurrency(saldoAgregado.totalUSD, 'USD')}
+              {aplicarOcultarSaldo(
+                monedaVista === 'VES'
+                  ? formatCurrency(saldoAgregado.totalVES, 'VES')
+                  : formatCurrency(saldoAgregado.totalUSD, 'USD'),
+                saldoOculto
+              )}
             </p>
           ) : debeMostrarFallback ? (
-            // Caso 3: fallback transparente sin tasa
+            // Caso 3: fallback transparente sin tasa (con toggle ocultar #219)
             <div data-testid="saldo-total-fallback" className="mb-2">
               <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                 {saldosPorMoneda.ves > 0 && (
                   <span className="text-3xl lg:text-4xl font-bold tracking-tight">
-                    {formatCurrency(saldosPorMoneda.ves, 'VES')}
+                    {aplicarOcultarSaldo(formatCurrency(saldosPorMoneda.ves, 'VES'), saldoOculto)}
                   </span>
                 )}
                 {saldosPorMoneda.ves > 0 && saldosPorMoneda.usd > 0 && (
@@ -519,7 +554,7 @@ export default function SocioDashboardPage() {
                 )}
                 {saldosPorMoneda.usd > 0 && (
                   <span className="text-3xl lg:text-4xl font-bold tracking-tight">
-                    {formatCurrency(saldosPorMoneda.usd, 'USD')}
+                    {aplicarOcultarSaldo(formatCurrency(saldosPorMoneda.usd, 'USD'), saldoOculto)}
                   </span>
                 )}
                 {/* Edge: si ambos son 0 pero hay cuentas con saldo en otras monedas */}
