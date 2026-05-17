@@ -122,6 +122,13 @@
             <version>8.5.7</version>
         </dependency>
 
+        <!-- Jsoup - HTML parsing para scraper BCV (issue #231) -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.18.1</version>
+        </dependency>
+
         <!-- Flyway - Database Migration -->
         <dependency>
             <groupId>org.flywaydb</groupId>
