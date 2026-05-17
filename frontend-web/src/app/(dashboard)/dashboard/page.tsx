@@ -3,11 +3,21 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
-import { Loader2, Wallet, CreditCard, TrendingUp, Plus, ArrowUpRight, ArrowDownRight, Truck, AlertTriangle, Shield, ChevronRight, FileText, Calendar } from 'lucide-react';
+import { Loader2, Wallet, CreditCard, Plus, ArrowUpRight, ArrowDownRight, Shield, FileText, Users, Calculator } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useTipoCambio } from '@/hooks/useTipoCambio';
 import { calcularSaldoTotal, calcularSaldosPorMoneda } from '@/lib/utils/calcular-saldo-total';
 import { parseCuentasResponse } from '@/lib/utils/parse-cuentas-response';
+import {
+  parseMovimientosResponse,
+  type MovimientoApi,
+} from '@/lib/utils/parse-movimientos-response';
+import {
+  parseBeneficiariosResponse,
+  beneficiariosActivosOrdenados,
+  sumaPorcentajes,
+  type BeneficiarioApi,
+} from '@/lib/utils/parse-beneficiarios-response';
 
 interface CuentaAhorro {
   id: string;
@@ -16,15 +26,6 @@ interface CuentaAhorro {
   moneda: string;
   saldoActual: number;
   estado: string;
-}
-
-interface Actividad {
-  id: string;
-  tipo: 'DEPOSITO' | 'RETIRO' | 'INTERES';
-  descripcion: string;
-  monto: number;
-  fecha: string;
-  icono: string;
 }
 
 function formatCurrency(amount: number, currency: string = 'VES') {
@@ -95,79 +96,57 @@ function AccountCard({ cuenta }: { cuenta: CuentaAhorro }) {
   );
 }
 
-function QuickActionButton({ icon: Icon, label, onClick, color }: { icon: typeof Plus; label: string; onClick?: () => void; color: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all active:scale-95 min-w-[100px]"
-    >
+function QuickActionButton({
+  icon: Icon,
+  label,
+  href,
+  onClick,
+  color,
+}: {
+  icon: typeof Plus;
+  label: string;
+  href?: string;
+  onClick?: () => void;
+  color: string;
+}) {
+  const content = (
+    <>
       <div className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center`}>
         <Icon className="w-6 h-6 text-white" />
       </div>
       <span className="text-xs font-medium text-slate-700 text-center">{label}</span>
+    </>
+  );
+
+  const baseClass =
+    'flex flex-col items-center gap-2 p-4 rounded-2xl bg-white border border-slate-200 ' +
+    'hover:border-slate-300 hover:shadow-md transition-all active:scale-95 min-w-[100px] w-full';
+
+  if (href) {
+    return (
+      <Link href={href} className={baseClass}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button onClick={onClick} className={baseClass}>
+      {content}
     </button>
   );
 }
 
-function VehicleAlertBanner() {
-  return (
-    <div className="flex items-center gap-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
-      <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-        <AlertTriangle className="w-6 h-6 text-amber-600" />
-      </div>
-      <div className="flex-1">
-        <p className="text-sm font-semibold text-amber-900">SOAT vence en 15 días</p>
-        <p className="text-xs text-amber-700">Renueva tu seguro antes del 15 May 2026</p>
-      </div>
-      <button className="px-4 py-2 bg-amber-500 text-white text-xs font-semibold rounded-lg hover:bg-amber-600 transition-colors">
-        Renovarlo
-      </button>
-    </div>
-  );
-}
+// Issue #212: VehicleAlertBanner y VehicleCard ELIMINADOS — eran mocks con
+// Toyota Hilux 2022 + SOAT ficticio que aparecían a CUALQUIER socio (incluso
+// los que no tienen vehículo). El módulo de transporte aún no está implementado
+// (EPIC #127). Cuando llegue, se reincorpora con datos reales.
 
-function VehicleCard() {
-  return (
-    <Card className="overflow-hidden border-slate-200">
-      <div className="bg-gradient-to-r from-[#0F2744] to-[#1a4a7a] p-5 text-white">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
-            <Truck className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="font-semibold">Toyota Hilux</p>
-            <p className="text-xs text-white/70">Placa: ABC-1234</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-xs text-white/50">Año</p>
-            <p className="font-medium">2022</p>
-          </div>
-          <div>
-            <p className="text-xs text-white/50">Color</p>
-            <p className="font-medium">Gris Oscuro</p>
-          </div>
-        </div>
-      </div>
-      <CardContent className="p-4">
-        <VehicleAlertBanner />
-        <div className="mt-4 flex items-center justify-between">
-          <Link href="/dashboard/unidad" className="text-xs text-[#16A34A] font-medium hover:underline flex items-center gap-1">
-            Ver detalle <ChevronRight className="w-3 h-3" />
-          </Link>
-          <button className="text-xs text-slate-500 hover:text-slate-700">
-            Editar
-          </button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TransactionItem({ actividad }: { actividad: Actividad }) {
-  const isDeposit = actividad.tipo === 'DEPOSITO' || actividad.tipo === 'INTERES';
-  const isInterest = actividad.tipo === 'INTERES';
+function TransactionItem({ actividad }: { actividad: MovimientoApi }) {
+  const tipo = actividad.tipo?.toUpperCase() ?? '';
+  const isDeposit = tipo === 'DEPOSITO' || tipo === 'INTERES' || tipo === 'TRANSFERENCIA_ENTRADA';
+  const isInterest = tipo === 'INTERES';
+  const monto = Number(actividad.monto) || 0;
 
   const iconBg = isInterest ? 'bg-emerald-100' : isDeposit ? 'bg-emerald-100' : 'bg-slate-100';
   const iconColor = isInterest ? 'text-emerald-600' : isDeposit ? 'text-emerald-600' : 'text-slate-600';
@@ -179,11 +158,15 @@ function TransactionItem({ actividad }: { actividad: Actividad }) {
         <IconComponent className={`w-5 h-5 ${iconColor}`} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-900 truncate">{actividad.descripcion}</p>
-        <p className="text-xs text-slate-500">{formatDate(actividad.fecha)}</p>
+        <p className="text-sm font-medium text-slate-900 truncate">
+          {actividad.descripcion || tipo.replace('_', ' ')}
+        </p>
+        <p className="text-xs text-slate-500">
+          {actividad.fechaMovimiento ? formatDate(actividad.fechaMovimiento) : '—'}
+        </p>
       </div>
       <div className={`text-sm font-semibold ${isDeposit ? 'text-emerald-600' : 'text-slate-700'}`}>
-        {isDeposit ? '+' : '-'}{formatCurrency(actividad.monto)}
+        {isDeposit ? '+' : '-'}{formatCurrency(monto)}
       </div>
     </div>
   );
@@ -212,6 +195,15 @@ export default function SocioDashboardPage() {
   // Toggle moneda de visualización (VES por defecto, mismo lado del país)
   const [monedaVista, setMonedaVista] = useState<'VES' | 'USD'>('VES');
 
+  // Issue #212: movimientos REALES (antes era `mockActividad` hardcoded)
+  const [movimientos, setMovimientos] = useState<MovimientoApi[]>([]);
+  const [loadingMovimientos, setLoadingMovimientos] = useState(true);
+
+  // Issue #212: beneficiarios REALES (antes era `mockBeneficiarios` hardcoded
+  // con "María García 60%, Juan Pérez 30%, Ana López 10%" — ficticios)
+  const [beneficiarios, setBeneficiarios] = useState<BeneficiarioApi[]>([]);
+  const [loadingBeneficiarios, setLoadingBeneficiarios] = useState(true);
+
   const cargarCuentas = useCallback(async () => {
     if (!user?.socioId) return;
     setLoadingCuentas(true);
@@ -238,6 +230,69 @@ export default function SocioDashboardPage() {
     }
   }, [isLoading, user?.socioId, cargarCuentas]);
 
+  // Issue #212: cargar beneficiarios REALES del socio
+  const cargarBeneficiarios = useCallback(async () => {
+    if (!user?.socioId) return;
+    setLoadingBeneficiarios(true);
+    try {
+      const res = await fetch(`/api/beneficiarios?socioId=${user.socioId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBeneficiarios(parseBeneficiariosResponse(data));
+      } else {
+        setBeneficiarios([]);
+      }
+    } catch (err) {
+      console.error('Error cargando beneficiarios:', err);
+      setBeneficiarios([]);
+    } finally {
+      setLoadingBeneficiarios(false);
+    }
+  }, [user?.socioId]);
+
+  useEffect(() => {
+    if (!isLoading && user?.socioId) {
+      cargarBeneficiarios();
+    }
+  }, [isLoading, user?.socioId, cargarBeneficiarios]);
+
+  // Issue #212: cargar movimientos REALES del socio (toma la primera cuenta
+  // disponible — la mayoría de socios tiene 1-2 cuentas; los demás pueden ir
+  // a "Ver todo" para ver los de otras cuentas).
+  const cuentaParaMovimientos = cuentas[0];
+  const cargarMovimientos = useCallback(async () => {
+    if (!cuentaParaMovimientos) {
+      // Sin cuentas → no hay movimientos posibles (ya no es loading)
+      setMovimientos([]);
+      setLoadingMovimientos(false);
+      return;
+    }
+    setLoadingMovimientos(true);
+    try {
+      const res = await fetch(
+        `/api/cuentas/${cuentaParaMovimientos.numeroCuenta}/movimientos?size=5`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setMovimientos(parseMovimientosResponse(data));
+      } else {
+        setMovimientos([]);
+      }
+    } catch (err) {
+      console.error('Error cargando movimientos:', err);
+      setMovimientos([]);
+    } finally {
+      setLoadingMovimientos(false);
+    }
+  }, [cuentaParaMovimientos]);
+
+  useEffect(() => {
+    // Esperar a que cuentas haya cargado antes de pedir movimientos
+    if (!loadingCuentas) {
+      cargarMovimientos();
+    }
+  }, [loadingCuentas, cargarMovimientos]);
+
   // Issue #213: agregación correcta de saldos multimoneda.
   // `null` cuando la tasa todavía no se cargó (mostramos fallback, no número).
   const saldoAgregado = calcularSaldoTotal(cuentas, tasaActual);
@@ -256,18 +311,12 @@ export default function SocioDashboardPage() {
     cuentas.length > 0 &&
     saldoAgregado === null;
 
-  const mockActividad: Actividad[] = [
-    { id: '1', tipo: 'DEPOSITO', descripcion: 'Depósito en efectivo', monto: 500000, fecha: '2026-04-28', icono: 'down' },
-    { id: '2', tipo: 'RETIRO', descripcion: 'Retiro en cajero', monto: 150000, fecha: '2026-04-27', icono: 'up' },
-    { id: '3', tipo: 'INTERES', descripcion: 'Abono de intereses', monto: 12500, fecha: '2026-04-26', icono: 'down' },
-    { id: '4', tipo: 'DEPOSITO', descripcion: 'Transferencia recibida', monto: 2000000, fecha: '2026-04-25', icono: 'down' },
-  ];
+  // Issue #212: mockActividad y mockBeneficiarios ELIMINADOS. Ahora vienen de
+  // /api/cuentas/{n}/movimientos y /api/beneficiarios?socioId=...
 
-  const mockBeneficiarios = [
-    { nombre: 'María García', porcentaje: 60 },
-    { nombre: 'Juan Pérez', porcentaje: 30 },
-    { nombre: 'Ana López', porcentaje: 10 },
-  ];
+  // Derivados de los beneficiarios reales para la UI
+  const beneficiariosOrdenados = beneficiariosActivosOrdenados(beneficiarios);
+  const totalPorcentajeAsignado = sumaPorcentajes(beneficiarios);
 
   if (isLoading) {
     return (
@@ -451,66 +500,127 @@ export default function SocioDashboardPage() {
         )}
       </div>
 
-      {/* Two Column Grid: Activity & Vehicle */}
+      {/* Issue #212: Two-Column Grid — Vehicle Card eliminado (mock Toyota Hilux).
+          Ahora: Actividad real (left) + Beneficiarios reales (right). */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
+
+        {/* Recent Activity — datos reales del primer cuenta del socio */}
         <Card className="border-slate-200">
           <CardContent className="p-0">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <h3 className="font-semibold text-[#0F2744]">Actividad Reciente</h3>
-              <Link href="/dashboard/cuentas" className="text-xs text-[#16A34A] font-medium hover:underline">
-                Ver todo
-              </Link>
+              {cuentaParaMovimientos && (
+                <Link
+                  href={`/dashboard/cuentas/${cuentaParaMovimientos.numeroCuenta}`}
+                  className="text-xs text-[#16A34A] font-medium hover:underline"
+                >
+                  Ver todo
+                </Link>
+              )}
             </div>
-            <div className="px-5">
-              {mockActividad.map((actividad) => (
-                <TransactionItem key={actividad.id} actividad={actividad} />
-              ))}
+            <div className="px-5 min-h-[200px]">
+              {loadingMovimientos ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-[#16A34A]" />
+                </div>
+              ) : movimientos.length > 0 ? (
+                movimientos.map((mov) => (
+                  <TransactionItem key={mov.id} actividad={mov} />
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Wallet className="w-10 h-10 text-slate-300 mb-2" />
+                  <p className="text-sm text-slate-500 mb-1">Aún no tienes movimientos</p>
+                  <p className="text-xs text-slate-400">
+                    Tus depósitos y retiros aparecerán aquí
+                  </p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Vehicle Card */}
-        <div className="space-y-4">
-          <VehicleCard />
+        {/* Beneficiaries — datos reales del socio (issue #212) */}
+        <Card className="border-slate-200">
+          <CardContent className="p-5 min-h-[200px]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-[#0F2744]">Beneficiarios</h3>
+              <Link href="/dashboard/beneficiarios" className="text-xs text-[#16A34A] font-medium hover:underline">
+                Gestionar
+              </Link>
+            </div>
 
-          {/* Beneficiaries Summary */}
-          <Card className="border-slate-200">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-[#0F2744]">Beneficiarios</h3>
-                <Link href="/dashboard/beneficiarios" className="text-xs text-[#16A34A] font-medium hover:underline">
-                  Gestionar
+            {loadingBeneficiarios ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-[#16A34A]" />
+              </div>
+            ) : beneficiariosOrdenados.length > 0 ? (
+              <>
+                <div className="space-y-3 mb-4">
+                  {beneficiariosOrdenados.slice(0, 3).map((b) => {
+                    const pct = Number(b.porcentaje) || 0;
+                    return (
+                      <div key={b.id}>
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <span className="text-slate-700 truncate pr-2">{b.nombreCompleto}</span>
+                          <span className="font-medium text-[#0F2744]">{pct.toFixed(0)}%</span>
+                        </div>
+                        <ProgressBar percentage={pct} color="bg-[#16A34A]" />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                  <span className="text-sm font-medium text-slate-700">Total asignado</span>
+                  {/* Mostramos el porcentaje real, no un "100%" hardcoded */}
+                  <span className={`text-sm font-bold ${
+                    totalPorcentajeAsignado === 100
+                      ? 'text-emerald-600'
+                      : 'text-amber-600'
+                  }`}>
+                    {totalPorcentajeAsignado.toFixed(0)}%
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Users className="w-10 h-10 text-slate-300 mb-2" />
+                <p className="text-sm text-slate-500 mb-3">Aún no tienes beneficiarios</p>
+                <Link
+                  href="/dashboard/beneficiarios"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#16A34A] text-white text-xs font-medium rounded-lg hover:bg-[#15803D]"
+                >
+                  <Plus className="w-3 h-3" />
+                  Agregar primer beneficiario
                 </Link>
               </div>
-
-              <div className="space-y-3 mb-4">
-                {mockBeneficiarios.map((b) => (
-                  <div key={b.nombre}>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-slate-700">{b.nombre}</span>
-                      <span className="font-medium text-[#0F2744]">{b.porcentaje}%</span>
-                    </div>
-                    <ProgressBar percentage={b.porcentaje} color="bg-[#16A34A]" />
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                <span className="text-sm font-medium text-slate-700">Total asignado</span>
-                <span className="text-sm font-bold text-emerald-600">100%</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Quick Links */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <QuickActionButton icon={FileText} label="Documentos" color="bg-slate-600" />
-        <QuickActionButton icon={Calendar} label="Simulador" color="bg-[#0F2744]" />
-        <QuickActionButton icon={Truck} label="Mi Unidad" color="bg-amber-500" />
-        <QuickActionButton icon={Shield} label="KYC" color="bg-emerald-600" />
+      {/* Quick Links — issue #200: "Mi Unidad" eliminado (link `/dashboard/unidad`
+          rompía con 404 porque el módulo Transporte aún no existe — EPIC #127). */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <QuickActionButton
+          icon={FileText}
+          label="Documentos"
+          href="/dashboard/documentos"
+          color="bg-slate-600"
+        />
+        <QuickActionButton
+          icon={Calculator}
+          label="Simulador"
+          href="/dashboard/creditos/simular"
+          color="bg-[#0F2744]"
+        />
+        <QuickActionButton
+          icon={Shield}
+          label="KYC"
+          href="/dashboard/kyc"
+          color="bg-emerald-600"
+        />
       </div>
     </div>
   );
