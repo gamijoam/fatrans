@@ -12,6 +12,8 @@ import com.tufondo.ahorros.domain.model.enums.TipoMovimiento;
 import com.tufondo.ahorros.domain.model.valueobjects.NumeroOperacion;
 import com.tufondo.ahorros.domain.repository.CuentaAhorroRepository;
 import com.tufondo.ahorros.domain.repository.MovimientoRepository;
+import com.tufondo.compliance.application.service.LocdoftOperacionService;
+import com.tufondo.compliance.domain.model.ConsentimientoLocdoftOperacion;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ public class RealizarRetiroUseCase {
     private final CuentaAhorroRepository cuentaRepository;
     private final MovimientoRepository movimientoRepository;
     private final AhorrosDTOMapper mapper;
+    private final LocdoftOperacionService locdoftService;
 
     @Transactional
     public MovimientoResponse ejecutar(String numeroCuenta, RetiroRequest request,
@@ -69,6 +72,19 @@ public class RealizarRetiroUseCase {
             throw new MontoExcedeLimiteException(request.getMonto(), LIMITE_RETIRO, "retiro");
         }
 
+        // LOCDOFT (#218 PR-C): mismo patrón que en depósito — si supera el
+        // umbral, registra el consentimiento o lanza 422.
+        ConsentimientoLocdoftOperacion consentimiento = locdoftService.validarYRegistrar(
+                new LocdoftOperacionService.DatosOperacion(
+                        cuenta.getSocioId(),
+                        cuenta.getId(),
+                        ConsentimientoLocdoftOperacion.TipoOperacion.RETIRO,
+                        request.getMonto(),
+                        cuenta.getMoneda() != null ? cuenta.getMoneda().name() : "VES",
+                        Boolean.TRUE.equals(request.getConfirmaOrigenLicito()),
+                        request.getOrigenFondos(),
+                        ipOrigen, null, sessionId, requestId));
+
         // Ejecutar retiro
         BigDecimal saldoAnterior = cuenta.getSaldoActual();
         cuenta.restarSaldo(request.getMonto());
@@ -98,6 +114,11 @@ public class RealizarRetiroUseCase {
                 requestId
         );
         movimiento = movimientoRepository.guardar(movimiento);
+
+        // Asociar consentimiento LOCDOFT con el movimiento real (resiliente).
+        if (consentimiento != null) {
+            locdoftService.asociarConMovimiento(consentimiento.getId(), movimiento.getId());
+        }
 
         log.info("Retiro realizado: {} de cuenta {}", request.getMonto(), numeroCuenta);
         return mapper.toResponse(movimiento);

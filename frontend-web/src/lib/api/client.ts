@@ -79,17 +79,28 @@ export const cuentasApi = {
     if (tipoFiltro) url += `&tipo=${tipoFiltro}`;
     return apiClient.get(url);
   },
-  deposito: (numeroCuenta: string, monto: number) =>
+  // Issue #218 PR-C — `extras` permite enviar la declaración LOCDOFT
+  // cuando el backend responde 422 LOCDOFT_CONSENT_REQUIRED y el usuario
+  // confirma en el modal. Para operaciones normales, no se pasa.
+  deposito: (numeroCuenta: string, monto: number, extras?: { confirmaOrigenLicito?: boolean; origenFondos?: string }) =>
     apiClient.post(`/v1/cuentas/${numeroCuenta}/depositos`, {
       monto,
       canalOrigen: 'WEB',
-      descripcion: 'Depósito en línea'
+      descripcion: 'Depósito en línea',
+      ...(extras?.confirmaOrigenLicito ? {
+        confirmaOrigenLicito: true,
+        origenFondos: extras.origenFondos || null,
+      } : {}),
     }),
-  retiro: (numeroCuenta: string, monto: number) =>
+  retiro: (numeroCuenta: string, monto: number, extras?: { confirmaOrigenLicito?: boolean; origenFondos?: string }) =>
     apiClient.post(`/v1/cuentas/${numeroCuenta}/retiros`, {
       monto,
       canalOrigen: 'WEB',
-      descripcion: 'Retiro en línea'
+      descripcion: 'Retiro en línea',
+      ...(extras?.confirmaOrigenLicito ? {
+        confirmaOrigenLicito: true,
+        origenFondos: extras.origenFondos || null,
+      } : {}),
     }),
 };
 

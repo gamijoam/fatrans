@@ -25,4 +25,10 @@ public class RetiroRequest {
     
     @NotNull(message = "canalOrigen es requerido")
     private CanalOrigen canalOrigen;
+
+    // ==== LOCDOFT — declaración jurada para operaciones grandes (#218 PR-C) ====
+    private Boolean confirmaOrigenLicito;
+
+    @Size(max = 2000, message = "origenFondos no puede exceder 2000 caracteres")
+    private String origenFondos;
 }

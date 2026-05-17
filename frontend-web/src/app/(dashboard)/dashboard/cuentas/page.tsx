@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Loader2 } from 'lucide-react';
 import { toastSuccess, toastError } from '@/components/ui/toast-helpers';
 import { useTipoCambio, convertirABolivares, convertirADolares } from '@/hooks/useTipoCambio';
+import { LocdoftOperacionModal } from '@/components/legal/locdoft-operacion-modal';
 
 interface Cuenta {
   id: string;
@@ -48,6 +49,13 @@ export default function CuentasPage() {
   const [loadingOperacion, setLoadingOperacion] = useState(false);
   const [operacion, setOperacion] = useState<'deposito' | 'retiro' | null>(null);
   const [openConfirm, setOpenConfirm] = useState(false);
+
+  // Issue #218 PR-C — modal LOCDOFT cuando el backend devuelve 422
+  // LOCDOFT_CONSENT_REQUIRED tras un primer intento sin el flag.
+  const [locdoftModal, setLocdoftModal] = useState<{
+    open: boolean;
+    umbral: number | null;
+  }>({ open: false, umbral: null });
   const [cuentaSeleccionada, setCuentaSeleccionada] = useState<Cuenta | null>(null);
 
   const [errores, setErrores] = useState<{ monto?: string }>({});
@@ -113,25 +121,23 @@ export default function CuentasPage() {
     setOpenConfirm(true);
   }
 
-  async function confirmarOperacion() {
+  // Ejecuta la operación. Si `extras` viene con `confirmaOrigenLicito=true`,
+  // significa que se está reintentando tras el modal LOCDOFT.
+  async function ejecutarOperacion(
+    extras?: { confirmaOrigenLicito: true; origenFondos: string }
+  ) {
     if (!cuentaSeleccionada || !operacion) return;
-
-    const error = validarMonto(monto, operacion);
-    if (error) {
-      setErrores({ monto: error });
-      return;
-    }
 
     setLoadingOperacion(true);
     try {
       const numMonto = parseFloat(monto);
       let nuevoSaldo: number;
       if (operacion === 'deposito') {
-        const res = await cuentasApi.deposito(cuentaSeleccionada.numeroCuenta, numMonto);
+        const res = await cuentasApi.deposito(cuentaSeleccionada.numeroCuenta, numMonto, extras);
         nuevoSaldo = res.data.saldoPosterior;
         toastSuccess('Depósito realizado', `Se depositaron $${numMonto.toFixed(2)} a la cuenta ${cuentaSeleccionada.numeroCuenta}`);
       } else {
-        const res = await cuentasApi.retiro(cuentaSeleccionada.numeroCuenta, numMonto);
+        const res = await cuentasApi.retiro(cuentaSeleccionada.numeroCuenta, numMonto, extras);
         nuevoSaldo = res.data.saldoPosterior;
         toastSuccess('Retiro realizado', `Se retiraron $${numMonto.toFixed(2)} de la cuenta ${cuentaSeleccionada.numeroCuenta}`);
       }
@@ -141,12 +147,36 @@ export default function CuentasPage() {
         )
       );
       setOpenConfirm(false);
+      setLocdoftModal({ open: false, umbral: null });
     } catch (err: unknown) {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error en la operación';
+      const errResp = err as { response?: { status?: number; data?: { message?: string; error?: string; detalles?: { umbral?: number | string } } } };
+      // Issue #218 PR-C — backend pide declaración LOCDOFT (HTTP 422)
+      if (
+        errResp?.response?.status === 422 &&
+        errResp?.response?.data?.error === 'LOCDOFT_CONSENT_REQUIRED'
+      ) {
+        const umbralRaw = errResp.response.data.detalles?.umbral;
+        const umbral = umbralRaw != null ? Number(umbralRaw) : null;
+        setLocdoftModal({ open: true, umbral: Number.isFinite(umbral as number) ? (umbral as number) : null });
+        return; // NO mostrar toast de error — el modal se encarga
+      }
+      const message = errResp?.response?.data?.message || 'Error en la operación';
       toastError('Operación fallida', message);
     } finally {
       setLoadingOperacion(false);
     }
+  }
+
+  async function confirmarOperacion() {
+    if (!cuentaSeleccionada || !operacion) return;
+
+    const error = validarMonto(monto, operacion);
+    if (error) {
+      setErrores({ monto: error });
+      return;
+    }
+
+    await ejecutarOperacion();
   }
 
   return (
@@ -341,6 +371,18 @@ export default function CuentasPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Issue #218 PR-C — modal LOCDOFT cuando backend devuelve 422 */}
+      <LocdoftOperacionModal
+        open={locdoftModal.open}
+        tipoOperacion={operacion === 'retiro' ? 'retiro' : 'deposito'}
+        monto={parseFloat(monto) || 0}
+        moneda={(cuentaSeleccionada?.moneda as 'VES' | 'USD') || 'VES'}
+        umbral={locdoftModal.umbral}
+        procesando={loadingOperacion}
+        onCancelar={() => setLocdoftModal({ open: false, umbral: null })}
+        onConfirmar={(datos) => ejecutarOperacion(datos)}
+      />
     </div>
   );
 }
