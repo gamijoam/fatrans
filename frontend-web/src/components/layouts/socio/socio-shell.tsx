@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { ProtectedRoute } from '@/components/shared/protected-route';
 import { LogoutButton } from '@/components/shared/logout-button';
 import { IdleTimeoutWatcher } from '@/components/shared/idle-timeout-watcher';
+import { NotificationBell } from '@/components/shared/notification-bell';
 import {
   LayoutDashboard,
   Wallet,
@@ -17,7 +18,6 @@ import {
   Menu,
   X,
   ChevronRight,
-  Bell,
   Settings,
   LogOut,
   Shield,
@@ -224,15 +224,18 @@ export function SocioShell({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
 
-              {/* Right: Profile */}
-              <div ref={profileRef} className="relative">
-                <button
-                  onClick={() => setProfileOpen(!profileOpen)}
-                  className="flex items-center gap-3 p-1.5 hover:bg-slate-100 rounded-xl transition-colors"
-                >
-                  <AvatarSocio name={user?.nombreCompleto || 'U'} size="sm" />
-                  <ChevronRight className={`w-4 h-4 text-slate-400 hidden sm:block transition-transform ${profileOpen ? 'rotate-90' : ''}`} />
-                </button>
+              {/* Right: Bell + Profile (issue #214 — Bell ya no es un dead import) */}
+              <div className="flex items-center gap-2">
+                <NotificationBell />
+
+                <div ref={profileRef} className="relative">
+                  <button
+                    onClick={() => setProfileOpen(!profileOpen)}
+                    className="flex items-center gap-3 p-1.5 hover:bg-slate-100 rounded-xl transition-colors"
+                  >
+                    <AvatarSocio name={user?.nombreCompleto || 'U'} size="sm" />
+                    <ChevronRight className={`w-4 h-4 text-slate-400 hidden sm:block transition-transform ${profileOpen ? 'rotate-90' : ''}`} />
+                  </button>
 
                 {profileOpen && (
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
@@ -262,6 +265,7 @@ export function SocioShell({ children }: { children: React.ReactNode }) {
                     </div>
                   </div>
                 )}
+                </div>
               </div>
             </div>
           </header>
