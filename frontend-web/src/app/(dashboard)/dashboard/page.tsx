@@ -18,6 +18,8 @@ import {
   sumaPorcentajes,
   type BeneficiarioApi,
 } from '@/lib/utils/parse-beneficiarios-response';
+import { decidirKycBanner, type KycBannerDecision } from '@/lib/utils/decidir-kyc-banner';
+import { AlertTriangle, Info, XOctagon, ChevronRight } from 'lucide-react';
 
 interface CuentaAhorro {
   id: string;
@@ -142,6 +144,78 @@ function QuickActionButton({
 // los que no tienen vehículo). El módulo de transporte aún no está implementado
 // (EPIC #127). Cuando llegue, se reincorpora con datos reales.
 
+/**
+ * Issue #215: banner condicional sobre el estado KYC del socio.
+ *
+ * Antes el socio no se enteraba en su home si su KYC estaba pendiente,
+ * en revisión, rechazado o nunca iniciado — descubría el problema solo
+ * cuando intentaba operar y fallaba. Ahora le mostramos el estado
+ * inmediato + CTA accionable.
+ *
+ * Si la decisión es `null` (APROBADO o estado desconocido), no renderiza
+ * nada — la ausencia de banner es señal positiva.
+ */
+function KycBanner({ decision }: { decision: KycBannerDecision | null }) {
+  if (!decision) return null;
+
+  const styles = {
+    warning: {
+      container: 'bg-amber-50 border-amber-200',
+      iconWrap: 'bg-amber-100',
+      iconColor: 'text-amber-600',
+      title: 'text-amber-900',
+      text: 'text-amber-800',
+      cta: 'bg-amber-500 hover:bg-amber-600 text-white',
+      Icon: AlertTriangle,
+    },
+    info: {
+      container: 'bg-blue-50 border-blue-200',
+      iconWrap: 'bg-blue-100',
+      iconColor: 'text-blue-600',
+      title: 'text-blue-900',
+      text: 'text-blue-800',
+      cta: 'bg-blue-500 hover:bg-blue-600 text-white',
+      Icon: Info,
+    },
+    error: {
+      container: 'bg-red-50 border-red-200',
+      iconWrap: 'bg-red-100',
+      iconColor: 'text-red-600',
+      title: 'text-red-900',
+      text: 'text-red-800',
+      cta: 'bg-red-500 hover:bg-red-600 text-white',
+      Icon: XOctagon,
+    },
+  }[decision.tipo];
+
+  const { Icon } = styles;
+
+  return (
+    <div
+      role="alert"
+      data-testid={`kyc-banner-${decision.tipo}`}
+      className={`flex items-start gap-4 p-4 lg:p-5 rounded-2xl border ${styles.container}`}
+    >
+      <div className={`w-10 h-10 rounded-xl ${styles.iconWrap} flex items-center justify-center flex-shrink-0`}>
+        <Icon className={`w-5 h-5 ${styles.iconColor}`} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm font-semibold ${styles.title} mb-1`}>{decision.titulo}</p>
+        <p className={`text-xs ${styles.text}`}>{decision.mensaje}</p>
+      </div>
+      {decision.ctaTexto && decision.ctaHref && (
+        <Link
+          href={decision.ctaHref}
+          className={`flex-shrink-0 inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${styles.cta}`}
+        >
+          {decision.ctaTexto}
+          <ChevronRight className="w-3 h-3" />
+        </Link>
+      )}
+    </div>
+  );
+}
+
 function TransactionItem({ actividad }: { actividad: MovimientoApi }) {
   const tipo = actividad.tipo?.toUpperCase() ?? '';
   const isDeposit = tipo === 'DEPOSITO' || tipo === 'INTERES' || tipo === 'TRANSFERENCIA_ENTRADA';
@@ -203,6 +277,12 @@ export default function SocioDashboardPage() {
   // con "María García 60%, Juan Pérez 30%, Ana López 10%" — ficticios)
   const [beneficiarios, setBeneficiarios] = useState<BeneficiarioApi[]>([]);
   const [loadingBeneficiarios, setLoadingBeneficiarios] = useState(true);
+
+  // Issue #215: estado KYC para decidir si mostrar banner de aviso.
+  // Mientras no haya cargado (`null`), no mostramos nada — la decisión
+  // del utility ya maneja `null` retornando `null`.
+  const [kycEstado, setKycEstado] = useState<string | null>(null);
+  const [kycMotivoRechazo, setKycMotivoRechazo] = useState<string | null>(null);
 
   const cargarCuentas = useCallback(async () => {
     if (!user?.socioId) return;
@@ -293,6 +373,33 @@ export default function SocioDashboardPage() {
     }
   }, [loadingCuentas, cargarMovimientos]);
 
+  // Issue #215: cargar estado KYC (el BFF mapea KYC no iniciado a estado SIN_KYC)
+  const cargarKycEstado = useCallback(async () => {
+    try {
+      const res = await fetch('/api/kyc/estado');
+      if (res.ok) {
+        const data = await res.json();
+        setKycEstado(data?.estado ?? null);
+        setKycMotivoRechazo(data?.motivoRechazo ?? null);
+      } else {
+        // 401/500 → no mostrar banner (no queremos ruido por fallo de red)
+        setKycEstado(null);
+      }
+    } catch (err) {
+      console.error('Error cargando estado KYC:', err);
+      setKycEstado(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading && user?.socioId) {
+      cargarKycEstado();
+    }
+  }, [isLoading, user?.socioId, cargarKycEstado]);
+
+  // Decisión derivada — el utility maneja todos los casos (incluido null).
+  const kycBannerDecision = decidirKycBanner(kycEstado, kycMotivoRechazo);
+
   // Issue #213: agregación correcta de saldos multimoneda.
   // `null` cuando la tasa todavía no se cargó (mostramos fallback, no número).
   const saldoAgregado = calcularSaldoTotal(cuentas, tasaActual);
@@ -337,6 +444,10 @@ export default function SocioDashboardPage() {
           <p className="text-sm text-slate-500 mt-0.5">Aquí está el resumen de tu cuenta</p>
         </div>
       </div>
+
+      {/* Issue #215: banner KYC condicional. NO renderiza nada si APROBADO o
+          estado aún no cargado — la ausencia es señal positiva. */}
+      <KycBanner decision={kycBannerDecision} />
 
       {/* Hero Balance Card */}
       <div className="bg-gradient-to-br from-[#0F2744] via-[#0F2744] to-[#1a4a7a] rounded-3xl p-6 lg:p-8 text-white relative overflow-hidden">
