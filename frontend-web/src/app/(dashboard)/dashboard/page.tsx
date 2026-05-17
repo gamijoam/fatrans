@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
 import { Loader2, Wallet, CreditCard, TrendingUp, Plus, ArrowUpRight, ArrowDownRight, Truck, AlertTriangle, Shield, ChevronRight, FileText, Calendar } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { useTipoCambio } from '@/hooks/useTipoCambio';
+import { calcularSaldoTotal } from '@/lib/utils/calcular-saldo-total';
 
 interface CuentaAhorro {
   id: string;
@@ -204,6 +206,11 @@ export default function SocioDashboardPage() {
   const [cuentas, setCuentas] = useState<CuentaAhorro[]>([]);
   const [loadingCuentas, setLoadingCuentas] = useState(true);
 
+  // Issue #213: tasa BCV para agregar saldos multimoneda correctamente
+  const { tasaActual, loading: loadingTasa } = useTipoCambio(1);
+  // Toggle moneda de visualización (VES por defecto, mismo lado del país)
+  const [monedaVista, setMonedaVista] = useState<'VES' | 'USD'>('VES');
+
   const cargarCuentas = useCallback(async () => {
     if (!user?.socioId) return;
     setLoadingCuentas(true);
@@ -226,8 +233,10 @@ export default function SocioDashboardPage() {
     }
   }, [isLoading, user?.socioId, cargarCuentas]);
 
-  const saldoTotal = cuentas.reduce((acc, c) => acc + c.saldoActual, 0);
-  const cuentaPrincipal = cuentas.find(c => c.moneda === 'VES') || cuentas[0];
+  // Issue #213: agregación correcta de saldos multimoneda.
+  // `null` cuando la tasa todavía no se cargó (mostramos skeleton, no número).
+  const saldoAgregado = calcularSaldoTotal(cuentas, tasaActual);
+  const saldoTotalListo = saldoAgregado !== null && !loadingTasa && !loadingCuentas;
 
   const mockActividad: Actividad[] = [
     { id: '1', tipo: 'DEPOSITO', descripcion: 'Depósito en efectivo', monto: 500000, fecha: '2026-04-28', icono: 'down' },
@@ -268,13 +277,72 @@ export default function SocioDashboardPage() {
         <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-white/5 translate-y-1/2 -translate-x-1/2" />
 
         <div className="relative">
-          <div className="flex items-center gap-2 mb-1">
-            <Shield className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs font-medium text-white/60 uppercase tracking-wider">Saldo Total Disponible</span>
+          <div className="flex items-center justify-between mb-1 flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-medium text-white/60 uppercase tracking-wider">Saldo Total Disponible</span>
+            </div>
+            {/* Issue #213: toggle moneda de visualización */}
+            <div
+              role="tablist"
+              aria-label="Moneda de visualización del saldo total"
+              className="inline-flex items-center bg-white/10 rounded-full p-1 text-xs font-semibold"
+            >
+              <button
+                role="tab"
+                aria-selected={monedaVista === 'VES'}
+                onClick={() => setMonedaVista('VES')}
+                className={`px-3 py-1 rounded-full transition-colors ${
+                  monedaVista === 'VES' ? 'bg-white text-[#0F2744]' : 'text-white/70 hover:text-white'
+                }`}
+              >
+                Bs
+              </button>
+              <button
+                role="tab"
+                aria-selected={monedaVista === 'USD'}
+                onClick={() => setMonedaVista('USD')}
+                className={`px-3 py-1 rounded-full transition-colors ${
+                  monedaVista === 'USD' ? 'bg-white text-[#0F2744]' : 'text-white/70 hover:text-white'
+                }`}
+              >
+                USD
+              </button>
+            </div>
           </div>
-          <p className="text-4xl lg:text-5xl font-bold tracking-tight mb-6">
-            {formatCurrency(saldoTotal)}
-          </p>
+
+          {/* Issue #213: muestra saldo agregado en la moneda seleccionada.
+              Mientras la tasa BCV no se haya cargado, mostramos skeleton (NO un
+              número incorrecto). */}
+          {saldoTotalListo && saldoAgregado ? (
+            <p
+              className="text-4xl lg:text-5xl font-bold tracking-tight mb-2"
+              data-testid="saldo-total-agregado"
+            >
+              {monedaVista === 'VES'
+                ? formatCurrency(saldoAgregado.totalVES, 'VES')
+                : formatCurrency(saldoAgregado.totalUSD, 'USD')}
+            </p>
+          ) : (
+            <div
+              data-testid="saldo-total-loading"
+              aria-label="Cargando saldo total"
+              className="h-12 lg:h-14 w-64 bg-white/10 rounded-lg animate-pulse mb-2"
+            />
+          )}
+
+          {/* Info de tasa usada para la conversión (transparencia) */}
+          {tasaActual && (
+            <p className="text-xs text-white/50 mb-6">
+              Tasa BCV {tasaActual.fecha}: 1 USD = Bs {tasaActual.tasaVenta.toFixed(2)} ·
+              {' '}
+              {monedaVista === 'VES' && saldoAgregado
+                ? <>Equivale a <span className="text-white/80">{formatCurrency(saldoAgregado.totalUSD, 'USD')}</span></>
+                : monedaVista === 'USD' && saldoAgregado
+                ? <>Equivale a <span className="text-white/80">{formatCurrency(saldoAgregado.totalVES, 'VES')}</span></>
+                : null}
+            </p>
+          )}
 
           {/* Quick Actions */}
           <div className="flex flex-wrap gap-3">
