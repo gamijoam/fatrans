@@ -15,6 +15,7 @@ import com.tufondo.kyc.domain.model.port.StoragePort;
 import com.tufondo.kyc.domain.repository.ConsentimientoKYCRepository;
 import com.tufondo.kyc.domain.repository.DocumentoIdentidadRepository;
 import com.tufondo.kyc.domain.repository.VerificacionKYCRepository;
+import com.tufondo.notificaciones.application.service.NotificacionPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,10 @@ public class RevisarDocumentosUseCase {
     private final DocumentoIdentidadRepository documentoRepository;
     private final ConsentimientoKYCRepository consentimientoRepository;
     private final StoragePort storagePort;
+    // Issue #214 PR-C: notificar al socio del resultado de la revisión KYC.
+    // El publisher es defensivo: si falla la persistencia de la notificación,
+    // el flujo de aprobar/rechazar NO se ve afectado.
+    private final NotificacionPublisher notificacionPublisher;
 
     public RevisionResponse obtenerDetalle(UUID verificacionId) {
         VerificacionKYC verificacion = verificacionRepository.findById(verificacionId)
@@ -136,6 +141,9 @@ public class RevisarDocumentosUseCase {
             documentoRepository.save(doc);
         }
 
+        // Issue #214 PR-C: notificar al socio
+        notificacionPublisher.notificarSocioKycAprobado(verificacion.getSocioId());
+
         return RevisionDecisionResponse.builder()
             .verificacionId(verificacion.getId())
             .estadoAnterior(estadoAnterior)
@@ -174,6 +182,10 @@ public class RevisarDocumentosUseCase {
             }
         }
 
+        // Issue #214 PR-C: notificar al socio del rechazo con el motivo
+        notificacionPublisher.notificarSocioKycRechazado(
+                verificacion.getSocioId(), request.getComentario());
+
         return RevisionDecisionResponse.builder()
             .verificacionId(verificacion.getId())
             .estadoAnterior(estadoAnterior)
@@ -199,6 +211,10 @@ public class RevisarDocumentosUseCase {
         verificacion.setFechaRevision(LocalDateTime.now());
         verificacion.setComentariosRevision(request.getComentario());
         verificacionRepository.save(verificacion);
+
+        // Issue #214 PR-C: notificar al socio que necesita enviar más info
+        notificacionPublisher.notificarSocioKycRequiereInfo(
+                verificacion.getSocioId(), request.getComentario());
 
         return RevisionDecisionResponse.builder()
             .verificacionId(verificacion.getId())
