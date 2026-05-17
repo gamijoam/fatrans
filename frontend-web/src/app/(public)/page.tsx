@@ -485,7 +485,7 @@ function Footer() {
           <div>
             <h4 className="font-semibold mb-4">Contacto</h4>
             <ul className="space-y-2 text-sm text-slate-400">
-              <li><a href="mailto:soporte@fatans.com" className="hover:text-white transition">soporte@fatans.com</a></li>
+              <li><a href="mailto:soporte@fatrans.com.ve" className="hover:text-white transition">soporte@fatrans.com.ve</a></li>
               <li><a href="https://wa.me/5800000000000" className="hover:text-white transition">WhatsApp</a></li>
             </ul>
           </div>
