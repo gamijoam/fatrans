@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,8 +52,11 @@ public class SocioController {
     private final EliminarSocioUseCase eliminarSocioUseCase;
     private final SocioDTOMapper socioDTOMapper;
 
+    // Issue #179: solo ADMIN puede crear socios directamente. El flujo público
+    // de auto-registro va por /api/v1/socios/solicitud (que sigue siendo permitAll).
     @PostMapping
-    @Operation(summary = "Crear un nuevo socio")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Crear un nuevo socio (solo admin)")
     public ResponseEntity<SocioResponseDTO> crearSocio(
             @Valid @RequestBody CrearSocioRequestDTO request) {
         Socio socio = crearSocioUseCase.ejecutar(request);
@@ -110,8 +114,11 @@ public class SocioController {
         return ResponseEntity.ok(socios.map(socioDTOMapper::toResponseDTO));
     }
 
+    // Issue #179: solo ADMIN puede actualizar datos de cualquier socio. La actualización
+    // de perfil propio del socio va por otro endpoint (/perfil) que sí valida ownership.
     @PutMapping("/{id}")
-    @Operation(summary = "Actualizar un socio")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Actualizar un socio (solo admin)")
     public ResponseEntity<SocioResponseDTO> actualizarSocio(
             @PathVariable UUID id,
             @Valid @RequestBody ActualizarSocioDTO request,
@@ -122,15 +129,18 @@ public class SocioController {
         return ResponseEntity.ok(response);
     }
 
+    // Issue #179: operaciones administrativas
     @PatchMapping("/{id}/activar")
-    @Operation(summary = "Activar un socio")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Activar un socio (solo admin)")
     public ResponseEntity<SocioResponseDTO> activarSocio(@PathVariable UUID id) {
         SocioResponseDTO response = activarSocioUseCase.ejecutar(id);
         return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{id}/desactivar")
-    @Operation(summary = "Desactivar un socio")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Desactivar un socio (solo admin)")
     public ResponseEntity<SocioResponseDTO> desactivarSocio(
             @PathVariable UUID id,
             @RequestParam(required = false) String motivo) {
@@ -138,8 +148,10 @@ public class SocioController {
         return ResponseEntity.ok(response);
     }
 
+    // Issue #179: eliminación es operación crítica, solo admin.
     @DeleteMapping("/{id}")
-    @Operation(summary = "Eliminar un socio (soft delete)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Eliminar un socio (soft delete, solo admin)")
     public ResponseEntity<Map<String, String>> eliminarSocio(
             @PathVariable UUID id,
             @RequestParam(required = false) String motivo) {

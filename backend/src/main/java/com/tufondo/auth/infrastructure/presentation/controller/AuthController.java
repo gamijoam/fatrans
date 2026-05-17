@@ -23,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -255,12 +256,18 @@ public class AuthController {
         return ResponseEntity.ok(validarTokenUseCase.ejecutar(token));
     }
 
+    // Issue #179: este endpoint era accesible sin token (estaba en `shouldNotFilter`
+    // del JwtAuthenticationFilter). Ahora requiere JWT + rol ADMIN. Casos de uso
+    // legítimos: back-office crea credenciales para un socio aprobado tras KYC.
     @PostMapping("/crear-usuario")
-    @Operation(summary = "Crear usuario vinculado a socio",
-               description = "Vincula un Socio existente con credenciales de acceso (Usuario)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Crear usuario vinculado a socio (solo admin)",
+               description = "Vincula un Socio existente con credenciales de acceso (Usuario). Requiere rol ADMIN.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Usuario creado exitosamente",
                     content = @Content(schema = @Schema(implementation = CrearUsuarioResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "Sin permisos (rol ADMIN requerido)"),
             @ApiResponse(responseCode = "404", description = "Socio no encontrado"),
             @ApiResponse(responseCode = "409", description = "Nombre de usuario ya existe o socio ya tiene usuario vinculado")
     })
@@ -296,7 +303,11 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    // Issue #179: defensa en profundidad — exigir autenticación explícitamente.
+    // El use case ya extrae el userId del SecurityContext; sin autenticación el
+    // contexto está vacío y el use case lanzaría NPE. Mejor fallar temprano con 401.
     @PostMapping("/cambiar-password")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Cambiar contraseña",
                description = "Permite al usuario autenticado cambiar su contraseña actual por una nueva")
     @ApiResponses(value = {
