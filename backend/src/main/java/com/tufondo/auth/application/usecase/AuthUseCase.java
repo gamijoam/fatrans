@@ -126,9 +126,11 @@ public class AuthUseCase {
         String nuevoRefreshToken = jwtService.generarRefreshToken(usuario);
         String nuevoRefreshTokenHash = argon2Hasher.hash(nuevoRefreshToken);
 
-        Instant accessTokenExpiracion = jwtService.extraerExpiracionAccessToken(nuevoAccessToken);
-        Instant refreshTokenExpiracion = Instant.now()
-                .plusSeconds(refreshTokenExpiracion(nuevoRefreshToken));
+        Instant accessTokenExpiracion = jwtService.extraerExpiracion(nuevoAccessToken);
+        // FIX issue #178: el claim `exp` ya es un instante absoluto (segundos epoch),
+        // no segundos relativos. Antes se sumaba a Instant.now() generando expiraciones
+        // en el año ~3025 → sesiones efectivamente eternas.
+        Instant refreshTokenExpiracion = jwtService.extraerExpiracion(nuevoRefreshToken);
 
         Sesion nuevaSesion = Sesion.desdeParametros(
                 UUID.randomUUID(),
@@ -196,9 +198,11 @@ public class AuthUseCase {
         String refreshToken = jwtService.generarRefreshToken(usuario);
         String refreshTokenHash = argon2Hasher.hash(refreshToken);
 
-        Instant accessTokenExpiracion = jwtService.extraerExpiracionAccessToken(accessToken);
-        Instant refreshTokenExpiracion = Instant.now()
-                .plusSeconds(refreshTokenExpiracion(refreshToken));
+        Instant accessTokenExpiracion = jwtService.extraerExpiracion(accessToken);
+        // FIX issue #178: el claim `exp` ya es un instante absoluto (segundos epoch),
+        // no segundos relativos. Antes se sumaba a Instant.now() generando expiraciones
+        // en el año ~3025 → sesiones efectivamente eternas.
+        Instant refreshTokenExpiracion = jwtService.extraerExpiracion(refreshToken);
 
         Sesion sesion = Sesion.desdeParametros(
                 UUID.randomUUID(),
@@ -233,7 +237,4 @@ public class AuthUseCase {
         );
     }
 
-    private long refreshTokenExpiracion(String refreshToken) {
-        return jwtService.extraerExpiracionAccessToken(refreshToken).getEpochSecond();
-    }
 }
