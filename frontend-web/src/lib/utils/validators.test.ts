@@ -221,6 +221,71 @@ describe('registroSchema - Validaciones Issue #99', () => {
       expect(result.success).toBe(false);
     });
 
+    // ===== Issue #204: Validación de mayoría de edad (≥18) =====
+
+    /**
+     * Formatea una fecha de cumpleaños relativa a hoy en formato "YYYY-MM-DD".
+     * Helper para tests independientes del año en que se ejecutan.
+     */
+    const fechaConOffset = (anios: number, dias: number = 0): string => {
+      const hoy = new Date();
+      const f = new Date(hoy.getFullYear() - anios, hoy.getMonth(), hoy.getDate() + dias);
+      const yyyy = f.getFullYear();
+      const mm = String(f.getMonth() + 1).padStart(2, '0');
+      const dd = String(f.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    const baseValido = {
+      nombreCompleto: 'Juan Pérez',
+      tipoDocumento: 'CEDULA' as const,
+      cedula: 'V-12345678',
+      genero: 'MASCULINO' as const,
+      estadoCivil: 'SOLTERO' as const,
+      correoElectronico: 'juan@test.com',
+      telefono: '04121234567',
+      empresa: 'Empresa Test',
+      aceptaTerminos: true as const,
+      aceptaLopdp: true as const,
+    };
+
+    it('Issue #204: persona con exactamente 18 años recién cumplidos pasa', () => {
+      const result = registroSchema.safeParse({
+        ...baseValido,
+        fechaNacimiento: fechaConOffset(18, 0),
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('Issue #204: persona con 17 años falla con mensaje claro', () => {
+      const result = registroSchema.safeParse({
+        ...baseValido,
+        fechaNacimiento: fechaConOffset(17, 0),
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const issueFecha = result.error.issues.find(i => i.path.includes('fechaNacimiento'));
+        expect(issueFecha?.message).toBe('Debes tener al menos 18 años para registrarte');
+      }
+    });
+
+    it('Issue #204: persona con 17 años y 364 días falla (1 día antes del 18)', () => {
+      const result = registroSchema.safeParse({
+        ...baseValido,
+        // Nacimiento mañana hace 18 años → todavía tiene 17 hoy
+        fechaNacimiento: fechaConOffset(18, 1),
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('Issue #204: persona con 30 años pasa (caso típico)', () => {
+      const result = registroSchema.safeParse({
+        ...baseValido,
+        fechaNacimiento: fechaConOffset(30, 0),
+      });
+      expect(result.success).toBe(true);
+    });
+
   });
 
   describe('5. Género', () => {
