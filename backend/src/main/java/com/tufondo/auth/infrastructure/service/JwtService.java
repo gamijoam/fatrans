@@ -117,8 +117,25 @@ public class JwtService {
         return socioIdStr != null ? UUID.fromString(socioIdStr) : null;
     }
 
-    public Instant extraerExpiracionAccessToken(String token) {
+    /**
+     * Extrae el claim {@code exp} de cualquier JWT (access o refresh) y lo devuelve
+     * como un {@link Instant} absoluto en UTC.
+     *
+     * <p>Reemplaza al método mal nombrado {@link #extraerExpiracionAccessToken(String)},
+     * que sugería que solo aplicaba a access tokens. Usar este método tanto para
+     * access como para refresh tokens.</p>
+     */
+    public Instant extraerExpiracion(String token) {
         Claims claims = validarToken(token);
         return claims.getExpiration().toInstant();
+    }
+
+    /**
+     * @deprecated Usar {@link #extraerExpiracion(String)}. El claim {@code exp} es
+     * el mismo para access y refresh tokens; el nombre anterior inducía a error.
+     */
+    @Deprecated(forRemoval = true)
+    public Instant extraerExpiracionAccessToken(String token) {
+        return extraerExpiracion(token);
     }
 }
