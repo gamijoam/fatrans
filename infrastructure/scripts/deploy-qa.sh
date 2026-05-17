@@ -86,11 +86,26 @@ docker tag fatrans-frontend-qa:latest fatrans-frontend-public-qa:latest
 docker tag fatrans-frontend-qa:latest fatrans-frontend-protected-qa:latest
 log "   Frontend build OK"
 
-# 5. Crear DB fondo_qa si no existe
+# 5. Crear DB fondo_qa si no existe (idempotente)
+#
+# Implementación anterior usaba `psql -tc ... | grep -q 1 || psql -c CREATE`
+# y fallaba intermitentemente con `ERROR: database "fondo_qa" already exists`:
+# con `set -o pipefail` activo, si el primer `docker exec` retornaba exit != 0
+# por cualquier transient (network blip, reattach), el pipe completo era != 0
+# *aunque grep matcheara*, y se ejecutaba el CREATE de todas formas. PostgreSQL
+# además NO soporta `CREATE DATABASE IF NOT EXISTS`, así que el CREATE en una
+# BD ya existente revienta con exit 1 y `set -e` aborta el deploy.
+#
+# Solución: psql `\gexec` — single round-trip, sin pipes, nativamente
+# idempotente. Si la BD existe, el SELECT devuelve 0 filas y `\gexec` no
+# ejecuta nada; si no existe, el SELECT devuelve "CREATE DATABASE fondo_qa"
+# y `\gexec` lo ejecuta. Verificado en QA: ambos casos exit=0.
 log "→ Verificando base de datos fondo_qa..."
-docker exec fatrans-postgres psql -U app -d fondo -tc \
-  "SELECT 1 FROM pg_database WHERE datname='fondo_qa'" 2>/dev/null | grep -q 1 \
-  || docker exec fatrans-postgres psql -U app -d fondo -c "CREATE DATABASE fondo_qa" >> "$LOG_FILE" 2>&1
+docker exec -i fatrans-postgres psql -U app -d fondo >> "$LOG_FILE" 2>&1 <<'SQL'
+SELECT 'CREATE DATABASE fondo_qa'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname='fondo_qa')
+\gexec
+SQL
 log "   DB fondo_qa OK"
 
 # 6. Detener SOLO contenedores QA (nunca tocar prod)
