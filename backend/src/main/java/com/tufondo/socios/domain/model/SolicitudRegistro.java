@@ -48,10 +48,13 @@ public class SolicitudRegistro {
     private String motivoRechazo;
     private Boolean aceptaTerminos;
     private Boolean aceptaLopdp;
-    // ---- Auditoría LOPDP ----
+    /** Declaración jurada LOCDOFT (origen lícito de fondos). Issue #218 PR-B. */
+    private Boolean aceptaLocdoft;
+    // ---- Auditoría LOPDP / LOCDOFT ----
     private String ipRegistro;
     private String userAgentRegistro;
     private Instant consentLopdpTimestamp;
+    private Instant consentLocdoftTimestamp;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -116,12 +119,16 @@ public class SolicitudRegistro {
     public void setAceptaTerminos(Boolean aceptaTerminos) { this.aceptaTerminos = aceptaTerminos; }
     public Boolean getAceptaLopdp() { return aceptaLopdp; }
     public void setAceptaLopdp(Boolean aceptaLopdp) { this.aceptaLopdp = aceptaLopdp; }
+    public Boolean getAceptaLocdoft() { return aceptaLocdoft; }
+    public void setAceptaLocdoft(Boolean aceptaLocdoft) { this.aceptaLocdoft = aceptaLocdoft; }
     public String getIpRegistro() { return ipRegistro; }
     public void setIpRegistro(String ipRegistro) { this.ipRegistro = ipRegistro; }
     public String getUserAgentRegistro() { return userAgentRegistro; }
     public void setUserAgentRegistro(String userAgentRegistro) { this.userAgentRegistro = userAgentRegistro; }
     public Instant getConsentLopdpTimestamp() { return consentLopdpTimestamp; }
     public void setConsentLopdpTimestamp(Instant consentLopdpTimestamp) { this.consentLopdpTimestamp = consentLopdpTimestamp; }
+    public Instant getConsentLocdoftTimestamp() { return consentLocdoftTimestamp; }
+    public void setConsentLocdoftTimestamp(Instant consentLocdoftTimestamp) { this.consentLocdoftTimestamp = consentLocdoftTimestamp; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
@@ -202,9 +209,11 @@ public class SolicitudRegistro {
         public SolicitudRegistroBuilder motivoRechazo(String v) { s.motivoRechazo = v; return this; }
         public SolicitudRegistroBuilder aceptaTerminos(Boolean v) { s.aceptaTerminos = v; return this; }
         public SolicitudRegistroBuilder aceptaLopdp(Boolean v) { s.aceptaLopdp = v; return this; }
+        public SolicitudRegistroBuilder aceptaLocdoft(Boolean v) { s.aceptaLocdoft = v; return this; }
         public SolicitudRegistroBuilder ipRegistro(String v) { s.ipRegistro = v; return this; }
         public SolicitudRegistroBuilder userAgentRegistro(String v) { s.userAgentRegistro = v; return this; }
         public SolicitudRegistroBuilder consentLopdpTimestamp(Instant v) { s.consentLopdpTimestamp = v; return this; }
+        public SolicitudRegistroBuilder consentLocdoftTimestamp(Instant v) { s.consentLocdoftTimestamp = v; return this; }
         public SolicitudRegistroBuilder createdAt(LocalDateTime v) { s.createdAt = v; return this; }
         public SolicitudRegistroBuilder updatedAt(LocalDateTime v) { s.updatedAt = v; return this; }
         public SolicitudRegistro build() { return s; }

@@ -165,6 +165,7 @@ class SolicitudRegistroControllerTest {
                 .salario(new BigDecimal("1500.00"))
                 .aceptaTerminos(true)
                 .aceptaLopdp(true)
+                .aceptaLocdoft(true)
                 .build();
     }
 }

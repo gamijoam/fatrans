@@ -121,7 +121,11 @@ public class SolicitudRegistroEntity {
     @Column(name = "acepta_lopdp", nullable = false)
     private Boolean aceptaLopdp;
 
-    // ---- Auditoría LOPDP (defensa legal Venezuela) ----
+    /** Declaración jurada LOCDOFT (origen lícito de fondos). Issue #218 PR-B. */
+    @Column(name = "acepta_locdoft", nullable = false)
+    private Boolean aceptaLocdoft;
+
+    // ---- Auditoría LOPDP / LOCDOFT (defensa legal Venezuela) ----
     @Column(name = "ip_registro", length = 45)
     private String ipRegistro;
 
@@ -130,6 +134,9 @@ public class SolicitudRegistroEntity {
 
     @Column(name = "consent_lopdp_timestamp")
     private Instant consentLopdpTimestamp;
+
+    @Column(name = "consent_locdoft_timestamp")
+    private Instant consentLocdoftTimestamp;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -200,12 +207,16 @@ public class SolicitudRegistroEntity {
     public void setAceptaTerminos(Boolean aceptaTerminos) { this.aceptaTerminos = aceptaTerminos; }
     public Boolean getAceptaLopdp() { return aceptaLopdp; }
     public void setAceptaLopdp(Boolean aceptaLopdp) { this.aceptaLopdp = aceptaLopdp; }
+    public Boolean getAceptaLocdoft() { return aceptaLocdoft; }
+    public void setAceptaLocdoft(Boolean aceptaLocdoft) { this.aceptaLocdoft = aceptaLocdoft; }
     public String getIpRegistro() { return ipRegistro; }
     public void setIpRegistro(String ipRegistro) { this.ipRegistro = ipRegistro; }
     public String getUserAgentRegistro() { return userAgentRegistro; }
     public void setUserAgentRegistro(String userAgentRegistro) { this.userAgentRegistro = userAgentRegistro; }
     public Instant getConsentLopdpTimestamp() { return consentLopdpTimestamp; }
     public void setConsentLopdpTimestamp(Instant consentLopdpTimestamp) { this.consentLopdpTimestamp = consentLopdpTimestamp; }
+    public Instant getConsentLocdoftTimestamp() { return consentLocdoftTimestamp; }
+    public void setConsentLocdoftTimestamp(Instant consentLocdoftTimestamp) { this.consentLocdoftTimestamp = consentLocdoftTimestamp; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
@@ -244,9 +255,11 @@ public class SolicitudRegistroEntity {
         public SolicitudRegistroEntityBuilder motivoRechazo(String v) { e.motivoRechazo = v; return this; }
         public SolicitudRegistroEntityBuilder aceptaTerminos(Boolean v) { e.aceptaTerminos = v; return this; }
         public SolicitudRegistroEntityBuilder aceptaLopdp(Boolean v) { e.aceptaLopdp = v; return this; }
+        public SolicitudRegistroEntityBuilder aceptaLocdoft(Boolean v) { e.aceptaLocdoft = v; return this; }
         public SolicitudRegistroEntityBuilder ipRegistro(String v) { e.ipRegistro = v; return this; }
         public SolicitudRegistroEntityBuilder userAgentRegistro(String v) { e.userAgentRegistro = v; return this; }
         public SolicitudRegistroEntityBuilder consentLopdpTimestamp(Instant v) { e.consentLopdpTimestamp = v; return this; }
+        public SolicitudRegistroEntityBuilder consentLocdoftTimestamp(Instant v) { e.consentLocdoftTimestamp = v; return this; }
         public SolicitudRegistroEntityBuilder createdAt(LocalDateTime v) { e.createdAt = v; return this; }
         public SolicitudRegistroEntityBuilder updatedAt(LocalDateTime v) { e.updatedAt = v; return this; }
         public SolicitudRegistroEntity build() { return e; }

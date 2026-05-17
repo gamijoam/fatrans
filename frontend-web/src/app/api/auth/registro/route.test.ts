@@ -60,6 +60,7 @@ function buildValidPayload(overrides: Record<string, unknown> = {}): Record<stri
     emergenciaParentesco: 'Cónyuge',
     aceptaTerminos: true,
     aceptaLopdp: true,
+    aceptaLocdoft: true, // Issue #218 PR-B — declaración LOCDOFT obligatoria
     ...overrides,
   };
 }
@@ -127,6 +128,7 @@ describe('POST /api/auth/registro (BFF)', () => {
       'emergenciaParentesco',
       'aceptaTerminos',
       'aceptaLopdp',
+      'aceptaLocdoft',
     ];
     for (const key of expectedKeys) {
       expect(forwarded).toHaveProperty(key);
@@ -146,6 +148,7 @@ describe('POST /api/auth/registro (BFF)', () => {
     // Booleanos de consentimiento llegan como `true`.
     expect(forwarded.aceptaTerminos).toBe(true);
     expect(forwarded.aceptaLopdp).toBe(true);
+    expect(forwarded.aceptaLocdoft).toBe(true);
 
     // Salario normalizado a string numérico para BigDecimal.
     expect(forwarded.salario).toBe('1500.5');

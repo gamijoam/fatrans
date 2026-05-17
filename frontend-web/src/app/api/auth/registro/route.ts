@@ -133,12 +133,15 @@ export async function POST(request: NextRequest) {
       // --- Consentimientos legales (booleanos, requeridos por el backend con @AssertTrue) ---
       aceptaTerminos: data.aceptaTerminos,
       aceptaLopdp: data.aceptaLopdp,
+      // Issue #218 PR-B — declaración jurada LOCDOFT (origen lícito de fondos).
+      aceptaLocdoft: data.aceptaLocdoft,
 
-      // --- Auditoría LOPDP (defensa legal Venezuela) ---
+      // --- Auditoría LOPDP / LOCDOFT (defensa legal Venezuela) ---
       // IP del cliente original (respeta x-forwarded-for; el primer hop) y user-agent.
       // El backend trunca a 45 / 500 chars y, si vienen null/vacíos, hace fallback a
-      // HttpServletRequest. El consentLopdpTimestamp lo sella el backend con Instant.now()
-      // cuando aceptaLopdp === true — NUNCA confiamos en el cliente para timestamps.
+      // HttpServletRequest. Los timestamps consentLopdpTimestamp y consentLocdoftTimestamp
+      // los sella el backend con Instant.now() cuando los flags llegan en true — NUNCA
+      // confiamos en el cliente para timestamps.
       ipRegistro: getClientIp(request),
       userAgentRegistro: request.headers.get('user-agent'),
     };

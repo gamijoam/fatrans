@@ -98,6 +98,16 @@ public class SolicitudRegistroRequestDTO {
     @AssertTrue(message = "Debe aceptar la política de protección de datos personales")
     private Boolean aceptaLopdp;
 
+    /**
+     * Declaración jurada LOCDOFT (origen lícito de fondos). Issue #218 PR-B.
+     * Obligación de la Ley Orgánica contra la Delincuencia Organizada y
+     * Financiamiento al Terrorismo — los sujetos obligados (Fatrans como
+     * fondo de ahorro) deben recolectar esta declaración al onboarding.
+     */
+    @NotNull(message = "Debe aceptar la declaración LOCDOFT")
+    @AssertTrue(message = "Debe declarar que los fondos provienen de actividades lícitas (LOCDOFT)")
+    private Boolean aceptaLocdoft;
+
     // ---- Metadatos opcionales de auditoría LOPDP ----
     // Provienen del BFF (que ya captura x-forwarded-for + user-agent).
     // El controller usa estos valores como fuente preferida y, si vienen vacíos,

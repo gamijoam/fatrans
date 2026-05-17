@@ -71,6 +71,7 @@ class SolicitudRegistroRepositoryImplTest {
                 .estado(EstadoSolicitud.PENDIENTE)
                 .aceptaTerminos(true)
                 .aceptaLopdp(true)
+                .aceptaLocdoft(true)
                 .fechaSolicitud(LocalDateTime.now())
                 .build();
 
@@ -105,11 +106,12 @@ class SolicitudRegistroRepositoryImplTest {
     }
 
     @Test
-    @DisplayName("Preserva aceptaTerminos y aceptaLopdp (defecto LOPDP histórico)")
+    @DisplayName("Preserva aceptaTerminos, aceptaLopdp y aceptaLocdoft (consentimientos legales)")
     void preservaConsentimientosLegales() {
         SolicitudRegistro solicitud = nuevaSolicitudMinima("V-30000001", "lopdp@test.com")
                 .aceptaTerminos(true)
                 .aceptaLopdp(true)
+                .aceptaLocdoft(true)
                 .build();
 
         SolicitudRegistro guardada = repository.guardar(solicitud);
@@ -123,6 +125,9 @@ class SolicitudRegistroRepositoryImplTest {
                 .isTrue();
         assertThat(recuperada.getAceptaLopdp())
                 .as("aceptaLopdp debe persistirse; mapping antiguo lo perdía (defecto legal LOPDP)")
+                .isTrue();
+        assertThat(recuperada.getAceptaLocdoft())
+                .as("aceptaLocdoft debe persistirse (#218 PR-B — declaración LOCDOFT)")
                 .isTrue();
     }
 
@@ -263,6 +268,10 @@ class SolicitudRegistroRepositoryImplTest {
                 .correoElectronico(correo)
                 .telefono("04121234567")
                 .empresa("Empresa Test")
+                // Consentimientos legales mínimos (#218 PR-B: locdoft también obligatorio)
+                .aceptaTerminos(true)
+                .aceptaLopdp(true)
+                .aceptaLocdoft(true)
                 .estado(EstadoSolicitud.PENDIENTE)
                 .fechaSolicitud(LocalDateTime.now());
     }

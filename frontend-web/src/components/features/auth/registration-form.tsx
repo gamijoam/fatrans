@@ -116,7 +116,7 @@ const STEPS: StepDef[] = [
     title: 'Confirmación',
     description: 'Revisa y acepta',
     icon: ShieldCheck,
-    fields: ['aceptaTerminos', 'aceptaLopdp'],
+    fields: ['aceptaTerminos', 'aceptaLopdp', 'aceptaLocdoft'],
   },
 ];
 
@@ -723,6 +723,32 @@ export function RegistrationForm() {
                   )}
                 />
                 <FieldError message={errors.aceptaLopdp?.message} />
+
+                {/* Declaración jurada LOCDOFT (#218 PR-B). Obligación legal —
+                    los sujetos obligados deben recolectar al onboarding. */}
+                <Controller
+                  control={control}
+                  name="aceptaLocdoft"
+                  render={({ field }) => (
+                    <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                      <Checkbox
+                        id="aceptaLocdoft"
+                        checked={field.value === true}
+                        onCheckedChange={(c) => field.onChange(c === true)}
+                        disabled={isLoading}
+                        aria-invalid={!!errors.aceptaLocdoft}
+                        className="mt-0.5"
+                      />
+                      <Label htmlFor="aceptaLocdoft" className="text-sm leading-relaxed text-amber-900">
+                        <strong className="block mb-1">Declaración jurada de origen lícito de fondos</strong>
+                        Declaro bajo fe de juramento que los fondos que utilizaré en esta plataforma{' '}
+                        <strong>no provienen de actividades ilícitas</strong> según la Ley Orgánica
+                        contra la Delincuencia Organizada y Financiamiento al Terrorismo (LOCDOFT).
+                      </Label>
+                    </div>
+                  )}
+                />
+                <FieldError message={errors.aceptaLocdoft?.message} />
               </div>
             </div>
           )}
