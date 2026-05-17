@@ -163,6 +163,51 @@ class SolicitudRegistroRequestDTOTest {
                     .collect(java.util.stream.Collectors.toSet());
             assertThat(violations).doesNotContain("fechaNacimiento");
         }
+
+        @Test
+        @DisplayName("Issue #204: persona con exactamente 18 años recién cumplidos pasa")
+        void edad_18_exacta_Pasa() {
+            SolicitudRegistroRequestDTO request = createValidRequest();
+            request.setFechaNacimiento(LocalDate.now().minusYears(18));
+            Set<String> violations = validator.validate(request).stream()
+                    .map(v -> v.getPropertyPath().toString())
+                    .collect(java.util.stream.Collectors.toSet());
+            assertThat(violations).doesNotContain("fechaNacimiento");
+        }
+
+        @Test
+        @DisplayName("Issue #204: persona con 17 años NO debe pasar (bloqueo LOPNNA)")
+        void edad_17_Falla() {
+            SolicitudRegistroRequestDTO request = createValidRequest();
+            request.setFechaNacimiento(LocalDate.now().minusYears(17));
+            Set<String> violations = validator.validate(request).stream()
+                    .map(v -> v.getPropertyPath().toString())
+                    .collect(java.util.stream.Collectors.toSet());
+            assertThat(violations).contains("fechaNacimiento");
+        }
+
+        @Test
+        @DisplayName("Issue #204: persona con 17 años y 364 días NO debe pasar")
+        void edad_17_y_364_dias_Falla() {
+            SolicitudRegistroRequestDTO request = createValidRequest();
+            // Fecha que da exactamente 17 años + 364 días (un día antes del 18 cumpleaños)
+            request.setFechaNacimiento(LocalDate.now().minusYears(18).plusDays(1));
+            Set<String> violations = validator.validate(request).stream()
+                    .map(v -> v.getPropertyPath().toString())
+                    .collect(java.util.stream.Collectors.toSet());
+            assertThat(violations).contains("fechaNacimiento");
+        }
+
+        @Test
+        @DisplayName("Issue #204: fecha futura falla (cubre tanto @Past como @MayorDeEdad)")
+        void fechaFutura_Falla() {
+            SolicitudRegistroRequestDTO request = createValidRequest();
+            request.setFechaNacimiento(LocalDate.now().plusDays(1));
+            Set<String> violations = validator.validate(request).stream()
+                    .map(v -> v.getPropertyPath().toString())
+                    .collect(java.util.stream.Collectors.toSet());
+            assertThat(violations).contains("fechaNacimiento");
+        }
     }
 
     @Nested

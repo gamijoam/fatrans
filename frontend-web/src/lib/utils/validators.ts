@@ -81,10 +81,18 @@ export const registroSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida. Formato: YYYY-MM-DD')
     .refine((val) => {
-      const date = new Date(val);
-      const now = new Date();
-      return date < now;
-    }, 'La fecha de nacimiento debe ser pasada'),
+      // Issue #204: validar mayoría de edad (≥18). Bloqueante legal (LOPNNA).
+      // Parseamos manualmente para evitar problemas de timezone con `new Date(val)`,
+      // que interpreta "YYYY-MM-DD" como UTC y puede restar un día en zonas negativas.
+      const [year, month, day] = val.split('-').map(Number);
+      const hoy = new Date();
+      const cumpleEste = new Date(hoy.getFullYear(), month - 1, day);
+      let edad = hoy.getFullYear() - year;
+      if (hoy < cumpleEste) {
+        edad -= 1; // aún no ha cumplido años este año
+      }
+      return edad >= 18;
+    }, 'Debes tener al menos 18 años para registrarte'),
   genero: z.enum(GENEROS, { required_error: 'El género es obligatorio' }),
   estadoCivil: z.enum(ESTADOS_CIVILES, { required_error: 'El estado civil es obligatorio' }),
   correoElectronico: z

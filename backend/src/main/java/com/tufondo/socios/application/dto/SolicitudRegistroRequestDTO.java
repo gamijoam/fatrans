@@ -1,6 +1,7 @@
 // 📁 com/tufondo/socios/application/dto/SolicitudRegistroRequestDTO.java
 package com.tufondo.socios.application.dto;
 
+import com.tufondo.socios.application.validation.MayorDeEdad;
 import com.tufondo.socios.domain.model.enums.EstadoCivil;
 import com.tufondo.socios.domain.model.enums.Genero;
 import com.tufondo.socios.domain.model.enums.TipoDocumento;
@@ -35,6 +36,7 @@ public class SolicitudRegistroRequestDTO {
 
     @NotNull(message = "La fecha de nacimiento es obligatoria")
     @Past(message = "La fecha de nacimiento debe ser una fecha pasada")
+    @MayorDeEdad(edadMinima = 18, message = "Debes tener al menos 18 años para registrarte")
     private LocalDate fechaNacimiento;
 
     @NotNull(message = "El género es obligatorio")
