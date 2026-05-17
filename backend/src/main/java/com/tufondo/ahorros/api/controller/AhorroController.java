@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.web.bind.annotation.*;
@@ -50,12 +51,17 @@ public class AhorroController {
     private final CalcularRendimientosBatchUseCase calcularRendimientosBatchUseCase;
 
     // 1. POST /cuentas - Crear Cuenta
+    // Issue #179: @PreAuthorize asegura autenticación; el use case valida ownership
+    // (un socio solo puede crear cuenta para sí mismo; admin puede para cualquiera).
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Crear cuenta de ahorro")
     public ResponseEntity<CuentaAhorroResponse> crearCuenta(
             @Valid @RequestBody CreateCuentaAhorroRequest request,
             Authentication authentication) {
-        CuentaAhorroResponse response = crearCuentaUseCase.ejecutar(request);
+        UUID socioIdToken = extraerSocioId(authentication);
+        boolean isAdmin = esAdmin(authentication);
+        CuentaAhorroResponse response = crearCuentaUseCase.ejecutar(request, socioIdToken, isAdmin);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

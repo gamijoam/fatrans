@@ -65,6 +65,11 @@ public class SecurityConfig {
                 )
             )
             .authorizeHttpRequests(auth -> auth
+                // Issue #179: crear-usuario y cambiar-password requieren autenticación
+                // y autorización específica (enforced también por @PreAuthorize en el
+                // controller para defensa en profundidad).
+                .requestMatchers("/api/v1/auth/crear-usuario").authenticated()
+                .requestMatchers("/api/v1/auth/cambiar-password").authenticated()
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/socios/solicitud").permitAll()
                 // Webhook biométrico del proveedor KYC (Didit). NO usa JWT — la

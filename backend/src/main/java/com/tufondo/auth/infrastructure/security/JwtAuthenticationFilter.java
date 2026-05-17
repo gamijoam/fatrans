@@ -107,6 +107,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
+        // Issue #179: /api/v1/auth/crear-usuario REMOVIDO del bypass.
+        // Era accesible sin autenticación → cualquier atacante creaba usuarios
+        // vinculados a socios existentes. Ahora requiere JWT + rol ADMIN
+        // (enforce via @PreAuthorize en AuthController.crearUsuario).
         return path.equals("/api/v1/auth/login")
             || path.equals("/api/v1/auth/login-web")
             || path.equals("/api/v1/auth/logout")
@@ -116,7 +120,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             || path.equals("/api/v1/auth/validar")
             || path.equals("/api/v1/auth/recuperar-password")
             || path.equals("/api/v1/auth/reset-password")
-            || path.equals("/api/v1/auth/crear-usuario")
             || path.equals("/api/v1/socios/solicitud");
     }
 }
