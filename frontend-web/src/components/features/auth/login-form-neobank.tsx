@@ -149,24 +149,51 @@ export function LoginFormNeobank() {
           procesando, no congelada. */}
       {isLoading && <LoadingLogo variante="overlay" mensaje="Iniciando sesión..." />}
 
-      {/* Login Card */}
-      <div className="relative z-10 w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-2xl shadow-blue-950/50 overflow-hidden">
-          {/* Card Header con logo institucional */}
-          <div className="px-8 pt-8 pb-6 text-center border-b border-slate-100">
-            <div className="flex justify-center mb-4">
-              <Logo size={88} priority />
+      {/* Container responsivo: 2 columnas en desktop (logo institucional
+          a la izquierda + card del form a la derecha), stack vertical en
+          mobile (logo dentro del card como antes). */}
+      <div className="relative z-10 w-full max-w-5xl">
+        <div className="grid lg:grid-cols-[1.1fr_1fr] gap-8 lg:gap-12 items-center">
+          {/* === COLUMNA IZQUIERDA: Branding institucional (solo desktop) === */}
+          <aside className="hidden lg:flex flex-col items-center text-center text-white px-4">
+            <Logo size={220} soloImagen priority />
+            <h1 className="mt-6 text-5xl font-bold tracking-tight">Fatrans</h1>
+            <p className="mt-2 text-base uppercase tracking-[0.2em] text-blue-200/90">
+              Asociación de Ahorro y Crédito
+            </p>
+            <p className="mt-8 text-sm text-white/80 max-w-md leading-relaxed">
+              El respaldo financiero del sector transporte venezolano.
+              Ahorro, crédito y servicios diseñados para socios del transporte.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-2 justify-center">
+              <TrustChip icon={Lock} label="Cifrado de grado bancario" />
+              <TrustChip icon={ShieldCheck} label="Auditoría LOCDOFT" />
             </div>
-            <h1 className="text-xl font-bold text-slate-900">
+            <p className="mt-10 text-xs text-white/40">
+              RIF J-50516835-5 · © {new Date().getFullYear()} Fatrans
+            </p>
+          </aside>
+
+          {/* === COLUMNA DERECHA: Card del formulario === */}
+          <div className="w-full max-w-md mx-auto lg:mx-0">
+        <div className="bg-white rounded-2xl shadow-2xl shadow-blue-950/50 overflow-hidden">
+          {/* Card Header — logo solo visible en mobile (en desktop ya
+              está en la columna izquierda). En desktop, el header queda
+              más compacto y limpio. */}
+          <div className="px-7 pt-6 pb-5 text-center border-b border-slate-100">
+            <div className="flex justify-center mb-3 lg:hidden">
+              <Logo size={72} priority />
+            </div>
+            <h2 className="text-lg lg:text-xl font-bold text-slate-900">
               Acceso Seguro al Fondo
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
+            </h2>
+            <p className="text-xs lg:text-sm text-slate-500 mt-1">
               Ingresa tus credenciales para continuar
             </p>
           </div>
 
-          {/* Card Body */}
-          <div className="px-8 py-8">
+          {/* Card Body — padding compactado para que el card no se infle */}
+          <div className="px-7 py-6">
             {/* Lockout Warning */}
             {lockoutRemaining > 0 && (
               <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3">
@@ -205,7 +232,7 @@ export function LoginFormNeobank() {
                   placeholder="Ej: V-12345678"
                   autoComplete="username"
                   disabled={isLoading || lockoutRemaining > 0}
-                  className="h-14 px-4 rounded-xl border-slate-300 bg-slate-50 text-base placeholder:text-slate-400 focus:bg-white focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 transition-all"
+                  className="h-12 px-4 rounded-xl border-slate-300 bg-slate-50 text-base placeholder:text-slate-400 focus:bg-white focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 transition-all"
                   {...register('identificador')}
                   aria-invalid={!!errors.identificador}
                   aria-describedby={errors.identificador ? 'identificador-error' : undefined}
@@ -236,7 +263,7 @@ export function LoginFormNeobank() {
                     placeholder="Ingresa tu contraseña"
                     autoComplete="current-password"
                     disabled={isLoading || lockoutRemaining > 0}
-                    className="h-14 px-4 pr-12 rounded-xl border-slate-300 bg-slate-50 text-base placeholder:text-slate-400 focus:bg-white focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 transition-all"
+                    className="h-12 px-4 pr-12 rounded-xl border-slate-300 bg-slate-50 text-base placeholder:text-slate-400 focus:bg-white focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 transition-all"
                     {...register('password')}
                     aria-invalid={!!errors.password}
                     aria-describedby={errors.password ? 'password-error' : undefined}
@@ -306,7 +333,7 @@ export function LoginFormNeobank() {
               {/* Submit Button */}
               <Button
                 type="submit"
-                className="w-full h-14 bg-[#16A34A] hover:bg-[#15803D] text-white font-semibold text-base rounded-xl transition-all shadow-lg shadow-[#16A34A]/25 hover:shadow-[#16A34A]/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-12 bg-[#16A34A] hover:bg-[#15803D] text-white font-semibold text-base rounded-xl transition-all shadow-lg shadow-[#16A34A]/25 hover:shadow-[#16A34A]/40 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isLoading || lockoutRemaining > 0}
               >
                 {isLoading ? (
@@ -334,24 +361,41 @@ export function LoginFormNeobank() {
             </p>
           </div>
 
-          {/* Card Footer - Trust Badges */}
-          <div className="px-8 py-5 bg-slate-50 border-t border-slate-100">
-            <div className="flex items-center justify-center gap-1 text-xs text-slate-400">
+          {/* Card Footer - Trust Badges (siempre visible) */}
+          <div className="px-7 py-4 bg-slate-50 border-t border-slate-100">
+            <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1 text-xs text-slate-400">
               <Lock className="w-3 h-3" />
               <span>Cifrado de grado bancario.</span>
-              <span className="mx-1.5 text-slate-300">•</span>
-              <span>Auditoría en tiempo real.</span>
-              <span className="mx-1.5 text-slate-300">•</span>
+              <span className="mx-1 text-slate-300">•</span>
               <span className="font-medium text-slate-500">v2.1.0</span>
             </div>
           </div>
         </div>
 
-        {/* Copyright */}
-        <p className="mt-6 text-center text-xs text-white/40">
-          © {new Date().getFullYear()} Fatrans. Todos los derechos reservados.
+        {/* Copyright — solo visible en mobile (en desktop ya está en la
+            columna izquierda con el RIF). */}
+        <p className="mt-6 text-center text-xs text-white/40 lg:hidden">
+          © {new Date().getFullYear()} Fatrans · RIF J-50516835-5
         </p>
+          </div>
+          {/* === FIN columna derecha === */}
+        </div>
+        {/* === FIN grid 2-cols === */}
       </div>
     </div>
+  );
+}
+
+/**
+ * Chip de confianza institucional (solo visible en desktop).
+ * Muestra una característica de seguridad/cumplimiento con ícono +
+ * label sobre fondo glassmorphism.
+ */
+function TrustChip({ icon: Icon, label }: { icon: React.ComponentType<{ className?: string }>; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 px-3 py-1.5 text-xs font-medium text-white/90">
+      <Icon className="w-3.5 h-3.5 text-emerald-400" />
+      {label}
+    </span>
   );
 }

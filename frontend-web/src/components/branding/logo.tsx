@@ -6,16 +6,14 @@ import Image from 'next/image';
  * Logo institucional de Fatrans.
  *
  * Usa `next/image` para optimización automática (resize, lazy, formatos
- * modernos). El archivo fuente vive en `frontend-web/public/logo-fatrans.svg`
- * (placeholder).
+ * modernos). El archivo fuente vive en `frontend-web/public/logo-fatrans.png`
+ * — debe ser el logo institucional real (PNG render del logo metálico con
+ * la mascota digital, sin RIF embebido). Idealmente 1024×1024 con fondo
+ * transparente.
  *
- * Para reemplazar por el logo institucional real (PNG render del logo
- * metálico con la mascota digital):
- *   1. Guardar el archivo en `frontend-web/public/logo-fatrans.png`
- *      (PNG con fondo transparente, idealmente 1024×1024).
- *   2. Cambiar el `src` abajo de `.svg` a `.png` (Next.js detecta el
- *      formato automáticamente).
- *   3. Opcional: eliminar `logo-fatrans.svg` si ya no se necesita.
+ * Si el PNG no existe, el browser muestra el alt text. Para tener un
+ * fallback visual, se mantiene `logo-fatrans.svg` (placeholder estilizado)
+ * — el dev puede cambiar el `src` temporalmente si quiere ver el placeholder.
  */
 
 export interface LogoProps {
@@ -41,7 +39,7 @@ export function Logo({ size = 96, className = '', soloImagen = false, priority =
         aria-label="Fatrans — Asociación de Ahorro y Crédito"
       >
         <Image
-          src="/logo-fatrans.svg"
+          src="/logo-fatrans.png"
           alt="Fatrans"
           fill
           sizes={`${size}px`}
