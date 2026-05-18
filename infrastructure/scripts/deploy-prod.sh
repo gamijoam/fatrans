@@ -44,12 +44,24 @@ docker build \
 log "   Backend build OK"
 
 # 3. Build del Frontend
+# IMPORTANTE: pasar los CUATRO build-args de NEXT_PUBLIC_*. Los valores
+# se inlinean al BUILD (no a runtime), así que si falta alguno acá, el
+# bundle queda con el default del Dockerfile y los env vars del
+# `docker-compose.prod.yml` no lo cambian en producción.
+#
+# El 18-may-2026 omitir ADMIN_URL y AUTH_URL hizo que el bundle quedara
+# con `NEXT_PUBLIC_AUTH_URL=https://fatrans.com.ve` (default del
+# Dockerfile) en vez de `auth.fatrans.com.ve` (compose). Los usuarios
+# que entraban por `www.fatrans.com.ve/registro` recibían 403
+# "Origen no permitido" porque la whitelist del BFF no incluía `www`.
 log "→ Construyendo imagen frontend (prod)..."
 docker build \
   -t fatrans-frontend:latest \
   -t "fatrans-frontend:$GIT_SHA" \
   --build-arg NEXT_PUBLIC_API_URL=https://api.fatrans.com.ve/api \
   --build-arg NEXT_PUBLIC_APP_URL=https://app.fatrans.com.ve \
+  --build-arg NEXT_PUBLIC_ADMIN_URL=https://admin.fatrans.com.ve \
+  --build-arg NEXT_PUBLIC_AUTH_URL=https://fatrans.com.ve \
   "$REPO_DIR/frontend-web/"
 
 docker tag fatrans-frontend:latest fatrans-frontend-public:latest

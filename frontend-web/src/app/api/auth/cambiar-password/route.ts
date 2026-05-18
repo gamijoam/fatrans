@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { enforceOriginPolicy } from '@/lib/security/origin-check';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 
@@ -16,18 +17,8 @@ const changePasswordRequestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get('origin');
-    const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:13000',
-    process.env.NEXT_PUBLIC_APP_URL,
-    process.env.NEXT_PUBLIC_ADMIN_URL,
-    process.env.NEXT_PUBLIC_AUTH_URL,
-  ].filter(Boolean);
-
-  if (origin && !allowedOrigins.includes(origin)) {
-    return NextResponse.json({ message: 'Origen no permitido' }, { status: 403 });
-  }
+  const blocked = enforceOriginPolicy(request);
+  if (blocked) return blocked;
 
   try {
     const body = await request.json();

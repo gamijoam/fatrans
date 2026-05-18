@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useForm, Controller, type Path } from 'react-hook-form';
+import { useEffect, useMemo, useState } from 'react';
+import { useForm, useWatch, Controller, type Path } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import {
@@ -152,11 +152,40 @@ export function RegistrationForm() {
     trigger,
     control,
     getValues,
+    setValue,
   } = useForm<RegistroFormData>({
     resolver: zodResolver(registroSchema),
     mode: 'onBlur',
     reValidateMode: 'onChange',
   });
+
+  // Auto-prefix de cédula según tipoDocumento. El usuario seleccionó
+  // "Cédula de Identidad (V-)" → mostramos un "V-" fijo a la izquierda
+  // del input y el usuario solo escribe los dígitos. Idem "E-" para
+  // extranjeros. Para RIF/Pasaporte dejamos el input plano (formato
+  // libre: RIF es V/E/J/G-XXXXXXX-Y y Pasaporte es alfanumérico).
+  const tipoDocumento = useWatch({ control, name: 'tipoDocumento' });
+  const cedulaPrefix = useMemo<'V-' | 'E-' | ''>(() => {
+    if (tipoDocumento === 'CEDULA') return 'V-';
+    if (tipoDocumento === 'CEDULA_EXTRANJERO') return 'E-';
+    return '';
+  }, [tipoDocumento]);
+
+  // Cuando cambia el tipo, re-prefijar los dígitos existentes para que
+  // pasar de Cédula → Extranjero (o viceversa) no obligue al usuario
+  // a retipear. Si pasa a RIF/Pasaporte, dejamos el valor sin prefijo.
+  useEffect(() => {
+    const current = getValues('cedula') || '';
+    const digits = current.replace(/^[VEJG]-?/, '');
+    if (cedulaPrefix) {
+      setValue('cedula', `${cedulaPrefix}${digits}`, { shouldValidate: false });
+    } else if (current && current !== digits) {
+      // Estábamos en CEDULA/EXTRANJERO y ahora es RIF/Pasaporte: limpiar
+      // prefijo automático para que el usuario lo escriba libremente.
+      setValue('cedula', digits, { shouldValidate: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cedulaPrefix]);
 
   const currentStep = STEPS[stepIndex];
   const isLastStep = stepIndex === STEPS.length - 1;
@@ -305,16 +334,71 @@ export function RegistrationForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <FieldLabel htmlFor="cedula">Cédula</FieldLabel>
-                  <Input
-                    id="cedula"
-                    type="text"
-                    placeholder="V-12345678"
-                    autoComplete="off"
-                    disabled={isLoading}
-                    aria-invalid={!!errors.cedula}
-                    {...register('cedula')}
-                  />
+                  <FieldLabel htmlFor="cedula">
+                    {tipoDocumento === 'RIF' ? 'RIF' : 'Cédula'}
+                  </FieldLabel>
+                  {cedulaPrefix ? (
+                    // Cédula nacional o extranjera — prefijo V-/E- fijo a la izquierda.
+                    // El input solo acepta dígitos; almacenamos `<prefix><digits>`
+                    // en el form state para que pase el regex /^(V|E)-\d{7,8}$/.
+                    <Controller
+                      control={control}
+                      name="cedula"
+                      render={({ field }) => {
+                        const digitsOnly = (field.value || '').replace(/^[VE]-?/, '');
+                        return (
+                          <div
+                            className={`flex items-stretch rounded-md border bg-background overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${
+                              errors.cedula ? 'border-destructive' : 'border-input'
+                            }`}
+                          >
+                            <span
+                              className="flex items-center px-3 bg-muted/50 text-sm font-semibold border-r border-input select-none text-foreground/80"
+                              aria-hidden="true"
+                            >
+                              {cedulaPrefix}
+                            </span>
+                            <Input
+                              id="cedula"
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              placeholder="12345678"
+                              autoComplete="off"
+                              maxLength={8}
+                              disabled={isLoading}
+                              aria-invalid={!!errors.cedula}
+                              value={digitsOnly}
+                              onChange={(e) => {
+                                const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 8);
+                                field.onChange(`${cedulaPrefix}${onlyDigits}`);
+                              }}
+                              onBlur={field.onBlur}
+                              className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
+                            />
+                          </div>
+                        );
+                      }}
+                    />
+                  ) : (
+                    // RIF / Pasaporte — formato libre.
+                    <Input
+                      id="cedula"
+                      type="text"
+                      placeholder={
+                        tipoDocumento === 'RIF' ? 'J-123456789-0' : 'Documento'
+                      }
+                      autoComplete="off"
+                      disabled={isLoading || !tipoDocumento}
+                      aria-invalid={!!errors.cedula}
+                      {...register('cedula')}
+                    />
+                  )}
+                  {!tipoDocumento && (
+                    <p className="text-xs text-muted-foreground">
+                      Primero seleccioná el tipo de documento.
+                    </p>
+                  )}
                   <FieldError message={errors.cedula?.message} />
                 </div>
 
