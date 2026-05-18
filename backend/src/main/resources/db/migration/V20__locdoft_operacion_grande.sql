@@ -14,14 +14,21 @@
 -- =========================================================================
 
 -- 1. Seeds de los umbrales (idempotente — sólo inserta si la clave no existe)
-INSERT INTO parametros_sistema (clave, valor, tipo, descripcion, categoria, editable)
-SELECT 'LOCDOFT_UMBRAL_VES', '10000.00', 'CURRENCY',
+--
+-- NOTA HISTÓRICA: la tabla `parametros_sistema` tiene DOS columnas NOT NULL
+-- duplicadas (`clave` de la migración V8 + `param_key` agregada por
+-- Hibernate `ddl-auto: update` desde el campo `key` de la entidad JPA).
+-- Cualquier INSERT directo desde SQL debe llenar AMBAS, sino viola el
+-- NOT NULL constraint de `param_key`. (Pendiente: unificar esto en una
+-- migración futura que dropee `clave` y deje solo `param_key`.)
+INSERT INTO parametros_sistema (clave, param_key, valor, tipo, descripcion, categoria, editable)
+SELECT 'LOCDOFT_UMBRAL_VES', 'LOCDOFT_UMBRAL_VES', '10000.00', 'CURRENCY',
        'Umbral en bolívares para exigir declaración jurada LOCDOFT en operaciones (depósito/retiro). Por defecto Bs 10.000 (aprox equivalente a USD 1.000 con tasa BCV media histórica).',
        'compliance', TRUE
 WHERE NOT EXISTS (SELECT 1 FROM parametros_sistema WHERE clave = 'LOCDOFT_UMBRAL_VES');
 
-INSERT INTO parametros_sistema (clave, valor, tipo, descripcion, categoria, editable)
-SELECT 'LOCDOFT_UMBRAL_USD', '1000.00', 'CURRENCY',
+INSERT INTO parametros_sistema (clave, param_key, valor, tipo, descripcion, categoria, editable)
+SELECT 'LOCDOFT_UMBRAL_USD', 'LOCDOFT_UMBRAL_USD', '1000.00', 'CURRENCY',
        'Umbral en USD para exigir declaración jurada LOCDOFT en operaciones (depósito/retiro). Recomendación FATF: USD 1.000 para reporting de operaciones.',
        'compliance', TRUE
 WHERE NOT EXISTS (SELECT 1 FROM parametros_sistema WHERE clave = 'LOCDOFT_UMBRAL_USD');
