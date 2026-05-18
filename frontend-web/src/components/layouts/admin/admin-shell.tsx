@@ -67,10 +67,25 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+      const target = event.target as Element | null;
+      if (!target) return;
+      // Ignorar clicks dentro de portals de Radix (Dialog/Popover/etc.).
+      // Razón: el LogoutButton abre un Dialog de confirmación que Radix
+      // renderiza vía Portal FUERA de `profileRef`. Sin esta guarda, el
+      // click en "Cerrar Sesión" del modal se interpretaba como
+      // "click afuera" → cerraba el dropdown → desmontaba el DialogTrigger
+      // → Radix cerraba el Dialog → el logout nunca se ejecutaba.
+      if (
+        target.closest('[role="dialog"]') ||
+        target.closest('[data-radix-popper-content-wrapper]') ||
+        target.closest('[data-radix-portal]')
+      ) {
+        return;
+      }
+      if (profileRef.current && !profileRef.current.contains(target as Node)) {
         setProfileOpen(false);
       }
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+      if (notifRef.current && !notifRef.current.contains(target as Node)) {
         setNotificationsOpen(false);
       }
     }
