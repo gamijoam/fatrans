@@ -12,6 +12,7 @@ import com.tufondo.creditos.domain.model.enums.EstadoSolicitud;
 import com.tufondo.creditos.domain.repository.PlanAmortizacionRepository;
 import com.tufondo.creditos.domain.repository.SolicitudCreditoRepository;
 import com.tufondo.creditos.domain.repository.TipoCreditoRepository;
+import com.tufondo.notificaciones.application.service.NotificacionPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,8 @@ public class DesembolsaCreditoUseCase {
     private final TipoCreditoRepository tipoCreditoRepository;
     private final PlanAmortizacionRepository planRepository;
     private final CreditosDTOMapper mapper;
+    // Issue #214 PR-C
+    private final NotificacionPublisher notificacionPublisher;
 
     @Transactional
     public Map<String, Object> ejecutar(String numeroSolicitud, DesembolsaRequest request, String ipOrigen) {
@@ -82,8 +85,12 @@ public class DesembolsaCreditoUseCase {
         solicitud.setUpdatedAt(LocalDateTime.now());
         solicitudRepository.guardar(solicitud);
 
-        log.info("Crédito desembolsado: {} - Monto: {} - Comision: {} - IP: {}", 
+        log.info("Crédito desembolsado: {} - Monto: {} - Comision: {} - IP: {}",
             numeroSolicitud, montoNeto, comisionApertura, ipOrigen);
+
+        // Issue #214 PR-C: notificar al socio del desembolso
+        notificacionPublisher.notificarSocioCreditoDesembolsado(
+                solicitud.getSocioId(), montoNeto, "Bs", numeroSolicitud);
 
         Map<String, Object> response = new HashMap<>();
         response.put("id", solicitud.getId().toString());

@@ -1,0 +1,141 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: fatrans-postgres
+    environment:
+      POSTGRES_DB: fondo
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: fatrans-secret-2026
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d fondo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fatrans-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: fatrans-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fatrans-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: fatrans-minio
+    environment:
+      MINIO_ROOT_USER: fatransminio
+      MINIO_ROOT_PASSWORD: fatransminio_secret_2026
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    # La imagen minio/minio:latest no incluye curl/wget — el healthcheck debe
+    # usar `mc` (cliente CLI incluido) o fallará siempre aunque el servicio
+    # responda correctamente. (Bug observado 2026-05-15: minio quedó unhealthy
+    # pese a HTTP 200 en /minio/health/live).
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 15s
+    networks:
+      - fatrans-network
+
+  backend:
+    image: fatrans-backend:latest
+    container_name: fatrans-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://fatrans-postgres:5432/fondo
+      DB_USER: app
+      DB_PASS: fatrans-secret-2026
+      REDIS_HOST: fatrans-redis
+      REDIS_PORT: 6379
+      MINIO_ENDPOINT: http://fatrans-minio:9000
+      MINIO_ACCESS_KEY: fatransminio
+      MINIO_SECRET_KEY: fatransminio_secret_2026
+      CORS_ORIGINS: https://fatrans.com.ve,https://www.fatrans.com.ve,https://auth.fatrans.com.ve,https://app.fatrans.com.ve,https://admin.fatrans.com.ve,https://api.fatrans.com.ve
+      JWT_SECRET: fatrans-fondo-ahorro-platform-super-secret-key-production-2026-v1
+      JWT_ISSUER: fatrans-fondo-ahorro
+      COOKIE_DOMAIN: .fatrans.com.ve
+      JWT_ACCESS_EXPIRATION_MINUTES: 60
+      JWT_REFRESH_EXPIRATION_DAYS: 7
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/v1/auth/login | grep -E '405|400|200' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - fatrans-network
+
+  # NOTA: ambos frontends usan la misma imagen (mismo BUILD_ID).
+  # Para reconstruir: docker build -t fatrans-frontend:latest ../frontend-web/
+  # Luego: docker tag fatrans-frontend:latest fatrans-frontend-public:latest
+  #        docker tag fatrans-frontend:latest fatrans-frontend-protected:latest
+
+  frontend_public:
+    image: fatrans-frontend-public:latest
+    container_name: fatrans-frontend-public
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: https://api.fatrans.com.ve/api
+      NEXT_PUBLIC_APP_URL: https://app.fatrans.com.ve
+      NEXT_PUBLIC_ADMIN_URL: https://admin.fatrans.com.ve
+      NEXT_PUBLIC_AUTH_URL: https://auth.fatrans.com.ve
+      BACKEND_URL: http://fatrans-backend:8080
+      JWT_SECRET: fatrans-fondo-ahorro-platform-super-secret-key-production-2026-v1
+    restart: unless-stopped
+    networks:
+      - fatrans-network
+
+  frontend_protected:
+    image: fatrans-frontend-protected:latest
+    container_name: fatrans-frontend-protected
+    ports:
+      - "3001:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: https://api.fatrans.com.ve/api
+      NEXT_PUBLIC_APP_URL: https://app.fatrans.com.ve
+      NEXT_PUBLIC_ADMIN_URL: https://admin.fatrans.com.ve
+      NEXT_PUBLIC_AUTH_URL: https://auth.fatrans.com.ve
+      BACKEND_URL: http://fatrans-backend:8080
+      JWT_SECRET: fatrans-fondo-ahorro-platform-super-secret-key-production-2026-v1
+    restart: unless-stopped
+    networks:
+      - fatrans-network
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  fatrans-network:
+    external: true

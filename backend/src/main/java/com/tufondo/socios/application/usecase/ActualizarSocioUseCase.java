@@ -10,6 +10,7 @@ import com.tufondo.socios.application.validation.ValidadorTelefono;
 import com.tufondo.socios.domain.exception.*;
 import com.tufondo.socios.domain.model.Socio;
 import com.tufondo.socios.domain.repository.SocioRepository;
+import com.tufondo.auth.infrastructure.service.SecurityAuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,9 +25,10 @@ public class ActualizarSocioUseCase {
     private final ValidadorCorreoElectronico validadorCorreo;
     private final ValidadorTelefono validadorTelefono;
     private final SocioDTOMapper dtoMapper;
+    private final SecurityAuditService auditService;
 
     @Transactional
-    public SocioResponseDTO ejecutar(java.util.UUID id, ActualizarSocioDTO dto) {
+    public SocioResponseDTO ejecutar(java.util.UUID id, ActualizarSocioDTO dto, String ipAddress, String userAgent) {
 
         Socio socio = socioRepository.buscarPorId(id)
                 .orElseThrow(() -> new SocioNoEncontradoException(id.toString()));
@@ -39,6 +41,11 @@ public class ActualizarSocioUseCase {
 
         // ── 3. Persistir y responder ──
         Socio actualizado = socioRepository.guardar(socio);
+
+        // ── 4. Registrar auditoría de cambio de perfil ──
+        auditService.logEntityEvent("PERFIL_SOCIO_ACTUALIZADO", id, ipAddress, "SOCIO",
+                id.toString(), "UPDATE", "Perfil de socio actualizado");
+
         return dtoMapper.toResponseDTO(actualizado);
     }
 

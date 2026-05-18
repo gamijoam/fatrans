@@ -47,7 +47,7 @@ public class TipoCreditoRepositoryImpl implements TipoCreditoRepository {
 
     @Override
     public Optional<TipoCredito> buscarPorCodigo(String codigo) {
-        return jpaRepository.findByCodigo(codigo).map(this::toDomain);
+        return jpaRepository.findByCodigoIgnoreCase(codigo).map(this::toDomain);
     }
 
     @Override
@@ -71,7 +71,7 @@ public class TipoCreditoRepositoryImpl implements TipoCreditoRepository {
 
     @Override
     public boolean existePorCodigo(String codigo) {
-        return jpaRepository.existsByCodigo(codigo);
+        return jpaRepository.existsByCodigoIgnoreCase(codigo);
     }
 
     private TipoCredito toDomain(TipoCreditoEntity entity) {

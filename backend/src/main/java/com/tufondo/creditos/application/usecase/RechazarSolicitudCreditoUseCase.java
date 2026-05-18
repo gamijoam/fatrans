@@ -7,6 +7,7 @@ import com.tufondo.creditos.domain.exception.EstadoCreditoInvalidoException;
 import com.tufondo.creditos.domain.model.SolicitudCredito;
 import com.tufondo.creditos.domain.model.enums.EstadoSolicitud;
 import com.tufondo.creditos.domain.repository.SolicitudCreditoRepository;
+import com.tufondo.notificaciones.application.service.NotificacionPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,8 @@ import java.util.Map;
 public class RechazarSolicitudCreditoUseCase {
 
     private final SolicitudCreditoRepository solicitudRepository;
+    // Issue #214 PR-C
+    private final NotificacionPublisher notificacionPublisher;
 
     @Transactional
     public Map<String, Object> ejecutar(String numeroSolicitud, AprobarRechazarRequest request) {
@@ -44,6 +47,10 @@ public class RechazarSolicitudCreditoUseCase {
         solicitudRepository.guardar(solicitud);
 
         log.info("Solicitud {} rechazada - Motivo: {}", numeroSolicitud, motivo);
+
+        // Issue #214 PR-C: notificar al socio con el motivo
+        notificacionPublisher.notificarSocioCreditoRechazado(
+                solicitud.getSocioId(), numeroSolicitud, motivo);
 
         Map<String, Object> response = new HashMap<>();
         response.put("id", solicitud.getId().toString());

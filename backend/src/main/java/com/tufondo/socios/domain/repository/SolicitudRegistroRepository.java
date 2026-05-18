@@ -34,6 +34,12 @@ public interface SolicitudRegistroRepository {
      * Lista todas las solicitudes con paginación.
      */
     Page<SolicitudRegistro> listar(Pageable pageable);
+
+    /**
+     * Cuenta solicitudes en un estado específico.
+     * Lo usa el dashboard de admin para mostrar cuántas solicitudes hay pendientes.
+     */
+    long contarPorEstado(EstadoSolicitud estado);
     
     /**
      * Verifica si existe una solicitud con la cédula proporcionada.

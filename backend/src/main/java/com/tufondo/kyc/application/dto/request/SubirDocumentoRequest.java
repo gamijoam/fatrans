@@ -32,7 +32,14 @@ public class SubirDocumentoRequest {
 
     @NotBlank(message = "nombreOriginal es requerido")
     @Size(max = 255, message = "Nombre de archivo muy largo (max 255 caracteres)")
-    @Pattern(regexp = "^[^./\\\\]+$", message = "Nombre de archivo invalido (no se permiten rutas ni ../)")
+    // Prevenimos path traversal pero permitimos puntos para mantener la
+    // extensión legítima del archivo (.pdf, .jpg, etc). Un solo regex que:
+    //  - rechaza `/` y `\` (rutas absolutas o relativas con separadores).
+    //  - rechaza `..` consecutivos (path traversal con .. estilo Unix/Win).
+    @Pattern(
+        regexp = "^(?!.*\\.\\.)[^/\\\\]+$",
+        message = "Nombre de archivo invalido (no se permiten rutas ni ../)"
+    )
     private String nombreOriginal;
 
     @NotNull(message = "tamanoBytes es requerido")

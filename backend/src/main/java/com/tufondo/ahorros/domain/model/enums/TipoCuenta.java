@@ -8,5 +8,6 @@ package com.tufondo.ahorros.domain.model.enums;
 public enum TipoCuenta {
     AHORRO,      // Cuenta estándar
     NOMINA,      // Cuenta de nómina del socio
-    PLAZO_FIJO   // Depósito a plazo fijo
+    PLAZO_FIJO,  // Depósito a plazo fijo
+    CORRIENTE    // Cuenta corriente (agregada por compatibilidad de DB)
 }

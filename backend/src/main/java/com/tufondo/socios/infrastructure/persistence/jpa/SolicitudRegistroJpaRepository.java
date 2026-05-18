@@ -21,4 +21,6 @@ public interface SolicitudRegistroJpaRepository extends JpaRepository<SolicitudR
     
     @Query("SELECT s FROM SolicitudRegistroEntity s WHERE s.estado = :estado")
     Page<SolicitudRegistroEntity> findByEstado(@Param("estado") EstadoSolicitud estado, Pageable pageable);
+
+    long countByEstado(EstadoSolicitud estado);
 }

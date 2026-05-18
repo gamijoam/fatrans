@@ -20,13 +20,19 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.tufondo.auth.domain.model.Sesion;
+
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -70,7 +76,8 @@ class AuthUseCaseTest {
                 Instant.now(),
                 Instant.now(),
                 0,
-                null
+                null,
+                false
         );
 
         loginRequest = new LoginRequestDTO("admin_test", "password123");
@@ -84,7 +91,7 @@ class AuthUseCaseTest {
         when(passwordEncoder.matches("password123", "passwordhash")).thenReturn(true);
         when(jwtService.generarAccessToken(any())).thenReturn("access_token");
         when(jwtService.generarRefreshToken(any())).thenReturn("refresh_token");
-        when(jwtService.extraerExpiracionAccessToken(any())).thenReturn(Instant.now().plusSeconds(900));
+        when(jwtService.extraerExpiracion(any())).thenReturn(Instant.now().plusSeconds(900));
         when(argon2Hasher.hash(any())).thenReturn("hash");
 
         var result = authUseCase.login(loginRequest);
@@ -95,6 +102,50 @@ class AuthUseCaseTest {
         assertThat(result.usuario().nombreUsuario()).isEqualTo("admin_test");
         verify(sesionRepository).guardar(any());
         verify(auditService).logLoginExitoso(any(), any());
+    }
+
+    @Test
+    @DisplayName("Issue #178: refreshTokenExpiracion en sesión persistida está dentro de rango razonable (no año 3025)")
+    void login_persiste_refresh_token_expiracion_en_rango_razonable() {
+        // Arrange: simulamos el comportamiento real de JwtService.extraerExpiracion()
+        // devolviendo un Instant absoluto (epoch). Antes del fix, el código sumaba
+        // este epoch a Instant.now() generando una fecha en el año ~3025.
+        Instant accessTokenExp = Instant.now().plusSeconds(15 * 60L);          // 15 min
+        Instant refreshTokenExp = Instant.now().plusSeconds(7 * 24 * 60 * 60L); // 7 días
+
+        when(usuarioRepository.buscarPorNombreUsuario("admin_test"))
+                .thenReturn(Optional.of(usuarioTest));
+        when(passwordEncoder.matches("password123", "passwordhash")).thenReturn(true);
+        when(jwtService.generarAccessToken(any())).thenReturn("access_token");
+        when(jwtService.generarRefreshToken(any())).thenReturn("refresh_token");
+        when(jwtService.extraerExpiracion("access_token")).thenReturn(accessTokenExp);
+        when(jwtService.extraerExpiracion("refresh_token")).thenReturn(refreshTokenExp);
+        when(argon2Hasher.hash(any())).thenReturn("hash");
+
+        // Act
+        authUseCase.login(loginRequest);
+
+        // Assert: capturamos la Sesion que se persistió y validamos sus expiraciones
+        var captor = forClass(Sesion.class);
+        verify(sesionRepository).guardar(captor.capture());
+        Sesion persisted = captor.getValue();
+
+        // El refresh debe estar entre ahora y un año (TTL configurable es 7d por default)
+        Instant ahora = Instant.now();
+        assertThat(persisted.refreshTokenExpiracion())
+                .as("refresh_token_expiracion no debe estar en el pasado")
+                .isAfter(ahora.minusSeconds(5));
+        assertThat(persisted.refreshTokenExpiracion())
+                .as("refresh_token_expiracion no debe exceder 1 año (bug: año ~3025)")
+                .isBefore(ahora.plus(Duration.ofDays(365)));
+
+        // Access y refresh deben ser distintos (access ~15min, refresh ~7d)
+        assertThat(persisted.accessTokenExpiracion())
+                .as("accessTokenExpiracion debe ser distinto al refresh (TTL diferentes)")
+                .isNotEqualTo(persisted.refreshTokenExpiracion());
+        assertThat(persisted.refreshTokenExpiracion())
+                .as("refresh debe expirar después que el access")
+                .isAfter(persisted.accessTokenExpiracion());
     }
 
     @Test
@@ -109,6 +160,59 @@ class AuthUseCaseTest {
                 .isInstanceOf(CredencialesInvalidasException.class);
 
         verify(auditService).logLoginFallido(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Issue #206: login con usuario inexistente ejecuta dummy passwordEncoder.matches (anti timing-attack)")
+    void login_usuario_inexistente_ejecuta_dummy_password_matches() {
+        // Arrange: usuario no existe ni por nombre ni por correo
+        when(usuarioRepository.buscarPorNombreUsuario("admin_test"))
+                .thenReturn(Optional.empty());
+        when(usuarioRepository.buscarPorCorreoElectronico("admin_test"))
+                .thenReturn(Optional.empty());
+
+        // Act
+        assertThatThrownBy(() -> authUseCase.login(loginRequest))
+                .isInstanceOf(CredencialesInvalidasException.class)
+                .hasMessage("Credenciales inválidas");
+
+        // Assert: passwordEncoder.matches debe haberse ejecutado UNA vez con el hash
+        // dummy. Sin esto, el atacante distingue "user no existe" (rápido) vs
+        // "password mala" (lento por BCrypt) por timing.
+        verify(passwordEncoder).matches(eq("password123"), startsWith("$2"));
+    }
+
+    @Test
+    @DisplayName("Issue #206: mensaje de login fallido por usuario inexistente es idéntico al de password incorrecta")
+    void login_usuario_inexistente_y_password_mala_producen_mismo_mensaje() {
+        // Caso A: usuario no existe
+        when(usuarioRepository.buscarPorNombreUsuario("admin_test"))
+                .thenReturn(Optional.empty(), Optional.of(usuarioTest));  // 1ra llamada vacía, 2da con user
+        when(usuarioRepository.buscarPorCorreoElectronico("admin_test"))
+                .thenReturn(Optional.empty());
+        when(passwordEncoder.matches(eq("password123"), startsWith("$2"))).thenReturn(false);
+        when(passwordEncoder.matches("password123", "passwordhash")).thenReturn(false);
+
+        String msgUsuarioInexistente = null;
+        String msgPasswordMala = null;
+
+        try {
+            authUseCase.login(loginRequest);
+        } catch (CredencialesInvalidasException e) {
+            msgUsuarioInexistente = e.getMessage();
+        }
+
+        // Caso B: usuario existe pero password mala (segunda llamada al stub)
+        try {
+            authUseCase.login(loginRequest);
+        } catch (CredencialesInvalidasException e) {
+            msgPasswordMala = e.getMessage();
+        }
+
+        assertThat(msgUsuarioInexistente)
+                .as("Ambos casos deben tirar la misma excepción con el mismo mensaje (anti-enumeración)")
+                .isNotNull()
+                .isEqualTo(msgPasswordMala);
     }
 
     @Test

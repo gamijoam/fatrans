@@ -3,15 +3,19 @@ package com.tufondo.ahorros.api.controller;
 
 import com.tufondo.ahorros.application.dto.*;
 import com.tufondo.ahorros.application.usecase.*;
+import com.tufondo.ahorros.domain.model.enums.TipoMovimiento;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.web.bind.annotation.*;
@@ -41,18 +45,24 @@ public class AhorroController {
     private final RealizarRetiroUseCase realizarRetiroUseCase;
     private final ListarMovimientosUseCase listarMovimientosUseCase;
     private final ObtenerMovimientoDetalleUseCase obtenerMovimientoDetalleUseCase;
+    private final GenerarComprobanteMovimientoUseCase generarComprobanteMovimientoUseCase;
     private final CalcularRendimientoUseCase calcularRendimientoUseCase;
     private final ListarRendimientosUseCase listarRendimientosUseCase;
     private final CerrarCuentaUseCase cerrarCuentaUseCase;
     private final CalcularRendimientosBatchUseCase calcularRendimientosBatchUseCase;
 
     // 1. POST /cuentas - Crear Cuenta
+    // Issue #179: @PreAuthorize asegura autenticación; el use case valida ownership
+    // (un socio solo puede crear cuenta para sí mismo; admin puede para cualquiera).
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Crear cuenta de ahorro")
     public ResponseEntity<CuentaAhorroResponse> crearCuenta(
             @Valid @RequestBody CreateCuentaAhorroRequest request,
             Authentication authentication) {
-        CuentaAhorroResponse response = crearCuentaUseCase.ejecutar(request);
+        UUID socioIdToken = extraerSocioId(authentication);
+        boolean isAdmin = esAdmin(authentication);
+        CuentaAhorroResponse response = crearCuentaUseCase.ejecutar(request, socioIdToken, isAdmin);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -103,9 +113,9 @@ public class AhorroController {
         UUID socioIdToken = extraerSocioId(authentication);
         boolean isAdmin = esAdmin(authentication);
         String ipOrigen = getClientIp(httpRequest);
-        String sessionId = authentication.getCredentials().toString();
+        String sessionId = UUID.randomUUID().toString();
         String requestId = UUID.randomUUID().toString();
-        
+
         MovimientoResponse response = realizarDepositoUseCase.ejecutar(
                 numeroCuenta, request, socioIdToken, isAdmin, ipOrigen, sessionId, requestId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -122,7 +132,7 @@ public class AhorroController {
         UUID socioIdToken = extraerSocioId(authentication);
         boolean isAdmin = esAdmin(authentication);
         String ipOrigen = getClientIp(httpRequest);
-        String sessionId = authentication.getCredentials().toString();
+        String sessionId = UUID.randomUUID().toString();
         String requestId = UUID.randomUUID().toString();
         
         MovimientoResponse response = realizarRetiroUseCase.ejecutar(
@@ -135,16 +145,20 @@ public class AhorroController {
     @Operation(summary = "Listar movimientos de cuenta")
     public ResponseEntity<MovimientosListResponse> listarMovimientos(
             @PathVariable String numeroCuenta,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "page debe ser >= 0") int page,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "size debe ser >= 1") @Max(value = 100, message = "size debe ser <= 100") int size,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin,
+            @RequestParam(required = false) TipoMovimiento tipo,
             Authentication authentication) {
+        if (fechaInicio != null && fechaFin != null && fechaFin.isBefore(fechaInicio)) {
+            throw new IllegalArgumentException("fechaFin debe ser mayor o igual a fechaInicio");
+        }
         UUID socioIdToken = extraerSocioId(authentication);
         boolean isAdmin = esAdmin(authentication);
-        
+
         MovimientosListResponse response = listarMovimientosUseCase.ejecutar(
-                numeroCuenta, socioIdToken, isAdmin, page, size, fechaInicio, fechaFin, null);
+                numeroCuenta, socioIdToken, isAdmin, page, size, fechaInicio, fechaFin, tipo);
         return ResponseEntity.ok(response);
     }
 
@@ -160,6 +174,29 @@ public class AhorroController {
         MovimientoResponse response = obtenerMovimientoDetalleUseCase.ejecutar(
                 numeroCuenta, numeroOperacion, socioIdToken, isAdmin);
         return ResponseEntity.ok(response);
+    }
+
+    // 8b. GET /cuentas/{numeroCuenta}/movimientos/{numeroOperacion}/comprobante - Comprobante PDF (#220 PR-B)
+    @GetMapping("/{numeroCuenta}/movimientos/{numeroOperacion}/comprobante")
+    @Operation(summary = "Descargar comprobante PDF del movimiento")
+    public ResponseEntity<byte[]> descargarComprobanteMovimiento(
+            @PathVariable String numeroCuenta,
+            @PathVariable String numeroOperacion,
+            Authentication authentication) {
+        UUID socioIdToken = extraerSocioId(authentication);
+        boolean isAdmin = esAdmin(authentication);
+        byte[] pdfBytes = generarComprobanteMovimientoUseCase.ejecutar(
+                numeroCuenta, numeroOperacion, socioIdToken, isAdmin);
+
+        String filename = String.format("Comprobante_%s.pdf", numeroOperacion);
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE,
+                        org.springframework.http.MediaType.APPLICATION_PDF_VALUE)
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\"")
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL,
+                        "no-store, no-cache, must-revalidate, private")
+                .body(pdfBytes);
     }
 
     // 9. POST /cuentas/{numeroCuenta}/rendimientos/calcular - Calcular Rendimiento
@@ -214,7 +251,13 @@ public class AhorroController {
 
     // Helper methods
     private UUID extraerSocioId(Authentication authentication) {
-        // Extraer socioId del authentication (del JWT token - es UUID)
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof com.tufondo.auth.infrastructure.security.AuthenticatedUser authUser) {
+            UUID socioId = authUser.getSocioId();
+            if (socioId != null) {
+                return socioId;
+            }
+        }
         return fromString(authentication.getName());
     }
 

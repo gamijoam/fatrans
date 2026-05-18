@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PLACEHOLDER SVG del logo de Fatrans (sin RIF).
+  El archivo real institucional vive en `public/logo-fatrans.png` y es
+  el que la app realmente carga. Este SVG queda como fallback de
+  desarrollo o si el PNG no se encuentra (cambiar el src en
+  `components/branding/logo.tsx` si se quiere usar).
+
+  Identidad visual: anillo metálico con texto curvado + mascota digital
+  verde con ojos de circuito + texto FATRANS abajo. Versión simplificada
+  del logo real (sin todo el detalle del render).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Fatrans">
+  <defs>
+    <radialGradient id="metalic" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#e2e8f0"/>
+      <stop offset="55%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </radialGradient>
+    <linearGradient id="alien" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#15803d"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f2744"/>
+      <stop offset="100%" stop-color="#1e40af"/>
+    </linearGradient>
+    <path id="circle-top" d="M 28 128 A 100 100 0 0 1 228 128" fill="none"/>
+    <path id="circle-bot" d="M 228 128 A 100 100 0 0 1 28 128" fill="none"/>
+  </defs>
+
+  <!-- Anillo metálico exterior -->
+  <circle cx="128" cy="128" r="122" fill="url(#metalic)" stroke="url(#ring)" stroke-width="6"/>
+  <!-- Anillo decorativo interior -->
+  <circle cx="128" cy="128" r="100" fill="none" stroke="#94a3b8" stroke-width="1" opacity="0.5"/>
+
+  <!-- Texto curvado superior "ASOCIACIÓN DE AHORRO Y CRÉDITO" -->
+  <text font-family="ui-sans-serif, system-ui, -apple-system, sans-serif"
+        font-size="13" font-weight="700" fill="#0f2744" letter-spacing="1">
+    <textPath href="#circle-top" startOffset="50%" text-anchor="middle">
+      ASOCIACIÓN DE AHORRO Y CRÉDITO
+    </textPath>
+  </text>
+
+  <!-- Mascota: silueta de "alien" digital simplificada -->
+  <g transform="translate(128 124)">
+    <!-- Antenas -->
+    <line x1="-22" y1="-40" x2="-32" y2="-60" stroke="#0f2744" stroke-width="4" stroke-linecap="round"/>
+    <line x1="22"  y1="-40" x2="32"  y2="-60" stroke="#0f2744" stroke-width="4" stroke-linecap="round"/>
+    <!-- Cabeza/cuerpo (forma ovalada) -->
+    <ellipse cx="0" cy="0" rx="40" ry="44" fill="#0f2744"/>
+    <!-- Ojos grandes de "circuito" verde -->
+    <ellipse cx="-14" cy="-6" rx="12" ry="16" fill="url(#alien)"/>
+    <ellipse cx="14"  cy="-6" rx="12" ry="16" fill="url(#alien)"/>
+    <!-- Brillo en los ojos -->
+    <ellipse cx="-16" cy="-11" rx="3" ry="4" fill="#bbf7d0" opacity="0.8"/>
+    <ellipse cx="12"  cy="-11" rx="3" ry="4" fill="#bbf7d0" opacity="0.8"/>
+    <!-- Boca pequeña -->
+    <path d="M -9 20 Q 0 27, 9 20" stroke="#94a3b8" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- Texto FATRANS abajo -->
+  <text x="128" y="228" text-anchor="middle"
+        font-family="ui-sans-serif, system-ui, -apple-system, Inter, sans-serif"
+        font-size="30" font-weight="800" fill="#0f2744"
+        letter-spacing="3">FATRANS</text>
+</svg>

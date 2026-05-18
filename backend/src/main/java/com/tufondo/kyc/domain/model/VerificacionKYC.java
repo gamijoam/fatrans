@@ -1,6 +1,7 @@
 // com.tufondo.kyc.domain.model.VerificacionKYC
 package com.tufondo.kyc.domain.model;
 
+import com.tufondo.kyc.domain.model.enums.EstadoBiometria;
 import com.tufondo.kyc.domain.model.enums.EstadoVerificacion;
 import com.tufondo.kyc.domain.model.enums.NivelVerificacion;
 import lombok.Builder;
@@ -34,6 +35,12 @@ public class VerificacionKYC {
     private String motivoRechazo;
     @Builder.Default
     private List<DocumentoIdentidad> documentos = new ArrayList<>();
+    /**
+     * Cache del resultado del flujo biométrico (Didit/AWS) — null en KYCs creadas antes
+     * de la migración V13. Lo mantiene sincronizado el use case que procesa el webhook.
+     */
+    @Builder.Default
+    private EstadoBiometria estadoBiometria = EstadoBiometria.NO_INICIADA;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

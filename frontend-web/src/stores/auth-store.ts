@@ -1,8 +1,7 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { devtools } from 'zustand/middleware';
 
-export type UserRol = 'ADMIN' | 'ADMINISTRADOR' | 'GESTOR' | 'SOCIO';
+export type UserRol = 'ADMIN' | 'SOCIO' | 'SUPER_ADMIN' | 'CAJERO' | 'ANALISTA_KYC' | 'SISTEMA';
 
 export interface User {
   id: string;
@@ -11,6 +10,7 @@ export interface User {
   nombreCompleto: string;
   rol: UserRol;
   socioId?: string;
+  debeCambiarPassword?: boolean;
 }
 
 interface AuthState {
@@ -24,23 +24,20 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   devtools(
-    persist(
-      (set) => ({
-        user: null,
-        isAuthenticated: false,
-        isLoading: true,
-        setUser: (user) => set({ user, isAuthenticated: !!user }),
-        setLoading: (isLoading) => set({ isLoading }),
-        logout: async () => {
-          try {
-            await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-          } finally {
-            set({ user: null, isAuthenticated: false });
-          }
-        },
-      }),
-      { name: 'auth-storage', partialize: (state) => ({ user: state.user }) }
-    ),
+    (set) => ({
+      user: null,
+      isAuthenticated: false,
+      isLoading: true,
+      setUser: (user) => set({ user, isAuthenticated: !!user }),
+      setLoading: (isLoading) => set({ isLoading }),
+      logout: async () => {
+        const response = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+        if (!response.ok) {
+          throw new Error('Logout failed');
+        }
+        set({ user: null, isAuthenticated: false });
+      },
+    }),
     { name: 'AuthStore' }
   )
 );

@@ -10,8 +10,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -22,7 +24,7 @@ public class UsuarioRepositoryImpl implements UsuarioRepository {
     @Override
     @Transactional(readOnly = true)
     public Optional<Usuario> buscarPorId(UUID id) {
-        return jpaRepository.findByIdAndCuentaActivaTrue(id)
+        return jpaRepository.findById(id)
                 .map(UsuarioEntity::aDominio);
     }
 
@@ -89,6 +91,7 @@ public class UsuarioRepositoryImpl implements UsuarioRepository {
         entity.setUltimaModificacion(Instant.now());
         entity.setIntentosFallidos(usuario.intentosFallidos());
         entity.setFechaBloqueo(usuario.fechaBloqueo());
+        entity.setDebeCambiarPassword(usuario.debeCambiarPassword());
         
         jpaRepository.save(entity);
     }
@@ -121,5 +124,21 @@ public class UsuarioRepositoryImpl implements UsuarioRepository {
         return jpaRepository.findBySocioIdAndRolAndCuentaActivaTrue(socioId,
                 com.tufondo.auth.domain.model.enums.Rol.SOCIO)
                 .map(UsuarioEntity::aDominio);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Usuario> listarPorRol(com.tufondo.auth.domain.model.enums.Rol rol) {
+        return jpaRepository.findByRol(rol).stream()
+                .map(UsuarioEntity::aDominio)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Usuario> listarTodos() {
+        return jpaRepository.findAll().stream()
+                .map(UsuarioEntity::aDominio)
+                .collect(Collectors.toList());
     }
 }

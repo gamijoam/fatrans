@@ -12,6 +12,7 @@ import com.tufondo.creditos.domain.repository.AmortizacionRepository;
 import com.tufondo.creditos.domain.repository.SolicitudCreditoRepository;
 import com.tufondo.socios.domain.model.enums.EstadoSocio;
 import com.tufondo.socios.domain.repository.SocioRepository;
+import com.tufondo.socios.domain.repository.SolicitudRegistroRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class ObtenerDashboardEstadisticasUseCase {
     private final MovimientoRepository movimientoRepository;
     private final SolicitudCreditoRepository solicitudCreditoRepository;
     private final AmortizacionRepository amortizacionRepository;
+    private final SolicitudRegistroRepository solicitudRegistroRepository;
 
     public DashboardEstadisticasResponse ejecutar() {
         log.info("Obteniendo estadísticas del dashboard admin");
@@ -61,6 +63,11 @@ public class ObtenerDashboardEstadisticasUseCase {
         long solicitudesPendientes = solicitudCreditoRepository.countByEstado(EstadoSolicitud.PENDIENTE);
         long solicitudesAprobadas = solicitudCreditoRepository.countByEstado(EstadoSolicitud.APROBADA);
         long solicitudesRechazadas = solicitudCreditoRepository.countByEstado(EstadoSolicitud.RECHAZADA);
+
+        // Solicitudes de registro de socios (NO de crédito) — el card del dashboard
+        // que dice "Solicitudes Pendientes" se refiere a éstas.
+        long solicitudesRegistroPendientes = solicitudRegistroRepository.contarPorEstado(
+                com.tufondo.socios.domain.model.enums.EstadoSolicitud.PENDIENTE);
 
         BigDecimal capitalDesembolsado = solicitudCreditoRepository.sumMontoSolicitadoByEstado(EstadoSolicitud.DESEMBOLSADO);
         if (capitalDesembolsado == null) capitalDesembolsado = BigDecimal.ZERO;
@@ -103,6 +110,7 @@ public class ObtenerDashboardEstadisticasUseCase {
             .solicitudesPendientes(solicitudesPendientes)
             .solicitudesAprobadas(solicitudesAprobadas)
             .solicitudesRechazadas(solicitudesRechazadas)
+            .solicitudesRegistroPendientes(solicitudesRegistroPendientes)
             .capitalDesembolsado(capitalDesembolsado.setScale(2, RoundingMode.HALF_UP))
             .carteraVencida(interesesMora.setScale(2, RoundingMode.HALF_UP))
             .cuotasVencidas(cuotasVencidas)

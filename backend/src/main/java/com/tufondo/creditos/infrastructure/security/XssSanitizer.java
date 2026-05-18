@@ -44,4 +44,11 @@ public class XssSanitizer {
         String sanitized = sanitize(description);
         return sanitized.replaceAll("['\"\\\\]", "");
     }
+
+    public String sanitizeUsername(String username) {
+        if (username == null) {
+            return null;
+        }
+        return sanitize(username).toLowerCase().trim();
+    }
 }

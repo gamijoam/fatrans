@@ -2,6 +2,7 @@ package com.tufondo.auth.infrastructure.presentation.controller;
 
 import com.tufondo.auth.application.dto.*;
 import com.tufondo.auth.application.usecase.AuthUseCase;
+import com.tufondo.auth.application.usecase.CambiarPasswordUseCase;
 import com.tufondo.auth.application.usecase.CrearUsuarioManualUseCase;
 import com.tufondo.auth.application.usecase.ObtenerUsuarioActualUseCase;
 import com.tufondo.auth.application.usecase.RestablecerPasswordUseCase;
@@ -22,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -47,6 +49,7 @@ public class AuthController {
     private final CrearUsuarioManualUseCase crearUsuarioManualUseCase;
     private final SolicitarRecuperacionPasswordUseCase solicitarRecuperacionPasswordUseCase;
     private final RestablecerPasswordUseCase restablecerPasswordUseCase;
+    private final CambiarPasswordUseCase cambiarPasswordUseCase;
 
     @PostMapping("/login")
     @Operation(summary = "Iniciar sesión", description = "Autentica un usuario y devuelve tokens JWT")
@@ -75,14 +78,18 @@ public class AuthController {
 
         String clientIp = extractClientIp(httpRequest);
         LoginResponseDTO login = authUseCase.login(request, clientIp);
+        boolean isSecure = isSecureCookie(httpRequest);
+
+        String cookieDomain = System.getenv().getOrDefault("COOKIE_DOMAIN", ".fatrans.com.ve");
 
         // Crear cookie de access token (httpOnly, secure, sameSite)
         ResponseCookie accessCookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE, login.accessToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(isSecure)
                 .path("/")
                 .maxAge(ACCESS_TOKEN_MAX_AGE)
-                .sameSite("Strict")
+                .sameSite("Lax")
+                .domain(cookieDomain)
                 .build();
         httpResponse.addHeader("Set-Cookie", accessCookie.toString());
 
@@ -90,10 +97,11 @@ public class AuthController {
         // Path apunta a /refresh-web que es el endpoint que usa este cookie
         ResponseCookie refreshCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE, login.refreshToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(isSecure)
                 .path("/api/v1/auth/refresh-web")
                 .maxAge(REFRESH_TOKEN_MAX_AGE)
-                .sameSite("Strict")
+                .sameSite("Lax")
+                .domain(cookieDomain)
                 .build();
         httpResponse.addHeader("Set-Cookie", refreshCookie.toString());
 
@@ -119,6 +127,7 @@ public class AuthController {
     })
     public ResponseEntity<Map<String, String>> logoutWeb(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         String clientIp = extractClientIp(httpRequest);
+        boolean isSecure = isSecureCookie(httpRequest);
 
         // Extraer token desde cookie o header
         String token = extractTokenFromRequest(httpRequest);
@@ -134,7 +143,7 @@ public class AuthController {
         // Limpiar cookies
         ResponseCookie accessCookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE, "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(isSecure)
                 .path("/")
                 .maxAge(0)
                 .sameSite("Strict")
@@ -143,7 +152,7 @@ public class AuthController {
 
         ResponseCookie refreshCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE, "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(isSecure)
                 .path("/api/v1/auth/refresh-web")
                 .maxAge(0)
                 .sameSite("Strict")
@@ -171,6 +180,7 @@ public class AuthController {
     })
     public ResponseEntity<LoginWebResponseDTO> refreshTokenWeb(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         String clientIp = extractClientIp(httpRequest);
+        boolean isSecure = isSecureCookie(httpRequest);
 
         // Extraer refresh token desde cookie
         String refreshToken = extractRefreshTokenFromCookie(httpRequest);
@@ -184,7 +194,7 @@ public class AuthController {
         // Actualizar cookies con nuevos tokens
         ResponseCookie accessCookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE, login.accessToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(isSecure)
                 .path("/")
                 .maxAge(ACCESS_TOKEN_MAX_AGE)
                 .sameSite("Strict")
@@ -193,7 +203,7 @@ public class AuthController {
 
         ResponseCookie refreshCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE, login.refreshToken())
                 .httpOnly(true)
-                .secure(true)
+                .secure(isSecure)
                 .path("/api/v1/auth/refresh-web")
                 .maxAge(REFRESH_TOKEN_MAX_AGE)
                 .sameSite("Strict")
@@ -246,12 +256,18 @@ public class AuthController {
         return ResponseEntity.ok(validarTokenUseCase.ejecutar(token));
     }
 
+    // Issue #179: este endpoint era accesible sin token (estaba en `shouldNotFilter`
+    // del JwtAuthenticationFilter). Ahora requiere JWT + rol ADMIN. Casos de uso
+    // legítimos: back-office crea credenciales para un socio aprobado tras KYC.
     @PostMapping("/crear-usuario")
-    @Operation(summary = "Crear usuario vinculado a socio",
-               description = "Vincula un Socio existente con credenciales de acceso (Usuario)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Crear usuario vinculado a socio (solo admin)",
+               description = "Vincula un Socio existente con credenciales de acceso (Usuario). Requiere rol ADMIN.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Usuario creado exitosamente",
                     content = @Content(schema = @Schema(implementation = CrearUsuarioResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "Sin permisos (rol ADMIN requerido)"),
             @ApiResponse(responseCode = "404", description = "Socio no encontrado"),
             @ApiResponse(responseCode = "409", description = "Nombre de usuario ya existe o socio ya tiene usuario vinculado")
     })
@@ -284,6 +300,25 @@ public class AuthController {
     public ResponseEntity<MensajeResponseDTO> resetPassword(
             @Valid @RequestBody ResetPasswordRequestDTO request) {
         MensajeResponseDTO response = restablecerPasswordUseCase.ejecutar(request);
+        return ResponseEntity.ok(response);
+    }
+
+    // Issue #179: defensa en profundidad — exigir autenticación explícitamente.
+    // El use case ya extrae el userId del SecurityContext; sin autenticación el
+    // contexto está vacío y el use case lanzaría NPE. Mejor fallar temprano con 401.
+    @PostMapping("/cambiar-password")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Cambiar contraseña",
+               description = "Permite al usuario autenticado cambiar su contraseña actual por una nueva")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Contraseña actualizada exitosamente"),
+            @ApiResponse(responseCode = "400", description = "Password no cumple requisitos"),
+            @ApiResponse(responseCode = "401", description = "Credenciales inválidas o no autorizado"),
+            @ApiResponse(responseCode = "403", description = "Cuenta bloqueada o desactivada")
+    })
+    public ResponseEntity<MensajeResponseDTO> cambiarPassword(
+            @Valid @RequestBody CambiarPasswordRequestDTO request) {
+        MensajeResponseDTO response = cambiarPasswordUseCase.ejecutar(request);
         return ResponseEntity.ok(response);
     }
 
@@ -323,5 +358,17 @@ public class AuthController {
             }
         }
         return null;
+    }
+
+    private boolean isSecureCookie(HttpServletRequest request) {
+        String origin = request.getHeader("Origin");
+        if (origin != null) {
+            return !origin.contains("localhost") && !origin.contains("127.0.0.1");
+        }
+        String referer = request.getHeader("Referer");
+        if (referer != null) {
+            return !referer.contains("localhost") && !referer.contains("127.0.0.1");
+        }
+        return true;
     }
 }

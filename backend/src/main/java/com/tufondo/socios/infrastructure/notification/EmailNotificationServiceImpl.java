@@ -14,13 +14,10 @@ public class EmailNotificationServiceImpl implements EmailNotificationService {
     
     @Override
     public void enviarCredenciales(String email, String nombreUsuario, String passwordTemporal) {
-        log.info("========== EMAIL MOCK: CREDENCIALES DE ACCESO ==========");
-        log.info("Para: {}", email);
-        log.info("Asunto: Tu cuenta del Fondo de Ahorro ha sido creada");
-        log.info("Cuerpo: Hola {}, tu solicitud ha sido aprobada.", "Usuario");
-        log.info("Usuario: {}", nombreUsuario);
-        log.info("Contraseña temporal: {}", passwordTemporal);
-        log.info("========================================================");
+        // NUNCA loguear la contraseña temporal — riesgo LOPDP/seguridad.
+        // Solo se registran metadatos suficientes para auditoría operacional.
+        log.info("Email de credenciales enviado (mock) a usuario={} (asunto: 'Tu cuenta del Fondo de Ahorro ha sido creada')",
+                nombreUsuario);
     }
     
     @Override

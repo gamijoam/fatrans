@@ -1,0 +1,72 @@
+name: Deploy → Producción
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  deploy-prod:
+    name: Deploy a Producción (fatrans.com.ve)
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+      issues: write
+
+    environment:
+      name: production
+      url: https://fatrans.com.ve
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy vía SSH al VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          timeout: 20m
+          script: |
+            bash /opt/fatrans/deploy-prod.sh ${{ github.sha }}
+
+      - name: Verificar Producción
+        run: |
+          sleep 20
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://fatrans.com.ve || echo "000")
+          echo "Producción HTTP status: $STATUS"
+
+      - name: Notificar deploy exitoso
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.sha.substring(0, 7);
+            console.log('✅ Deploy producción OK — SHA ' + sha);
+
+      - name: Rollback automático si falla
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            echo "⚠️ Deploy falló — intentando rollback..."
+            PREV=$(docker images fatrans-backend --format "{{.Tag}}" | grep -v latest | sort -r | sed -n '2p')
+            if [ -n "$PREV" ]; then
+              docker tag fatrans-backend:$PREV fatrans-backend:latest
+              cd /opt/fatrans/backend/infrastructure
+              docker-compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend
+              echo "Rollback a $PREV completado"
+            else
+              echo "No hay imagen anterior para rollback"
+            fi

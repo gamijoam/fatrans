@@ -15,8 +15,10 @@ import com.tufondo.kyc.domain.model.port.StoragePort;
 import com.tufondo.kyc.domain.repository.ConsentimientoKYCRepository;
 import com.tufondo.kyc.domain.repository.DocumentoIdentidadRepository;
 import com.tufondo.kyc.domain.repository.VerificacionKYCRepository;
+import com.tufondo.notificaciones.application.service.NotificacionPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,16 +36,22 @@ public class RevisarDocumentosUseCase {
     private final DocumentoIdentidadRepository documentoRepository;
     private final ConsentimientoKYCRepository consentimientoRepository;
     private final StoragePort storagePort;
+    // Issue #214 PR-C: notificar al socio del resultado de la revisión KYC.
+    // El publisher es defensivo: si falla la persistencia de la notificación,
+    // el flujo de aprobar/rechazar NO se ve afectado.
+    private final NotificacionPublisher notificacionPublisher;
 
     public RevisionResponse obtenerDetalle(UUID verificacionId) {
         VerificacionKYC verificacion = verificacionRepository.findById(verificacionId)
             .orElseThrow(() -> new com.tufondo.kyc.domain.exception.VerificacionNotFoundException(verificacionId));
 
-        // Validar que la verificacion esta en estado de revision (mitigar IDOR)
-        if (verificacion.getEstado() != EstadoVerificacion.EN_REVISION) {
-            throw new com.tufondo.kyc.domain.exception.AccesoNoAutorizadoException(
-                "Verificacion no disponible para revision. Estado actual: " + verificacion.getEstado());
-        }
+        // NOTA: aquí teníamos una guarda `estado != EN_REVISION → 403`,
+        // pero rompía el caso de uso de ver detalle de un KYC ya APROBADO
+        // o RECHAZADO desde el panel admin (historial / auditoría). El
+        // `@PreAuthorize` del controller ya restringe el endpoint a roles
+        // autorizados (ANALISTA_KYC, ADMIN, SUPER_ADMIN), así que la
+        // restricción semántica de "solo en revisión" debe vivir en los
+        // endpoints que MUTAN (aprobar/rechazar), no en el GET de detalle.
 
         List<DocumentoIdentidad> documentos = documentoRepository.findByVerificacionId(verificacionId);
 
@@ -89,6 +97,17 @@ public class RevisarDocumentosUseCase {
             .build();
     }
 
+    /**
+     * Aprueba una verificación KYC.
+     *
+     * `@Transactional` es CRÍTICO: el método actualiza primero el estado del
+     * KYC y luego el estado de cada documento individual. Sin transacción, si
+     * el save del documento falla (como ocurrió con el bug @Version null en
+     * DocumentoIdentidadEntity), el KYC quedaba APROBADO pero los docs en
+     * PENDIENTE — inconsistencia visible al usuario. Con @Transactional toda
+     * la operación es atómica.
+     */
+    @Transactional
     public RevisionDecisionResponse aprobar(UUID verificacionId, AprobarVerificacionRequest request, String analistaId) {
         VerificacionKYC verificacion = verificacionRepository.findById(verificacionId)
             .orElseThrow(() -> new com.tufondo.kyc.domain.exception.VerificacionNotFoundException(verificacionId));
@@ -96,6 +115,14 @@ public class RevisarDocumentosUseCase {
         if (!verificacion.puedeSerRevisada()) {
             throw new com.tufondo.kyc.domain.exception.VerificacionNoEditableException(
                 "La verificacion no esta en estado de revision");
+        }
+
+        // Regla de negocio: no se puede aprobar documentalmente si la biometría
+        // no pasó. El analista debe pedir al socio repetir la captura biométrica.
+        if (verificacion.getEstadoBiometria() != com.tufondo.kyc.domain.model.enums.EstadoBiometria.APROBADA) {
+            throw new com.tufondo.kyc.domain.exception.VerificacionNoEditableException(
+                "No se puede aprobar la verificacion: el flujo biometrico no esta aprobado " +
+                "(estado actual: " + verificacion.getEstadoBiometria() + ")");
         }
 
         EstadoVerificacion estadoAnterior = verificacion.getEstado();
@@ -114,6 +141,9 @@ public class RevisarDocumentosUseCase {
             documentoRepository.save(doc);
         }
 
+        // Issue #214 PR-C: notificar al socio
+        notificacionPublisher.notificarSocioKycAprobado(verificacion.getSocioId());
+
         return RevisionDecisionResponse.builder()
             .verificacionId(verificacion.getId())
             .estadoAnterior(estadoAnterior)
@@ -122,6 +152,7 @@ public class RevisarDocumentosUseCase {
             .build();
     }
 
+    @Transactional
     public RevisionDecisionResponse rechazar(UUID verificacionId, RechazarVerificacionRequest request, String analistaId) {
         VerificacionKYC verificacion = verificacionRepository.findById(verificacionId)
             .orElseThrow(() -> new com.tufondo.kyc.domain.exception.VerificacionNotFoundException(verificacionId));
@@ -151,6 +182,10 @@ public class RevisarDocumentosUseCase {
             }
         }
 
+        // Issue #214 PR-C: notificar al socio del rechazo con el motivo
+        notificacionPublisher.notificarSocioKycRechazado(
+                verificacion.getSocioId(), request.getComentario());
+
         return RevisionDecisionResponse.builder()
             .verificacionId(verificacion.getId())
             .estadoAnterior(estadoAnterior)
@@ -159,6 +194,7 @@ public class RevisarDocumentosUseCase {
             .build();
     }
 
+    @Transactional
     public RevisionDecisionResponse solicitarInfo(UUID verificacionId, SolicitarInfoRequest request, String analistaId) {
         VerificacionKYC verificacion = verificacionRepository.findById(verificacionId)
             .orElseThrow(() -> new com.tufondo.kyc.domain.exception.VerificacionNotFoundException(verificacionId));
@@ -175,6 +211,10 @@ public class RevisarDocumentosUseCase {
         verificacion.setFechaRevision(LocalDateTime.now());
         verificacion.setComentariosRevision(request.getComentario());
         verificacionRepository.save(verificacion);
+
+        // Issue #214 PR-C: notificar al socio que necesita enviar más info
+        notificacionPublisher.notificarSocioKycRequiereInfo(
+                verificacion.getSocioId(), request.getComentario());
 
         return RevisionDecisionResponse.builder()
             .verificacionId(verificacion.getId())

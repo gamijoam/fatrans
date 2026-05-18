@@ -38,7 +38,6 @@ public class SubirDocumentoUseCase {
 
     private static final Set<String> FORMATOS_PERMITIDOS = Set.of("image/jpeg", "image/png", "application/pdf");
     private static final long MAX_TAMANO_BYTES = 10 * 1024 * 1024; // 10MB
-    private static final Set<String> MAGIC_NUMBERS_VALIDOS = Set.of("FFD8FF", "89504E47", "25504446");
 
     public SubirDocumentoResponse ejecutar(SubirDocumentoRequest request, UUID socioId) {
 
@@ -74,9 +73,13 @@ public class SubirDocumentoUseCase {
                 "El archivo decodificado excede 10MB");
         }
 
-        // 6. Validar magic number
-        String magicNumber = getMagicNumber(archivoBytes);
-        if (!MAGIC_NUMBERS_VALIDOS.contains(magicNumber)) {
+        // 6. Validar magic number. Cada formato tiene un prefijo distinto:
+        //   JPEG: FF D8 FF       (3 bytes)
+        //   PNG : 89 50 4E 47    (4 bytes)
+        //   PDF : 25 50 44 46    (4 bytes — "%PDF")
+        // Comparamos el prefijo correcto según largo, NO truncamos a 3 bytes
+        // como hacía la implementación anterior (rechazaba todo PDF/PNG).
+        if (!esMagicNumberValido(archivoBytes)) {
             throw new com.tufondo.kyc.domain.exception.DocumentoFormatoInvalidoException(
                 "El archivo no es un JPEG, PNG o PDF valido");
         }
@@ -147,9 +150,35 @@ public class SubirDocumentoUseCase {
             .build();
     }
 
-    private String getMagicNumber(byte[] bytes) {
-        if (bytes.length < 4) return "";
-        return String.format("%02X%02X%02X", bytes[0], bytes[1], bytes[2]);
+    /**
+     * Valida el magic number del archivo contra los formatos permitidos.
+     * Cada formato necesita verificarse con su largo de prefijo correcto:
+     * truncar todo a 3 bytes (como hacía la versión anterior) hace que PDF
+     * y PNG nunca matcheen, porque sus magic numbers tienen 4 bytes.
+     */
+    private boolean esMagicNumberValido(byte[] bytes) {
+        if (bytes.length < 4) return false;
+        // JPEG: FF D8 FF (3 bytes). Los siguientes bytes varían por subformato.
+        if ((bytes[0] & 0xFF) == 0xFF
+                && (bytes[1] & 0xFF) == 0xD8
+                && (bytes[2] & 0xFF) == 0xFF) {
+            return true;
+        }
+        // PNG: 89 50 4E 47 (4 bytes).
+        if ((bytes[0] & 0xFF) == 0x89
+                && (bytes[1] & 0xFF) == 0x50
+                && (bytes[2] & 0xFF) == 0x4E
+                && (bytes[3] & 0xFF) == 0x47) {
+            return true;
+        }
+        // PDF: 25 50 44 46 (4 bytes = "%PDF").
+        if ((bytes[0] & 0xFF) == 0x25
+                && (bytes[1] & 0xFF) == 0x50
+                && (bytes[2] & 0xFF) == 0x44
+                && (bytes[3] & 0xFF) == 0x46) {
+            return true;
+        }
+        return false;
     }
 
     private void validarTipoDocumentoPermitido(NivelVerificacion nivel, TipoDocumentoKYC tipo) {

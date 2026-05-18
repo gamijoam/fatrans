@@ -1,18 +1,22 @@
 import axios from 'axios';
-import Cookies from 'js-cookie';
+import { toast } from 'sonner';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:18080/api';
 
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: API_URL,
   timeout: 10_000,
   withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 apiClient.interceptors.request.use((config) => {
-  if (['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase() || '')) {
-    const csrfToken = Cookies.get('csrf_token');
+  const method = config.method?.toLowerCase();
+  if (['post', 'put', 'delete', 'patch'].includes(method || '')) {
+    const csrfToken = typeof document !== 'undefined' ? document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('csrf_token='))
+      ?.split('=')[1] : null;
+    
     if (csrfToken) {
       config.headers['X-CSRF-Token'] = csrfToken;
     }
@@ -28,38 +32,95 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
-        const newToken = await refreshAccessToken();
-        if (newToken) {
-          originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
-          return apiClient(originalRequest);
-        }
+        await apiClient.post('/v1/auth/refresh-web');
+        return apiClient(originalRequest);
       } catch {
-        await logout();
-        window.location.href = '/login';
+        toast.error('Sesión expirada. Por favor inicie sesión nuevamente.');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
       }
     }
+
+    const message = error.response?.data?.message || error.message || 'Error desconocido';
+    // No mostrar toast para errores 404 de recursos no encontrados en dashboard (silencioso)
+    if (error.response?.status !== 404) {
+      toast.error(message);
+    }
+    
     return Promise.reject(error);
   }
 );
 
-export async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = Cookies.get('refresh_token');
-  if (!refreshToken) return null;
-  try {
-    const response = await apiClient.post('/v1/auth/refresh', { refreshToken });
-    return response.data.accessToken;
-  } catch {
-    return null;
-  }
-}
+export const authApi = {
+  login: (identificador: string, password: string) =>
+    apiClient.post('/v1/auth/login-web', { identificador, password }),
+  logout: () => apiClient.post('/v1/auth/logout-web'),
+  refresh: () => apiClient.post('/v1/auth/refresh-web'),
+  me: () => apiClient.get('/v1/auth/me'),
+  changePassword: (passwordActual: string, nuevoPassword: string) =>
+    apiClient.post('/v1/auth/cambiar-password', { passwordActual, nuevoPassword }),
+};
 
-export async function logout(): Promise<void> {
-  try {
-    await apiClient.post('/v1/auth/logout');
-  } finally {
-    Cookies.remove('access_token');
-    Cookies.remove('refresh_token');
-    Cookies.remove('csrf_token');
-    Cookies.remove('usuario');
-  }
-}
+export const sociosApi = {
+  getAll: () => apiClient.get('/v1/socios'),
+  getById: (id: string) => apiClient.get(`/v1/socios/${id}`),
+  updateProfile: (id: string, data: unknown) => apiClient.put(`/v1/socios/${id}/perfil`, data),
+};
+
+export const cuentasApi = {
+  getCuentas: (socioId: string) => apiClient.get(`/v1/cuentas/socio/${socioId}`),
+  getCuenta: (numeroCuenta: string) => apiClient.get(`/v1/cuentas/${numeroCuenta}`),
+  getSaldo: (numeroCuenta: string) => apiClient.get(`/v1/cuentas/${numeroCuenta}/saldo`),
+  getMovimientos: (numeroCuenta: string, page = 0, size = 10, fechaInicio?: string, fechaFin?: string, tipoFiltro?: string) => {
+    let url = `/v1/cuentas/${numeroCuenta}/movimientos?page=${page}&size=${size}`;
+    if (fechaInicio) url += `&fechaInicio=${fechaInicio}`;
+    if (fechaFin) url += `&fechaFin=${fechaFin}`;
+    if (tipoFiltro) url += `&tipo=${tipoFiltro}`;
+    return apiClient.get(url);
+  },
+  // Issue #218 PR-C — `extras` permite enviar la declaración LOCDOFT
+  // cuando el backend responde 422 LOCDOFT_CONSENT_REQUIRED y el usuario
+  // confirma en el modal. Para operaciones normales, no se pasa.
+  deposito: (numeroCuenta: string, monto: number, extras?: { confirmaOrigenLicito?: boolean; origenFondos?: string }) =>
+    apiClient.post(`/v1/cuentas/${numeroCuenta}/depositos`, {
+      monto,
+      canalOrigen: 'WEB',
+      descripcion: 'Depósito en línea',
+      ...(extras?.confirmaOrigenLicito ? {
+        confirmaOrigenLicito: true,
+        origenFondos: extras.origenFondos || null,
+      } : {}),
+    }),
+  retiro: (numeroCuenta: string, monto: number, extras?: { confirmaOrigenLicito?: boolean; origenFondos?: string }) =>
+    apiClient.post(`/v1/cuentas/${numeroCuenta}/retiros`, {
+      monto,
+      canalOrigen: 'WEB',
+      descripcion: 'Retiro en línea',
+      ...(extras?.confirmaOrigenLicito ? {
+        confirmaOrigenLicito: true,
+        origenFondos: extras.origenFondos || null,
+      } : {}),
+    }),
+};
+
+export const creditosApi = {
+  getTiposCredito: () => apiClient.get('/v1/creditos/tipos-credito'),
+  getSolicitudesAdmin: (params?: Record<string, string>) => {
+    const query = params ? new URLSearchParams(params).toString() : '';
+    return apiClient.get(`/v1/admin/creditos/solicitudes${query ? `?${query}` : ''}`);
+  },
+  getSolicitudesPorSocio: (socioId: string) => apiClient.get(`/v1/creditos/solicitudes/socio/${socioId}`),
+  getSolicitud: (numero: string) => apiClient.get(`/v1/creditos/solicitudes/${numero}`),
+  crearSolicitud: (data: unknown) => apiClient.post('/v1/creditos/solicitudes', data),
+  simular: (data: unknown) => apiClient.post('/v1/simulador', data),
+};
+
+export const adminApi = {
+  getStats: () => apiClient.get('/v1/admin/dashboard/estadisticas'),
+  getActividad: (limit: number = 15) => apiClient.get(`/v1/admin/actividad?limit=${limit}`),
+  getSolicitudes: (params?: Record<string, string>) => {
+    const query = params ? new URLSearchParams(params).toString() : '';
+    return apiClient.get(`/v1/admin/creditos/solicitudes${query ? `?${query}` : ''}`);
+  },
+};

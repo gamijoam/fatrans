@@ -73,6 +73,7 @@ public class OpenPdfGeneratorService implements PdfGeneratorPort {
                 case PAGARE -> generarPagare(datos);
                 case TABLA_AMORTIZACION -> generarTablaAmortizacion(datos);
                 case CARTA_BENEFICIARIOS -> generarCartaBeneficiarios(datos);
+                case COMPROBANTE_MOVIMIENTO -> generarComprobanteMovimiento(datos);
             };
         } catch (GeneracionPDFException | FirmaDigitalException e) {
             throw e;
@@ -291,6 +292,82 @@ public class OpenPdfGeneratorService implements PdfGeneratorPort {
 
         document.close();
         return baos.toByteArray();
+    }
+
+    /**
+     * Genera comprobante on-demand de un movimiento individual (issue #220).
+     *
+     * <p>Diferencia clave con los otros generadores: NO se persiste en
+     * MinIO ni en la tabla {@code documentos}. El movimiento original
+     * (inmutable, RN-006) es la fuente de verdad — el PDF se reconstruye
+     * cada vez. Esto simplifica el flujo y evita duplicar storage.</p>
+     *
+     * <p>Datos esperados en el map:
+     * <ul>
+     *   <li>{@code socio}: map con nombreCompleto, cedula</li>
+     *   <li>{@code cuenta}: map con numeroCuenta, tipoCuenta, moneda</li>
+     *   <li>{@code movimiento}: map con numeroOperacion, tipo (DEPOSITO/RETIRO/...),
+     *       monto, saldoAnterior, saldoPosterior, fechaMovimiento, descripcion,
+     *       referencia, canalOrigen, estado</li>
+     *   <li>{@code fechaEmision}: timestamp legible de generación</li>
+     * </ul>
+     */
+    @SuppressWarnings("unchecked")
+    private byte[] generarComprobanteMovimiento(Map<String, Object> datos) throws DocumentException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        Document document = new Document(PageSize.A4);
+        PdfWriter.getInstance(document, baos);
+        document.open();
+
+        Map<String, Object> socio = (Map<String, Object>) datos.get("socio");
+        Map<String, Object> cuenta = (Map<String, Object>) datos.get("cuenta");
+        Map<String, Object> mov = (Map<String, Object>) datos.get("movimiento");
+
+        addHeader(document, "COMPROBANTE DE MOVIMIENTO");
+        addFecha(safeStr(datos.get("fechaEmision")), document);
+
+        addSectionTitle(document, "Datos del Socio");
+        addKeyValue(document, "Nombre:", safeStr(socio != null ? socio.get("nombreCompleto") : null));
+        addKeyValue(document, "Cédula:", safeStr(socio != null ? socio.get("cedula") : null));
+
+        addSectionTitle(document, "Datos de la Cuenta");
+        addKeyValue(document, "Número de Cuenta:", safeStr(cuenta != null ? cuenta.get("numeroCuenta") : null));
+        addKeyValue(document, "Tipo de Cuenta:", safeStr(cuenta != null ? cuenta.get("tipoCuenta") : null));
+        addKeyValue(document, "Moneda:", safeStr(cuenta != null ? cuenta.get("moneda") : null));
+
+        addSectionTitle(document, "Detalle del Movimiento");
+        addKeyValue(document, "Número de Operación:", safeStr(mov != null ? mov.get("numeroOperacion") : null));
+        addKeyValue(document, "Tipo:", safeStr(mov != null ? mov.get("tipo") : null));
+        addKeyValue(document, "Fecha:", safeStr(mov != null ? mov.get("fechaMovimiento") : null));
+        addKeyValue(document, "Canal:", safeStr(mov != null ? mov.get("canalOrigen") : null));
+        addKeyValue(document, "Estado:", safeStr(mov != null ? mov.get("estado") : null));
+        if (mov != null && mov.get("descripcion") != null) {
+            addKeyValue(document, "Descripción:", safeStr(mov.get("descripcion")));
+        }
+        if (mov != null && mov.get("referencia") != null) {
+            addKeyValue(document, "Referencia:", safeStr(mov.get("referencia")));
+        }
+
+        addSectionTitle(document, "Importes");
+        addKeyValue(document, "Monto:", formatMonto(mov != null ? mov.get("monto") : null));
+        addKeyValue(document, "Saldo Anterior:", formatMonto(mov != null ? mov.get("saldoAnterior") : null));
+        addKeyValue(document, "Saldo Posterior:", formatMonto(mov != null ? mov.get("saldoPosterior") : null));
+
+        addEmptyLine(document);
+        addParagraph(document, "Este comprobante es un duplicado generado a partir del registro "
+                + "original del movimiento. El movimiento queda registrado en los libros del "
+                + "Fondo de Ahorro con carácter inmutable conforme a las normativas vigentes.",
+                NORMAL_FONT);
+
+        addWatermarkRobusto(document, "COMPROBANTE", datos);
+
+        document.close();
+        return baos.toByteArray();
+    }
+
+    /** Helper local: convierte un Object a String tratando null. */
+    private static String safeStr(Object o) {
+        return o == null ? "—" : o.toString();
     }
 
     /**

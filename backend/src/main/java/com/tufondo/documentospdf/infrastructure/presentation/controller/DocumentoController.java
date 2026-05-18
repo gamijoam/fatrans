@@ -1,6 +1,7 @@
 // com.tufondo.documentospdf.infrastructure.presentation.controller.DocumentoController
 package com.tufondo.documentospdf.infrastructure.presentation.controller;
 
+import com.tufondo.auth.infrastructure.security.AuthenticatedUser;
 import com.tufondo.documentospdf.application.dto.DescargarDocumentoResponseDTO;
 import com.tufondo.documentospdf.application.dto.DocumentoListResponseDTO;
 import com.tufondo.documentospdf.application.dto.DocumentoResponseDTO;
@@ -62,7 +63,7 @@ public class DocumentoController {
      * Validación IDOR: socio solo puede generar su propio estado de cuenta
      */
     @GetMapping("/estado-cuenta/{cuentaId}")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Generar estado de cuenta")
     public ResponseEntity<DocumentoResponseDTO> generarEstadoCuenta(
             @PathVariable UUID cuentaId,
@@ -80,7 +81,7 @@ public class DocumentoController {
      * Validación IDOR: socio solo puede generar su propia constancia
      */
     @GetMapping("/constancia-afiliacion/{socioId}")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Generar constancia de afiliación")
     public ResponseEntity<DocumentoResponseDTO> generarConstanciaAfiliacion(
             @PathVariable UUID socioId,
@@ -146,7 +147,7 @@ public class DocumentoController {
      * Validación IDOR: socio solo puede generar su propia carta
      */
     @GetMapping("/carta-beneficiarios/{socioId}")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Generar carta de beneficiarios")
     public ResponseEntity<DocumentoResponseDTO> generarCartaBeneficiarios(
             @PathVariable UUID socioId,
@@ -166,7 +167,7 @@ public class DocumentoController {
      * Validación IDOR: socio solo puede ver sus propios documentos
      */
     @GetMapping("/{documentoId}")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Obtener metadata de documento")
     public ResponseEntity<DocumentoResponseDTO> obtenerDocumento(
             @PathVariable UUID documentoId,
@@ -185,7 +186,7 @@ public class DocumentoController {
      * Retorna pre-signed URL (nunca bytes directos)
      */
     @GetMapping("/{documentoId}/descargar")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Descargar documento (pre-signed URL)")
     public ResponseEntity<DescargarDocumentoResponseDTO> descargarDocumento(
             @PathVariable UUID documentoId,
@@ -203,7 +204,7 @@ public class DocumentoController {
      * Validación IDOR: socio solo puede ver sus propios documentos
      */
     @GetMapping("/socio/{socioId}")
-    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Listar documentos de socio")
     public ResponseEntity<Map<String, Object>> listarDocumentos(
             @PathVariable UUID socioId,
@@ -230,9 +231,12 @@ public class DocumentoController {
 
     private UUID extraerSocioId(Authentication authentication) {
         try {
+            if (authentication.getPrincipal() instanceof AuthenticatedUser authUser) {
+                return authUser.getSocioId();
+            }
             return fromString(authentication.getName());
         } catch (Exception e) {
-            log.warn("No se pudo extraer socioId del token, usando nombre directo");
+            log.warn("No se pudo extraer socioId del token");
             return null;
         }
     }

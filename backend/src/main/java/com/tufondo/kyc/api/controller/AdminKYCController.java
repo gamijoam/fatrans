@@ -4,14 +4,19 @@ package com.tufondo.kyc.api.controller;
 import com.tufondo.kyc.application.dto.response.ColaRevisionResponse;
 import com.tufondo.kyc.application.dto.response.EstadisticasKYCResponse;
 import com.tufondo.kyc.application.dto.response.HistorialKYCResponse;
+import com.tufondo.kyc.domain.model.DocumentoIdentidad;
 import com.tufondo.kyc.domain.model.VerificacionKYC;
 import com.tufondo.kyc.domain.model.enums.EstadoVerificacion;
 import com.tufondo.kyc.domain.model.enums.NivelVerificacion;
+import com.tufondo.kyc.domain.model.port.StoragePort;
+import com.tufondo.kyc.domain.repository.DocumentoIdentidadRepository;
 import com.tufondo.kyc.domain.repository.VerificacionKYCRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -35,12 +40,14 @@ import java.util.stream.Collectors;
 public class AdminKYCController {
 
     private final VerificacionKYCRepository verificacionRepository;
+    private final DocumentoIdentidadRepository documentoRepository;
+    private final StoragePort storagePort;
 
     /**
      * GET /kyc/cola-revision - Cola de Revision
      */
     @GetMapping("/cola-revision")
-    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Obtener cola de revision de verificaciones")
     public ResponseEntity<ColaRevisionResponse> obtenerColaRevision(
             @RequestParam(defaultValue = "0") int page,
@@ -48,20 +55,19 @@ public class AdminKYCController {
             @RequestParam(required = false) NivelVerificacion nivel,
             @RequestParam(defaultValue = "EN_REVISION") EstadoVerificacion estado) {
 
-        List<VerificacionKYC> verificaciones;
-
-        if (nivel != null) {
-            verificaciones = verificacionRepository.findByEstado(estado).stream()
-                .filter(v -> v.getNivel() == nivel)
-                .skip((long) page * size)
-                .limit(size)
-                .collect(Collectors.toList());
-        } else {
-            verificaciones = verificacionRepository.findByRevisionPendienteOrderByFechaAsc().stream()
-                .skip((long) page * size)
-                .limit(size)
-                .collect(Collectors.toList());
-        }
+        // Filtra por el parámetro `estado` recibido. La rama anterior llamaba
+        // a `findByRevisionPendienteOrderByFechaAsc()` cuando no había filtro
+        // de nivel — pero ese método HARDCODEA EstadoVerificacion.EN_REVISION,
+        // ignorando el parámetro. Eso hacía que el filtro "Aprobados" del
+        // admin devolviera `cola: []` aunque `totalElementos > 0` (porque
+        // `countByEstado` sí respeta el filtro). Ahora usamos siempre
+        // `findByEstado(estado)` y solo aplicamos el filtro de nivel si
+        // viene seteado.
+        List<VerificacionKYC> verificaciones = verificacionRepository.findByEstado(estado).stream()
+            .filter(v -> nivel == null || v.getNivel() == nivel)
+            .skip((long) page * size)
+            .limit(size)
+            .collect(Collectors.toList());
 
         List<ColaRevisionResponse.ColaItemResponse> cola = verificaciones.stream()
             .map(this::toColaItem)
@@ -78,6 +84,35 @@ public class AdminKYCController {
             .build();
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /kyc/admin/socio/{socioId} - Obtener KYC de un socio específico (Admin)
+     */
+    @GetMapping("/admin/socio/{socioId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Operation(summary = "Obtener verificación KYC actual de un socio")
+    public ResponseEntity<?> obtenerKycPorSocio(@PathVariable UUID socioId) {
+        return verificacionRepository.findBySocioId(socioId)
+            .map(verificacion -> {
+                HistorialKYCResponse.HistorialItemResponse item = toHistorialItem(verificacion);
+                return ResponseEntity.ok(Map.of(
+                    "verificacionId", verificacion.getId(),
+                    "socioId", socioId,
+                    "nivel", verificacion.getNivel(),
+                    "estado", verificacion.getEstado(),
+                    "fechaInicio", verificacion.getFechaInicio(),
+                    "fechaCompletado", verificacion.getFechaCompletado() != null ? verificacion.getFechaCompletado() : "",
+                    "fechaExpiracion", verificacion.getFechaExpiracion() != null ? verificacion.getFechaExpiracion() : "",
+                    "revisadoPor", verificacion.getRevisadoPor() != null ? verificacion.getRevisadoPor() : "",
+                    "motivoRechazo", verificacion.getMotivoRechazo() != null ? verificacion.getMotivoRechazo() : ""
+                ));
+            })
+            .orElse(ResponseEntity.ok(Map.of(
+                "socioId", socioId,
+                "estado", "SIN_KYC",
+                "mensaje", "El socio no tiene verificaciones KYC"
+            )));
     }
 
     /**
@@ -110,7 +145,7 @@ public class AdminKYCController {
      * GET /kyc/admin/estadisticas - Estadisticas
      */
     @GetMapping("/admin/estadisticas")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Obtener estadisticas de KYC")
     public ResponseEntity<EstadisticasKYCResponse> obtenerEstadisticas() {
 
@@ -200,5 +235,37 @@ public class AdminKYCController {
         } else {
             return (minutos / 1440) + " dias";
         }
+    }
+
+    /**
+     * GET /kyc/admin/documentos/{documentoId}/descargar
+     *
+     * Sirve el archivo binario desde MinIO al admin. NO usamos pre-signed
+     * URLs porque MinIO está en la red interna de Docker (`fatrans-minio:9000`)
+     * y ese hostname no resuelve desde el browser. El backend hace el bridge:
+     * recibe la request del admin (vía Cloudflare → backend público), lee el
+     * archivo de MinIO con su client interno, y lo stream como respuesta.
+     */
+    @GetMapping("/admin/documentos/{documentoId}/descargar")
+    @PreAuthorize("hasAnyRole('ANALISTA_KYC', 'ADMIN', 'SUPER_ADMIN')")
+    @Operation(summary = "Descargar un documento KYC (admin/analista)")
+    public ResponseEntity<byte[]> descargarDocumentoAdmin(@PathVariable UUID documentoId) {
+        DocumentoIdentidad doc = documentoRepository.findById(documentoId)
+            .orElseThrow(() -> new com.tufondo.kyc.domain.exception.KYCException(
+                "Documento no encontrado: " + documentoId));
+
+        byte[] contenido = storagePort.download(doc.getUrlAlmacenamiento());
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(doc.getMimeType()));
+        // inline → el browser intenta renderizar (PDF nativo, imagen).
+        // attachment → fuerza descarga. Preferimos inline para la review.
+        headers.setContentDisposition(
+            org.springframework.http.ContentDisposition.inline()
+                .filename(doc.getNombreOriginal())
+                .build());
+        headers.setContentLength(contenido.length);
+
+        return ResponseEntity.ok().headers(headers).body(contenido);
     }
 }

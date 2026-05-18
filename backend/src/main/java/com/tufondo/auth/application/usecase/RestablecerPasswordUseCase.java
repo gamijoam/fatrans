@@ -99,7 +99,8 @@ public class RestablecerPasswordUseCase {
                 usuario.fechaCreacion(),
                 java.time.Instant.now(),
                 0, // Reset intentos fallidos
-                null // Reset fecha bloqueo
+                null, // Reset fecha bloqueo
+                usuario.debeCambiarPassword()
         );
 
         usuarioRepository.actualizar(usuarioActualizado);

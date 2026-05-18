@@ -90,12 +90,27 @@ public class VerificacionKYCRepositoryImpl implements VerificacionKYCRepository 
     @Override
     public VerificacionKYC save(VerificacionKYC verificacion) {
         VerificacionKYCEntity entity = toEntity(verificacion);
+        // Si el entity ya existe en BD, rescatamos el `version` (campo @Version
+        // para optimistic locking) y el createdAt original. El domain
+        // VerificacionKYC no expone esos campos —son detalles de persistencia—,
+        // así que sin esto Hibernate ve `version=null` en un detached entity
+        // y falla con "uninitialized version value".
+        if (entity.getId() != null) {
+            Optional<VerificacionKYCEntity> existingOpt = jpaRepository.findById(entity.getId());
+            if (existingOpt.isPresent()) {
+                VerificacionKYCEntity existing = existingOpt.get();
+                entity.setVersion(existing.getVersion());
+                if (entity.getCreatedAt() == null) {
+                    entity.setCreatedAt(existing.getCreatedAt());
+                }
+            }
+        }
         if (entity.getCreatedAt() == null) {
             entity.setCreatedAt(LocalDateTime.now());
         }
         entity.setUpdatedAt(LocalDateTime.now());
-        entity = jpaRepository.save(entity);
-        return toDomain(entity);
+        VerificacionKYCEntity saved = jpaRepository.save(entity);
+        return toDomain(saved);
     }
 
     @Override
@@ -128,6 +143,7 @@ public class VerificacionKYCRepositoryImpl implements VerificacionKYCRepository 
             .fechaRevision(entity.getFechaRevision())
             .comentariosRevision(entity.getComentariosRevision())
             .motivoRechazo(entity.getMotivoRechazo())
+            .estadoBiometria(entity.getEstadoBiometria())
             .createdAt(entity.getCreatedAt())
             .updatedAt(entity.getUpdatedAt())
             .build();
@@ -147,6 +163,7 @@ public class VerificacionKYCRepositoryImpl implements VerificacionKYCRepository 
             .fechaRevision(domain.getFechaRevision())
             .comentariosRevision(domain.getComentariosRevision())
             .motivoRechazo(domain.getMotivoRechazo())
+            .estadoBiometria(domain.getEstadoBiometria())
             .createdAt(domain.getCreatedAt())
             .updatedAt(domain.getUpdatedAt())
             .build();

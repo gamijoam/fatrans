@@ -1,8 +1,11 @@
 package com.tufondo.auth.infrastructure.security;
 
+import com.tufondo.core.infrastructure.security.ratelimit.GlobalRateLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -27,6 +30,19 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final AdminDashboardRateLimitFilter adminDashboardRateLimitFilter;
+    private final GlobalRateLimitFilter globalRateLimitFilter;
+
+    @Bean
+    public RoleHierarchy roleHierarchy() {
+        RoleHierarchyImpl roleHierarchy = new RoleHierarchyImpl();
+        String hierarchy = "ROLE_SUPER_ADMIN > ROLE_ADMIN\n" +
+                          "ROLE_ADMIN > ROLE_ANALISTA_KYC\n" +
+                          "ROLE_ADMIN > ROLE_ANALISTA_CREDITO\n" +
+                          "ROLE_ADMIN > ROLE_CAJERO\n" +
+                          "ROLE_ADMIN > ROLE_SOCIO";
+        roleHierarchy.setHierarchy(hierarchy);
+        return roleHierarchy;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -49,14 +65,25 @@ public class SecurityConfig {
                 )
             )
             .authorizeHttpRequests(auth -> auth
+                // Issue #179: crear-usuario y cambiar-password requieren autenticación
+                // y autorización específica (enforced también por @PreAuthorize en el
+                // controller para defensa en profundidad).
+                .requestMatchers("/api/v1/auth/crear-usuario").authenticated()
+                .requestMatchers("/api/v1/auth/cambiar-password").authenticated()
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/socios/solicitud").permitAll()
+                // Webhook biométrico del proveedor KYC (Didit). NO usa JWT — la
+                // autenticación es por firma HMAC verificada dentro del adapter
+                // (`DiditKycAdapter#procesarWebhook`). Si exigimos JWT aquí, Didit
+                // recibe 401 y nunca confirma el resultado de las verificaciones.
+                .requestMatchers("/api/v1/kyc/biometric/webhook").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/favicon.ico").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(adminDashboardRateLimitFilter, JwtAuthenticationFilter.class);
+            .addFilterAfter(adminDashboardRateLimitFilter, JwtAuthenticationFilter.class)
+            .addFilterAfter(globalRateLimitFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -79,7 +106,7 @@ public class SecurityConfig {
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
-        configuration.setExposedHeaders(List.of("X-User-Id", "X-User-Rol", "X-Correlation-Id"));
+        configuration.setExposedHeaders(List.of("X-User-Id", "X-User-Rol", "X-Correlation-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);

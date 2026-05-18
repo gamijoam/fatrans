@@ -11,6 +11,26 @@ public record SecurityEvent(
         Instant timestamp,
         String detalles
 ) {
+    public static SecurityEventBuilder builder() {
+        return new SecurityEventBuilder();
+    }
+
+    public static class SecurityEventBuilder {
+        private UUID id = UUID.randomUUID();
+        private String tipoEvento;
+        private UUID usuarioId;
+        private String ipAddress;
+        private Instant timestamp = Instant.now();
+        private String detalles;
+
+        public SecurityEventBuilder id(UUID id) { this.id = id; return this; }
+        public SecurityEventBuilder tipoEvento(String tipoEvento) { this.tipoEvento = tipoEvento; return this; }
+        public SecurityEventBuilder usuarioId(UUID usuarioId) { this.usuarioId = usuarioId; return this; }
+        public SecurityEventBuilder ipAddress(String ipAddress) { this.ipAddress = ipAddress; return this; }
+        public SecurityEventBuilder timestamp(Instant timestamp) { this.timestamp = timestamp; return this; }
+        public SecurityEventBuilder detalles(String detalles) { this.detalles = detalles; return this; }
+        public SecurityEvent build() { return new SecurityEvent(id, tipoEvento, usuarioId, ipAddress, timestamp, detalles); }
+    }
     public static SecurityEvent loginExitoso(UUID usuarioId, String ip) {
         return new SecurityEvent(
                 UUID.randomUUID(),
@@ -74,6 +94,28 @@ public record SecurityEvent(
                 ip,
                 Instant.now(),
                 "rol=" + rol
+        );
+    }
+
+    public static SecurityEvent sesionesInvalidadas(UUID usuarioId, String ip, UUID invalidadoPor, int cantidad) {
+        return new SecurityEvent(
+                UUID.randomUUID(),
+                "SESSIONS_INVALIDATED",
+                usuarioId,
+                ip,
+                Instant.now(),
+                "invalidado_por=" + invalidadoPor + ", cantidad=" + cantidad
+        );
+    }
+
+    public static SecurityEvent sesionIndividualInvalidadas(UUID usuarioId, String ip, UUID invalidadoPor, String sesionId) {
+        return new SecurityEvent(
+                UUID.randomUUID(),
+                "SESSION_INVALIDATED",
+                usuarioId,
+                ip,
+                Instant.now(),
+                "invalidado_por=" + invalidadoPor + ", sesion_id=" + sesionId
         );
     }
 }

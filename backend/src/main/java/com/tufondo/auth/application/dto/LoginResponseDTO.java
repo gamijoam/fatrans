@@ -34,6 +34,12 @@ public record LoginResponseDTO(
             String nombreCompleto,
 
             @Schema(description = "Rol del usuario")
-            String rol
+            String rol,
+
+            @Schema(description = "ID del socio asociado (puede ser null para admins)")
+            String socioId,
+
+            @Schema(description = "Indica si el usuario debe cambiar su contraseña")
+            boolean debeCambiarPassword
     ) {}
 }

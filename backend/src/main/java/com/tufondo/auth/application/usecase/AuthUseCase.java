@@ -30,6 +30,19 @@ public class AuthUseCase {
     private static final int MAX_INTENTOS_FALLIDOS = 5;
     private static final int MINUTOS_BLOQUEO = 30;
 
+    /**
+     * Hash BCrypt válido de una password dummy (no usado para autenticar).
+     * Se evalúa contra {@link PasswordEncoder#matches} cuando el usuario NO existe,
+     * para que el tiempo de respuesta sea indistinguible del caso "password mala"
+     * (mitigación de enumeración por timing attack — issue #206).
+     *
+     * <p>El hash corresponde a la cadena fija "dummy-password-no-real" generada
+     * con BCrypt 10 rounds. Es seguro publicarlo: no autentica a ningún usuario
+     * real (no hay registro en BD con este hash).</p>
+     */
+    private static final String DUMMY_BCRYPT_HASH =
+            "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
     private final UsuarioRepository usuarioRepository;
     private final SesionRepository sesionRepository;
     private final JwtService jwtService;
@@ -47,6 +60,11 @@ public class AuthUseCase {
         }
 
         Usuario usuario = usuarioOpt.orElseThrow(() -> {
+            // Mitigación timing attack (issue #206): ejecutamos un BCrypt dummy para
+            // que el tiempo de respuesta sea similar al de un usuario existente con
+            // password mala. Sin esto, el atacante distingue "user no existe" en ms
+            // vs "password mala" en ~100ms (BCrypt es deliberadamente lento).
+            passwordEncoder.matches(request.password(), DUMMY_BCRYPT_HASH);
             auditService.logLoginFallido(request.identificador(), clientIp, "usuario_no_encontrado");
             return new CredencialesInvalidasException("Credenciales inválidas");
         });
@@ -126,9 +144,11 @@ public class AuthUseCase {
         String nuevoRefreshToken = jwtService.generarRefreshToken(usuario);
         String nuevoRefreshTokenHash = argon2Hasher.hash(nuevoRefreshToken);
 
-        Instant accessTokenExpiracion = jwtService.extraerExpiracionAccessToken(nuevoAccessToken);
-        Instant refreshTokenExpiracion = Instant.now()
-                .plusSeconds(refreshTokenExpiracion(nuevoRefreshToken));
+        Instant accessTokenExpiracion = jwtService.extraerExpiracion(nuevoAccessToken);
+        // FIX issue #178: el claim `exp` ya es un instante absoluto (segundos epoch),
+        // no segundos relativos. Antes se sumaba a Instant.now() generando expiraciones
+        // en el año ~3025 → sesiones efectivamente eternas.
+        Instant refreshTokenExpiracion = jwtService.extraerExpiracion(nuevoRefreshToken);
 
         Sesion nuevaSesion = Sesion.desdeParametros(
                 UUID.randomUUID(),
@@ -155,7 +175,9 @@ public class AuthUseCase {
                         usuario.nombreUsuario(),
                         usuario.correoElectronico(),
                         usuario.nombreCompleto(),
-                        usuario.rol().name()
+                        usuario.rol().name(),
+                        usuario.socioId() != null ? usuario.socioId().toString() : null,
+                        usuario.debeCambiarPassword()
                 )
         );
     }
@@ -194,9 +216,11 @@ public class AuthUseCase {
         String refreshToken = jwtService.generarRefreshToken(usuario);
         String refreshTokenHash = argon2Hasher.hash(refreshToken);
 
-        Instant accessTokenExpiracion = jwtService.extraerExpiracionAccessToken(accessToken);
-        Instant refreshTokenExpiracion = Instant.now()
-                .plusSeconds(refreshTokenExpiracion(refreshToken));
+        Instant accessTokenExpiracion = jwtService.extraerExpiracion(accessToken);
+        // FIX issue #178: el claim `exp` ya es un instante absoluto (segundos epoch),
+        // no segundos relativos. Antes se sumaba a Instant.now() generando expiraciones
+        // en el año ~3025 → sesiones efectivamente eternas.
+        Instant refreshTokenExpiracion = jwtService.extraerExpiracion(refreshToken);
 
         Sesion sesion = Sesion.desdeParametros(
                 UUID.randomUUID(),
@@ -224,12 +248,11 @@ public class AuthUseCase {
                         usuario.nombreUsuario(),
                         usuario.correoElectronico(),
                         usuario.nombreCompleto(),
-                        usuario.rol().name()
+                        usuario.rol().name(),
+                        usuario.socioId() != null ? usuario.socioId().toString() : null,
+                        usuario.debeCambiarPassword()
                 )
         );
     }
 
-    private long refreshTokenExpiracion(String refreshToken) {
-        return jwtService.extraerExpiracionAccessToken(refreshToken).getEpochSecond();
-    }
 }

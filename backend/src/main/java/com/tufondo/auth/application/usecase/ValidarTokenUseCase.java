@@ -45,7 +45,7 @@ public class ValidarTokenUseCase {
                     usuario.nombreUsuario(),
                     usuario.correoElectronico(),
                     rol,
-                    jwtService.extraerExpiracionAccessToken(token),
+                    jwtService.extraerExpiracion(token),
                     true
             );
 

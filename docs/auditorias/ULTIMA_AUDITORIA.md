@@ -1,276 +1,351 @@
-# Auditoría de Seguridad y Arquitectura
-## Feature: admin_solicitudes_registro (Issue #69)
+# 🔒 AUDITORÍA DE SEGURIDAD - Issue #101
+## Verificación de Contraseña para Acciones Sensibles
 
-**Fecha:** 2026-04-21
-**Auditor:** Lead Software Architect & Cyber-Security Auditor
-**Proyecto:** Fondo de Ahorro Platform
-**Versión Analizada:** Issue #69 - Gestión Solicitudes de Registro
+**Fecha:** 2026-04-27  
+**Auditor:** Lead Software Architect & Cyber-Security Auditor  
+**Alcance:** Frontend + Backend (Verificación de Password)  
+**Clasificación:** PÚBLICA
 
 ---
 
 ## RESUMEN EJECUTIVO
 
-| Severidad | Total |
-|-----------|-------|
-| 🔴 CRÍTICA | 1 |
+| Criticidad | Cantidad |
+|------------|----------|
+| 🔴 CRÍTICA | 3 |
 | 🟠 ALTA | 4 |
 | 🟡 MEDIA | 2 |
 | ⚪ BAJA | 0 |
 
-**Estado General:** ⚠️ APROBADO CON NOTAS
+### Estado General
 
-La implementación cumple con los requisitos funcionales básicos pero presenta vulnerabilidades de seguridad que requieren corrección antes de producción. La arquitectura sigue patrones de Clean Architecture en su mayoría, pero existen puntos de entrada sin validación suficiente.
+La implementación de Issue #101 presenta **fallas críticas de seguridad** que exponen el sistema a ataques de **fuerza bruta** y **secuestro de sesiones**. Si bien la arquitectura base es sólida (uso de PasswordEncoder, tokens UUID, auditoría), el endpoint `/api/v1/perfil/verificar-password` **carece de protección por rate limiting** y tiene **control de intentos insuficiente**, violando principios fundamentales de seguridad bancaria.
 
 ---
 
 ## VIOLACIONES CRÍTICAS (🔴)
 
-### 1. Posible XSS en Motivo de Rechazo
+### 1. Endpoint sin Rate Limiting - Ataque de Fuerza Bruta
 
-**[CRITICIDAD]:** CRÍTICA
-**[CATEGORÍA]:** Seguridad
-**[DESCRIPCIÓN]:** En `solicitud_registro_card.dart:98`, el motivo de rechazo se renderiza directamente sin sanitización:
+**Archivo:** `backend/src/main/java/com/tufondo/core/infrastructure/security/ratelimit/GlobalRateLimitFilter.java:32-41`
 
-```dart
-'Motivo rechazo: ${solicitud.motivoRechazo}'
+**Descripción:**
+El endpoint `/api/v1/perfil/verificar-password` **NO está incluido** en la lista de endpoints protegidos por rate limiting. El filtro protege login (5/min), registro (3/min), pero ignora completamente el endpoint de verificación de password.
+
+```java
+private static final Map<String, RateLimitConfig> ENDPOINT_LIMITS = Map.of(
+    "/api/v1/auth/login", new RateLimitConfig(5, Duration.ofMinutes(1)),
+    "/api/v1/auth/registro", new RateLimitConfig(3, Duration.ofMinutes(1)),
+    "/api/v1/admin/**", new RateLimitConfig(30, Duration.ofMinutes(1)),
+    "/api/v1/socios/**", new RateLimitConfig(60, Duration.ofMinutes(1)),
+    // ⚠️ FALTA: "/api/v1/perfil/verificar-password"
+    "/api/v1/cuentas/**", new RateLimitConfig(30, Duration.ofMinutes(1)),
+    ...
+);
 ```
 
-**[IMPACTO]:** Si un atacante logra inyectar código JavaScript malicioso en el campo `motivoRechazo` a través del backend (o si el backend no valida este campo), cuando un administrador visualice la lista de solicitudes, el código se ejecutará en el contexto del navegador del admin. En un sistema bancario, esto podría llevar a:
-- Robo de tokens de sesión del administrador
-- Exposición de datos sensibles de usuarios
-- Modificación maliciosa de datos
+**Impacto:**
+Un atacante con acceso a credenciales válidas puede realizar **ataques de fuerza bruta** contra el endpoint de verificación de password sin ser bloqueado. Esto compromete cualquier acción sensible posterior (cambio de contraseña, modificación de datos, etc.).
 
-**[CORRECCIÓN]:**
-```dart
-// Usar Text instead of String interpolation directa
-child: Text(
-  'Motivo rechazo: ${solicitud.motivoRechazo}',
-  style: TextStyle(
-    fontSize: 12,
-    color: Colors.red.shade700,
-  ),
-),
-// O sanitizar si es necesario
-```
-
-O mejor aún, usar un widget que安全感 maneje el contenido:
-```dart
-child: HtmlSanitizer.sanitize(
-  'Motivo rechazo: ${solicitud.motivoRechazo}',
-),
+**Corrección:**
+```java
+"/api/v1/perfil/verificar-password", new RateLimitConfig(5, Duration.ofMinutes(1)),
 ```
 
 ---
 
-## VIOLACIONES DE ARQUITECTURA (🟠)
+### 2. Sin Control de Intentos en Verificación de Password
 
-### 2. Import Incorrecto en Repository Abstract
+**Archivo:** `backend/src/main/java/com/tufondo/auth/infrastructure/service/VerificacionService.java:32-34`
 
-**[CRITICIDAD]:** ALTA
-**[CATEGORÍA]:** Arquitectura
-**[DESCRIPCIÓN]:** En `admin_solicitudes_registro_repository.dart:1`, el repositorio abstracto importa directamente la implementación del datasource:
+**Descripción:**
+El método `verificarPasswordUsuario` NO implementa control de intentos, a diferencia de `confirmarCodigo` que sí tiene `MAX_INTENTOS = 3`.
 
-```dart
-import '../../data/datasources/admin_solicitudes_registro_remote_datasource.dart';
-```
-
-Esto viola el principio de Clean Architecture. El repositorio abstracto (interfaz) debería depender solo de contratos, no de implementaciones concretas.
-
-**[IMPACTO]:** Acoplamiento indebido entre capas. Si se necesita cambiar la implementación del datasource (ej: agregar caché local), se debe modificar el interface de repositorio.
-
-**[CORRECCIÓN]:**
-Mover la clase `AdminSolicitudesRegistroResponse` a un archivo separado en `domain/models/` y que el repositorio solo referencie:
-```dart
-import '../../domain/models/admin_solicitudes_registro_response.dart';
-
-abstract class AdminSolicitudesRegistroRepository {
-  Future<AdminSolicitudesRegistroResponse> listarSolicitudes({...});
-  Future<void> aprobarSolicitud(String id, {String? comentario});
-  Future<void> rechazarSolicitud(String id, String motivo);
+```java
+public boolean verificarPasswordUsuario(UUID usuarioId, String password, String hashedPassword) {
+    return passwordEncoder.matches(password, hashedPassword);  // ⚠️ Sin control de intentos
 }
 ```
 
----
+vs.
 
-### 3. Estado Inconsistente tras Error en Cubit
-
-**[CRITICIDAD]:** ALTA
-**[CATEGORÍA]:** Arquitectura
-**[DESCRIPCIÓN]:** En `admin_solicitudes_registro_cubit.dart:164-169`, tras un error en `aprobarSolicitud`:
-
-```dart
-} catch (e) {
-  emit(currentState.copyWith(isAprobando: false));  // Estado A
-  emit(AdminSolicitudesRegistroError(...));          // Estado B
-  emit(currentState);                                 // Estado C - ¡BUG!
+```java
+if (entity.getIntentos() >= MAX_INTENTOS) {  // ✓ confirmarCodigo SÍ tiene esto
+    throw new ExcesoIntentosException("Superaste el número máximo de intentos");
 }
 ```
 
-Se emite `currentState` original (sin `isAprobando: false`) al final. Hay una inconsistencia donde el flag `isAprobando` se setea a `false` pero luego se pierde cuando se re-emite `currentState`.
+**Impacto:**
+Un atacante puede realizar **ataques de diccionario infinitos** hasta encontrar la contraseña correcta. El sistema solo registra el intento fallido en auditoría pero **no bloquea ni limita**.
 
-**[IMPACTO]:** El indicador de carga podría no reflejar el estado real. Si el usuario intenta otra acción mientras se muestra el error, el flag `isAprobando` podría estar en un estado inesperado.
-
-**[CORRECCIÓN]:**
-```dart
-} catch (e) {
-  emit(AdminSolicitudesRegistroError(...));
-  emit(currentState.copyWith(isAprobando: false));
+**Corrección:**
+```java
+@Transactional
+public boolean verificarPasswordUsuario(UUID usuarioId, String password, String hashedPassword) {
+    // Verificar si hay intentos fallidos previos bloqueados
+    Optional<VerificacionTokenEntity> bloqueo = tokenRepository
+        .findByUsuarioIdAndTipoAndUsedFalseAndExpiresAtAfter(
+            usuarioId, TipoVerificacion.PASSWORD_FALLO, Instant.now());
+    
+    if (bloqueo.isPresent() && bloqueo.get().getIntentos() >= MAX_INTENTOS_PASSWORD) {
+        throw new ExcesoIntentosException("Demasiados intentos fallidos. Intente en 5 minutos.");
+    }
+    
+    boolean valido = passwordEncoder.matches(password, hashedPassword);
+    
+    if (!valido) {
+        // Registrar intento fallido
+        registrarIntentoFalloPassword(usuarioId);
+    }
+    
+    return valido;
 }
 ```
 
 ---
 
-### 4. Indicadores de Carga Globales en Lista
+### 3. Token de Verificación Predecible (UUID)
 
-**[CRITICIDAD]:** ALTA
-**[CATEGORÍA]:** UX / Rendimiento
-**[DESCRIPCIÓN]:** En `admin_solicitudes_registro_page.dart:274`, todos los cards comparten el mismo flag `isLoading`:
+**Archivo:** `backend/src/main/java/com/tufondo/auth/infrastructure/service/VerificacionService.java:37-38`
 
-```dart
-isLoading: state.isAprobando || state.isRechazando,
+**Descripción:**
+El token de verificación se genera usando `UUID.randomUUID()` que, aunque parece aleatorio, es **predecible y no diseñado para seguridad criptográfica**.
+
+```java
+public String generarTokenVerificacion(UUID usuarioId, String ipAddress, String userAgent) {
+    String token = UUID.randomUUID().toString();  // ⚠️ No es criptográficamente seguro
+    // ...
+}
 ```
 
-Y en `admin_solicitudes_registro_cubit.dart:33-34`, `isAprobando` e `isRechazando` son flags globales en `AdminSolicitudesRegistroLoaded`.
+**Impacto:**
+Un atacante que obtenga acceso a la base de datos (SQL Injection, insider threat) puede:
+1. Listar todos los tokens pendientes
+2. Adivinar tokens UUID v4 (known weakness)
+3. Usar tokens robados para acceder a funciones sensibles
 
-**[IMPACTO]:** Si un administrador está aprobando/rechazando UNA solicitud, TODAS las solicitudes muestran el indicador de carga. Esto genera:
-- Confusión visual (el usuario no sabe cuál solicitud se está procesando)
-- UX deficiente cuando hay múltiples solicitudes pendientes
-- Bloqueo de acciones en solicitudes que no están siendo procesadas
+**Corrección:**
+```java
+import java.security.SecureRandom;
+import java.util.Base64;
 
-**[CORRECCIÓN]:** Cambiar a flags por solicitud:
-```dart
-class AdminSolicitudesRegistroLoaded {
-  final Map<String, bool> loadingById; // Instead of global flags
-  
-  bool isLoadingFor(String id) => loadingById[id] ?? false;
+public String generarTokenVerificacion(UUID usuarioId, String ipAddress, String userAgent) {
+    SecureRandom secureRandom = new SecureRandom();
+    byte[] tokenBytes = new byte[32];  // 256 bits
+    secureRandom.nextBytes(tokenBytes);
+    String token = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
+    // ... resto igual
 }
 ```
 
 ---
 
-### 5. Validación Insuficiente en Diálogos de Entrada
+## VIOLACIONES DE ARQUITECTURA / ALTA (🟠)
 
-**[CRITICIDAD]:** ALTA
-**[CATEGORÍA]:** Seguridad
-**[DESCRIPCIÓN]:** En `_showRechazoDialog` (`admin_solicitudes_registro_page.dart:64`) y `_showAprobarDialog` (`admin_solicitudes_registro_page.dart:120-127`):
+### 4. IP Spoofing en getClientIp
 
-- Solo se valida que el motivo no esté vacío
-- No hay validación de longitud máxima
-- No hay sanitización de caracteres especiales
-- No hay validación del comentario opcional
+**Archivo:** `backend/src/main/java/com/tufondo/socios/application/usecase/VerificacionUseCase.java:106-112`
 
-**[IMPACTO]:** Un usuario malicioso podría:
-- Enviar motivos de rechazo extremadamente largos para causar DoS
-- Inyectar caracteres especiales que podrían causar problemas en el backend
-- Enviar datos con formatos inesperados
+**Descripción:**
+El método `getClientIp` usa `X-Forwarded-For` sin validación, permitiendo a un atacante falsificar la IP.
 
-**[CORRECCIÓN]:**
-```dart
-void _showRechazoDialog(SolicitudRegistroAdminItem solicitud) {
-  final motivoController = TextEditingController();
-  
-  showDialog(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      // ...
-      TextField(
-        controller: motivoController,
-        decoration: const InputDecoration(
-          labelText: 'Motivo del rechazo',
-          hintText: 'Ingrese el motivo...',
-          border: OutlineInputBorder(),
-        ),
-        maxLines: 3,
-        maxLength: 500, // Longitud máxima
-      ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            final motivo = motivoController.text.trim();
-            if (motivo.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Debe ingresar un motivo'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-              return;
-            }
-            if (motivo.length < 10) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('El motivo debe tener al menos 10 caracteres'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-              return;
-            }
-            Navigator.pop(dialogContext);
-            context.read<AdminSolicitudesRegistroCubit>().rechazarSolicitud(
-              solicitud.id,
-              htmlEscape(motivo), // Sanitizar
-            );
-          },
-          // ...
-        ),
-      ],
-    ),
-  );
+```java
+private String getClientIp(HttpServletRequest request) {
+    String xForwardedFor = request.getHeader("X-Forwarded-For");
+    if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+        return xForwardedFor.split(",")[0].trim();  // ⚠️ Sin validar formato
+    }
+    return request.getRemoteAddr();
 }
+```
+
+**Impacto:**
+Un atacante puede falsificar la IP en los logs de auditoría para ocultar su origen real, dificultando la investigación forense y el rastreo.
+
+**Corrección:**
+```java
+private String getClientIp(HttpServletRequest request) {
+    String xForwardedFor = request.getHeader("X-Forwarded-For");
+    if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+        String ip = xForwardedFor.split(",")[0].trim();
+        // Validar formato IPv4 o IPv6
+        if (isValidIpAddress(ip)) {
+            return ip;
+        }
+    }
+    String xRealIp = request.getHeader("X-Real-IP");
+    if (xRealIp != null && !xRealIp.isEmpty() && isValidIpAddress(xRealIp)) {
+        return xRealIp;
+    }
+    return request.getRemoteAddr();
+}
+
+private boolean isValidIpAddress(String ip) {
+    if (ip == null || ip.isEmpty()) return false;
+    // IPv4 basic regex
+    return ip.matches("^(\\d{1,3}\\.){3}\\d{1,3}$") || 
+           ip.matches("^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$");
+}
+```
+
+---
+
+### 5. Exposición de Información en Mensajes de Error
+
+**Archivo:** `frontend-web/src/app/api/perfil/verificar-password/route.ts:37-38`
+
+**Descripción:**
+El endpoint propaga mensajes de error específicos del backend al cliente.
+
+```typescript
+return NextResponse.json(
+    { message: errorData.message || 'Contraseña incorrecta', valido: false },
+    { status: backendResponse.status }
+);
+```
+
+**Impacto:**
+Un atacante puede distinguir entre "usuario no existe" vs "contraseña incorrecta" si el backend tiene mensajes diferentes. Además, mensajes de error detallados pueden ayudar en ataques de enumeración.
+
+**Corrección:**
+```typescript
+// En el route.ts del frontend
+if (!backendResponse.ok) {
+    return NextResponse.json(
+        { message: 'Credenciales inválidas', valido: false },  // Mensaje genérico
+        { status: 401 }
+    );
+}
+```
+
+---
+
+### 6. Token No Vinculado al Contexto de Seguridad
+
+**Archivo:** `backend/src/main/java/com/tufondo/auth/infrastructure/service/VerificacionService.java:37-57`
+
+**Descripción:**
+El token de verificación generado NO incluye un hash del contexto original (IP, User-Agent) para validar que no fue robado.
+
+```java
+public String generarTokenVerificacion(UUID usuarioId, String ipAddress, String userAgent) {
+    String token = UUID.randomUUID().toString();
+    // ⚠️ El token se guarda pero NO se almacena hash del contexto
+    // Un atacante puede robar el token y usarlo desde otra IP
+}
+```
+
+**Impacto:**
+Si un atacante intercepta el `tokenVerificacion` (man-in-the-middle, acceso a logs, base de datos), puede usarlo desde cualquier ubicación para realizar acciones sensibles.
+
+**Corrección:**
+```java
+public String generarTokenVerificacion(UUID usuarioId, String ipAddress, String userAgent) {
+    SecureRandom secureRandom = new SecureRandom();
+    byte[] tokenBytes = new byte[32];
+    secureRandom.nextBytes(tokenBytes);
+    String token = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
+    
+    // Hash del contexto para verificación posterior
+    String contextoHash = hashContexto(ipAddress, userAgent);
+    
+    VerificacionTokenEntity entity = VerificacionTokenEntity.builder()
+            .token(token)
+            .usuarioId(usuarioId)
+            .tipo(TipoVerificacion.EMAIL)
+            .contextoHash(contextoHash)  // Nuevo campo
+            .createdAt(Instant.now())
+            .expiresAt(Instant.now().plus(TTL_MINUTES, ChronoUnit.MINUTES))
+            .used(false)
+            .intentos(0)
+            .ipAddress(ipAddress)
+            .userAgent(userAgent)
+            .build();
+    // ...
+}
+
+public boolean validarTokenVerificacion(UUID usuarioId, String token, String ipActual, String userAgentActual) {
+    // Validar que el contexto coincide
+    if (!entity.getContextoHash().equals(hashContexto(ipActual, userAgentActual))) {
+        auditService.registrarIntentoVerificacion(usuarioId, "TOKEN_CTX_MISMATCH", false, ipActual);
+        return false;
+    }
+}
+```
+
+---
+
+### 7. Falta Rate Limit Específico en el Controller
+
+**Archivo:** `backend/src/main/java/com/tufondo/socios/presentation/controller/PerfilVerificacionController.java:28-43`
+
+**Descripción:**
+El controller de verificación no tiene protección específica contra abuso, rely únicamente en el filtro global que no cubre este endpoint.
+
+```java
+@PostMapping("/verificar-password")
+public ResponseEntity<VerificarPasswordResponseDTO> verificarPassword(
+        @Valid @RequestBody VerificarPasswordRequestDTO request,
+        Authentication authentication,
+        HttpServletRequest httpRequest) {
+    // ⚠️ Sin @RateLimited o similar
+}
+```
+
+**Impacto:**
+Además del filtro global, este endpoint requiere su propia configuración de rate limiting específica debido a la naturaleza sensible de la operación.
+
+**Corrección:**
+```java
+@PostMapping("/verificar-password")
+@RateLimiting(value = 5, unit = RateLimiting.Unit.MINUTE)  // Nueva anotación
+public ResponseEntity<VerificarPasswordResponseDTO> verificarPassword(...)
 ```
 
 ---
 
 ## MEJORAS RECOMENDADAS (🟡)
 
-### 6. Duplicación de Lógica de Estados
+### 8. Validación de Longitud de Contraseña
 
-**[CRITICIDAD]:** MEDIA
-**[CATEGORÍA]:** Mantenibilidad
-**[DESCRIPCIÓN]:** La lógica para convertir códigos de estado (`PENDIENTE`, `APROBADA`, etc.) a nombres legibles está duplicada:
+**Archivo:** `backend/src/main/java/com/tufondo/socios/application/dto/VerificarPasswordRequestDTO.java:15-16`
 
-- `EstadoBadge._getDisplayName()` (línea 27-40)
-- `SolicitudRegistroAdminItem.estadoDisplay` (línea 73-86)
+**Descripción:**
+El DTO solo tiene `@NotBlank`, no valida longitud mínima.
 
-**[IMPACTO]:** Violación del principio DRY. Si se necesita cambiar el formato de display, hay que hacerlo en dos lugares.
+```java
+@NotBlank(message = "La contraseña es obligatoria")
+private String password;  // ⚠️ Sin @Size(min=8)
+```
 
-**[CORRECCIÓN]:** Centralizar en el enum `EstadoSolicitudRegistro` y usar extensión en ambos widgets.
+**Recomendación:**
+```java
+@NotBlank(message = "La contraseña es obligatoria")
+@Size(min = 8, max = 128, message = "La contraseña debe tener entre 8 y 128 caracteres")
+private String password;
+```
 
 ---
 
-### 7. Estados como String Libre en Entity
+### 9. Logging de Códigos SMS en Desarrollo
 
-**[CRITICIDAD]:** MEDIA
-**[CATEGORÍA]:** Arquitectura
-**[DESCRIPCIÓN]:** `SolicitudRegistroAdminItem.estado` es un `String` en lugar del enum `EstadoSolicitudRegistro`:
+**Archivo:** `backend/src/main/java/com/tufondo/auth/infrastructure/service/VerificacionService.java:90-93`
 
-```dart
-final String estado; // Debería ser EstadoSolicitudRegistro
+**Descripción:**
+En entorno de desarrollo se loguean códigos de verificación SMS.
+
+```java
+log.info("========= SMS MOCK: CÓDIGO DE VERIFICACIÓN =========");
+log.info("Para: {}", valor);
+log.info("Código: {}", codigo);  // ⚠️ En producción esto es CRÍTICO
+log.info("===================================================");
 ```
 
-Y en `fromJson`:
-```dart
-estado: json['estado'] as String? ?? '',
-```
-
-No hay validación de que el estado sea uno de los valores válidos.
-
-**[IMPACTO]:** Estados inválidos podrían causar `SwitchError` en runtime, o comportamiento inesperado en la UI.
-
-**[CORRECCIÓN]:**
-```dart
-final EstadoSolicitudRegistro estado;
-
-factory SolicitudRegistroAdminItem.fromJson(Map<String, dynamic> json) {
-  final estadoStr = json['estado'] as String? ?? 'PENDIENTE';
-  return SolicitudRegistroAdminItem(
-    // ...
-    estado: EstadoSolicitudRegistro.values.firstWhere(
-      (e) => e.apiValue == estadoStr,
-      orElse: () => EstadoSolicitudRegistro.pendiente,
-    ),
-    // ...
-  );
+**Recomendación:**
+Verificar que en producción estos logs no se ejecuten:
+```java
+if (log.isDebugEnabled()) {
+    log.debug("SMS MOCK: Para: {}, Código: {}", valor, codigo);
 }
 ```
 
@@ -278,31 +353,33 @@ factory SolicitudRegistroAdminItem.fromJson(Map<String, dynamic> json) {
 
 ## ARCHIVOS AFECTADOS
 
-| Prioridad | Archivo | Hallazgo |
-|-----------|---------|----------|
-| CRÍTICA | `presentation/widgets/solicitud_registro_card.dart:98` | XSS en motivo rechazo |
-| ALTA | `domain/repositories/admin_solicitudes_registro_repository.dart:1` | Import incorrecto |
-| ALTA | `presentation/cubit/admin_solicitudes_registro_cubit.dart:164-169` | Estado inconsistente |
-| ALTA | `presentation/pages/admin_solicitudes_registro_page.dart:274` | Flags globales |
-| ALTA | `presentation/pages/admin_solicitudes_registro_page.dart:64,120` | Validación insuficiente |
-| MEDIA | `presentation/widgets/estado_badge.dart` + `domain/entities/solicitud_registro_admin_item.dart` | Duplicación |
-| MEDIA | `domain/entities/solicitud_registro_admin_item.dart:57` | String libre para estado |
+| Prioridad | Archivo |
+|-----------|---------|
+| 🔴 CRÍTICA | `backend/src/main/java/com/tufondo/core/infrastructure/security/ratelimit/GlobalRateLimitFilter.java` |
+| 🔴 CRÍTICA | `backend/src/main/java/com/tufondo/auth/infrastructure/service/VerificacionService.java` |
+| 🔴 CRÍTICA | `backend/src/main/java/com/tufondo/auth/infrastructure/service/VerificacionService.java` |
+| 🟠 ALTA | `backend/src/main/java/com/tufondo/socios/application/usecase/VerificacionUseCase.java` |
+| 🟠 ALTA | `frontend-web/src/app/api/perfil/verificar-password/route.ts` |
+| 🟠 ALTA | `backend/src/main/java/com/tufondo/auth/infrastructure/service/VerificacionService.java` |
+| 🟠 ALTA | `backend/src/main/java/com/tufondo/socios/presentation/controller/PerfilVerificacionController.java` |
+| 🟡 MEDIA | `backend/src/main/java/com/tufondo/socios/application/dto/VerificarPasswordRequestDTO.java` |
+| 🟡 MEDIA | `backend/src/main/java/com/tufondo/auth/infrastructure/service/VerificacionService.java` |
 
 ---
 
-## VEREDICTO
+## CONCLUSIONES
 
-### ⚠️ APROBADO CON NOTAS
+La implementación de Issue #101 requiere **correcciones inmediatas** antes de producción:
 
-La implementación es funcional y sigue la arquitectura general del proyecto. Sin embargo, antes de pasar a producción **es obligatorio corregir**:
+1. **AGREGAR rate limiting** al endpoint `/api/v1/perfil/verificar-password` (5 intentos/minuto máximo)
+2. **IMPLEMENTAR control de intentos** en `verificarPasswordUsuario` similar a `confirmarCodigo`
+3. **SUSTITUIR UUID.randomUUID()** por `SecureRandom + Base64` para token criptográficamente seguro
+4. **AÑADIR hash de contexto** al token de verificación para prevenir token hijacking
 
-1. **[CRÍTICA]** El bug de XSS potencial en el motivo de rechazo (debe sanitizarse la salida)
-2. **[ALTA]** La validación de entradas en los diálogos de aprobar/rechazar
-3. **[ALTA]** El import incorrecto en el repositorio abstracto
-
-Las otras mejoras son recomendadas pero no bloqueantes.
+La arquitectura general es correcta (PasswordEncoder, auditoría, DTOs con validación), pero carece de protecciones críticas anti-fuerza-bruta que son **obligatorias en sistemas FinTech**.
 
 ---
 
-*Generado por: Security Auditor - Fondo de Ahorro Platform*
-*Fecha: 2026-04-21 21:04:47*
+**Firma del Auditor:** Lead Software Architect & Cyber-Security Auditor  
+**Fecha del Reporte:** 2026-04-27  
+**Próxima Auditoría:** Antes de liberación a producción

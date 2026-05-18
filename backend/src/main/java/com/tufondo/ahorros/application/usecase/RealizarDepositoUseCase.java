@@ -14,6 +14,8 @@ import com.tufondo.ahorros.domain.model.enums.EstadoCuenta;
 import com.tufondo.ahorros.domain.model.valueobjects.NumeroOperacion;
 import com.tufondo.ahorros.domain.repository.CuentaAhorroRepository;
 import com.tufondo.ahorros.domain.repository.MovimientoRepository;
+import com.tufondo.compliance.application.service.LocdoftOperacionService;
+import com.tufondo.compliance.domain.model.ConsentimientoLocdoftOperacion;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,7 @@ public class RealizarDepositoUseCase {
     private final CuentaAhorroRepository cuentaRepository;
     private final MovimientoRepository movimientoRepository;
     private final AhorrosDTOMapper mapper;
+    private final LocdoftOperacionService locdoftService;
 
     @Transactional
     public MovimientoResponse ejecutar(String numeroCuenta, DepositoRequest request,
@@ -58,6 +61,20 @@ public class RealizarDepositoUseCase {
         if (request.getMonto().compareTo(LIMITE_DEPOSITO) > 0) {
             throw new MontoExcedeLimiteException(request.getMonto(), LIMITE_DEPOSITO, "depósito");
         }
+
+        // LOCDOFT (#218 PR-C): si supera el umbral, registra el consentimiento
+        // o lanza LocdoftConsentimientoRequeridoException (HTTP 422 → frontend
+        // abre modal con la pregunta de origen lícito).
+        ConsentimientoLocdoftOperacion consentimiento = locdoftService.validarYRegistrar(
+                new LocdoftOperacionService.DatosOperacion(
+                        cuenta.getSocioId(),
+                        cuenta.getId(),
+                        ConsentimientoLocdoftOperacion.TipoOperacion.DEPOSITO,
+                        request.getMonto(),
+                        cuenta.getMoneda() != null ? cuenta.getMoneda().name() : "VES",
+                        Boolean.TRUE.equals(request.getConfirmaOrigenLicito()),
+                        request.getOrigenFondos(),
+                        ipOrigen, null, sessionId, requestId));
 
         // Ejecutar depósito
         BigDecimal saldoAnterior = cuenta.getSaldoActual();
@@ -90,6 +107,12 @@ public class RealizarDepositoUseCase {
                 request.getReferencia()
         );
         movimiento = movimientoRepository.guardar(movimiento);
+
+        // Asociar consentimiento LOCDOFT con el movimiento real recién creado
+        // (resiliente: si falla, queda con movimiento_id=null, no aborta).
+        if (consentimiento != null) {
+            locdoftService.asociarConMovimiento(consentimiento.getId(), movimiento.getId());
+        }
 
         log.info("Depósito realizado: {} en cuenta {}", request.getMonto(), numeroCuenta);
         return mapper.toResponse(movimiento);
