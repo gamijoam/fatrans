@@ -18,6 +18,9 @@ LOG_FILE="/var/log/fatrans-prod-deploy.log"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
+NGINX_CONF_SRC="$REPO_DIR/infrastructure/nginx/fatrans.conf"
+NGINX_CONF_DST="/etc/nginx/sites-enabled/fatrans"
+
 log "======================================================"
 log " Iniciando deploy PRODUCCIÓN  —  SHA: $GIT_SHA"
 log "======================================================"
@@ -86,6 +89,37 @@ for c in fatrans-backend fatrans-frontend-public fatrans-frontend-protected; do
     fi
   fi
 done
+
+# 4.b. Actualizar config nginx desde el repo (fuente de verdad).
+#      Histórico: el config solo vivía en `/etc/nginx/sites-enabled/fatrans`
+#      sin version control. El 18-may-2026 le faltaba `qa.fatrans.com.ve`
+#      en server_name y nginx mandaba ese host al default_server (PROD
+#      landing), provocando que el botón "Registrarse" de QA llevara a
+#      PROD. Ahora el repo es la fuente de verdad y este deploy lo
+#      sincroniza. Si `nginx -t` falla, ABORTAMOS sin reload — nginx
+#      sigue sirviendo el config anterior. Backup previo a cada cambio.
+if [ -f "$NGINX_CONF_SRC" ]; then
+  log "→ Actualizando nginx config desde el repo..."
+  if ! diff -q "$NGINX_CONF_SRC" "$NGINX_CONF_DST" >/dev/null 2>&1; then
+    BAK="/root/fatrans.nginx.bak_$(date +%Y%m%d_%H%M%S)"
+    cp "$NGINX_CONF_DST" "$BAK"
+    log "   Backup del config previo: $BAK"
+    cp "$NGINX_CONF_SRC" "$NGINX_CONF_DST"
+    if nginx -t 2>>"$LOG_FILE"; then
+      nginx -s reload
+      log "   ✅ nginx config recargado"
+    else
+      log "   ❌ nginx -t FALLÓ — restaurando backup"
+      cp "$BAK" "$NGINX_CONF_DST"
+      nginx -t 2>>"$LOG_FILE"
+      exit 1
+    fi
+  else
+    log "   Config nginx sin cambios — skip"
+  fi
+else
+  log "   ⚠️ $NGINX_CONF_SRC no existe en el repo — skip nginx update"
+fi
 
 # 5. Restart con zero-downtime (recrear uno a uno)
 log "→ Actualizando backend..."
