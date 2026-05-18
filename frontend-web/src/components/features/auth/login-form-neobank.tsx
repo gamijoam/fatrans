@@ -74,6 +74,19 @@ export function LoginFormNeobank() {
     if (lockoutRemaining > 0) return;
 
     setIsLoading(true);
+    // Minimo visual de la animacion de "Iniciando sesion..." - si el backend
+    // responde en <1500ms el overlay del logo animado apenas se ve y el
+    // usuario percibe el login como "no hizo nada". Forzamos un piso de
+    // 1.5s para que el feedback sea claro (patron estandar de banca digital
+    // que prioriza confianza sobre microsegundos de latencia percibida).
+    const ANIM_MIN_MS = 1500;
+    const animStart = Date.now();
+    const waitMinDelay = async () => {
+      const elapsed = Date.now() - animStart;
+      if (elapsed < ANIM_MIN_MS) {
+        await new Promise((r) => setTimeout(r, ANIM_MIN_MS - elapsed));
+      }
+    };
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -111,6 +124,9 @@ export function LoginFormNeobank() {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
         const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || '';
 
+        // Esperar minimo 1.5s para que la animacion se vea (UX bancario)
+        await waitMinDelay();
+
         if (rol === 'SOCIO') {
           window.location.href = `${appUrl}/dashboard`;
         } else {
@@ -119,6 +135,11 @@ export function LoginFormNeobank() {
       }
     } catch (error) {
       setLoading(false);
+      // Tambien respetar el minimo en errores: si el backend rebota en 200ms
+      // con "credenciales invalidas", queremos que la animacion se vea al
+      // menos un segundo antes de mostrar el toast (sino el usuario duda si
+      // siquiera intento loguearse).
+      await waitMinDelay();
       console.error('Login error:', error);
       const message = error instanceof Error ? sanitizeHTML(error.message) : 'Error de conexión';
       toast.error(message);

@@ -44,6 +44,12 @@ export function Logo({ size = 96, className = '', soloImagen = false, priority =
           fill
           sizes={`${size}px`}
           priority={priority}
+          // `unoptimized` evita que Next.js intente procesar el PNG con
+          // `sharp` (no instalado en el container standalone). Para un logo
+          // estatico servido como PNG con fondo transparente ya optimizado,
+          // no necesitamos la pipeline de webp/avif resampling. Bonus:
+          // evita el log spam "'sharp' is required" en produccion.
+          unoptimized
           className="object-contain drop-shadow-md"
         />
       </div>
