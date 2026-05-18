@@ -6,6 +6,9 @@ target/
 .env
 .env.local
 .env.*.local
+.env.prod
+.env.qa
+.env.production
 .idea/
 .vscode/
 .ai/venv/
