@@ -48,7 +48,13 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
+          # `timeout` es solo el handshake SSH; `command_timeout` es lo que
+          # corre el script. Default es 10m — insuficiente para el primer
+          # deploy a PROD donde hay que buildear backend (4 min) + frontend
+          # (5 min) + correr 10 migrations + start de Spring + healthcheck.
+          # 30 min cubre primeros deploys cold y deja margen.
           timeout: 20m
+          command_timeout: 30m
           script: |
             chmod +x /opt/fatrans/deploy-prod.sh
             bash /opt/fatrans/deploy-prod.sh ${{ github.sha }}
@@ -67,6 +73,14 @@ jobs:
             const sha = context.sha.substring(0, 7);
             console.log('✅ Deploy producción OK — SHA ' + sha);
 
+      # Rollback condicional: solo ejecuta si el backend NO está
+      # respondiendo. La versión anterior corría en todo failure() —
+      # incluyendo timeouts SSH o errores en steps de verificación
+      # cosméticos, casos donde el backend en realidad estaba arriba.
+      # Eso causó (18-05-2026) que matáramos un deploy exitoso porque
+      # el SSH timeout de 10m disparó el rollback y el rollback re-taggeó
+      # `latest` apuntando a una imagen anterior incompatible con la BD
+      # ya migrada a V20, dejando PROD sin backend usable.
       - name: Rollback automático si falla
         if: failure()
         uses: appleboy/ssh-action@v1.0.3
@@ -76,13 +90,26 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
           script: |
-            echo "⚠️ Deploy falló — intentando rollback..."
-            PREV=$(docker images fatrans-backend --format "{{.Tag}}" | grep -v latest | sort -r | sed -n '2p')
+            echo "⚠️ Workflow falló — evaluando si necesita rollback..."
+            sleep 5
+            # Si el backend responde en 8080, asumimos que el deploy llegó
+            # lejos y que el "failure" del workflow fue cosmético (timeout,
+            # healthcheck mal configurado, etc). No tocar nada.
+            if docker exec fatrans-backend nc -z -w 3 localhost 8080 2>/dev/null; then
+              echo "✅ Backend responde en :8080 — NO rollback. Verificar manualmente."
+              exit 0
+            fi
+            echo "❌ Backend no responde — iniciando rollback..."
+            # Buscar la imagen anterior (segunda en orden reverso, descartando :latest)
+            PREV=$(docker images fatrans-backend --format "{{.Tag}}" \
+                    | grep -v '^latest$' | grep -v '^<none>$' \
+                    | sort -r | sed -n '2p')
             if [ -n "$PREV" ]; then
-              docker tag fatrans-backend:$PREV fatrans-backend:latest
+              echo "→ Rollback a fatrans-backend:$PREV"
+              docker tag "fatrans-backend:$PREV" fatrans-backend:latest
               cd /opt/fatrans/backend/infrastructure
-              docker-compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend
-              echo "Rollback a $PREV completado"
+              docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend
+              echo "Rollback completado"
             else
-              echo "No hay imagen anterior para rollback"
+              echo "No hay imagen anterior para rollback — backend queda caído"
             fi
