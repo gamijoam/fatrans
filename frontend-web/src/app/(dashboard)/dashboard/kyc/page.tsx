@@ -41,14 +41,23 @@ interface EstadoKYC {
   estadoBiometria: 'NO_INICIADA' | 'EN_PROGRESO' | 'APROBADA' | 'RECHAZADA' | 'EXPIRADA' | null;
 }
 
-/** Todos los documentos que el KYC puede requerir. El subset visible depende
-    del estado biométrico — ver `documentosVisibles` abajo. Cuando la biometría
-    está APROBADA, los documentos con `cubrePorBiometria=true` se ocultan porque
-    Didit ya capturó esa información (cédula anverso/reverso + selfie). */
+/** Documentos que el socio sube **manualmente** desde esta UI.
+ *
+ *  Histórico (18-may-2026): antes había 4 entradas — cédula anverso/reverso,
+ *  selfie con cédula y comprobante de domicilio. Los 3 primeros estaban
+ *  marcados `cubrePorBiometria=true` y se ocultaban una vez que la biometría
+ *  pasaba. Problema: si el socio subía screenshots/fotos malas **antes** de
+ *  hacer la biometría, el backend interpretaba que ya estaban "los 4 docs"
+ *  y movía la verificación a EN_REVISION automáticamente. A partir de ahí
+ *  el socio quedaba bloqueado: ya no podía subir más documentos NI hacer
+ *  biometría sin intervención manual del admin. Caso real: ronni.ronni en
+ *  PROD subió 4 screenshots y quedó en EN_REVISION con biometría sin iniciar.
+ *
+ *  Fix: la cédula y la selfie YA NO se suben manualmente. La única forma
+ *  de aportar esos datos es vía verificación biométrica (Didit). Acá solo
+ *  queda el comprobante de domicilio, que Didit no puede capturar.
+ */
 const TIPOS_DOCUMENTO = [
-  { tipo: 'CEDULA_ANVERSO', label: 'Cédula - Anverso', required: true, cubrePorBiometria: true },
-  { tipo: 'CEDULA_REVERSO', label: 'Cédula - Reverso', required: true, cubrePorBiometria: true },
-  { tipo: 'SELFIE_CEDULA', label: 'Selfie con Cédula', required: true, cubrePorBiometria: true },
   { tipo: 'COMPROBANTE_DOMICILIO', label: 'Comprobante de Domicilio', required: true, cubrePorBiometria: false },
 ];
 
@@ -218,21 +227,20 @@ export default function DashboardKYCPagina() {
       (consentimiento → ready → in_progress → submitted). */
   const puedeBiometrica = estadoKYC && estadoKYC.estado !== 'APROBADO';
 
-  /** Si la biometría ya pasó, Didit ya capturó cédula + selfie. Ocultamos los
-      3 documentos correspondientes en "Paso 2" y dejamos solo los que NO cubre
-      la biometría (comprobante de domicilio). Evita que el socio resuba algo
-      que ya tenemos validado por el proveedor. */
   const biometriaAprobada = estadoKYC?.estadoBiometria === 'APROBADA';
-  const documentosVisibles = biometriaAprobada
-    ? TIPOS_DOCUMENTO.filter(d => !d.cubrePorBiometria)
-    : TIPOS_DOCUMENTO;
+  /** Cédula+selfie ya no son uploads manuales — solo se proveen vía biometría.
+      El array siempre devuelve solo `[COMPROBANTE_DOMICILIO]` independientemente
+      del estado biométrico. Mantengo `documentosVisibles` como nombre por
+      compatibilidad con el render abajo. */
+  const documentosVisibles = TIPOS_DOCUMENTO;
 
-  /** El backend siempre cuenta 4 documentos requeridos. Si la biometría
-      aprobó, sumamos los 3 que cubre Didit como ya validados — la barra
-      de progreso refleja el avance real considerando la biometría. */
-  const docsCubiertosPorBiometria = biometriaAprobada
-    ? TIPOS_DOCUMENTO.filter(d => d.cubrePorBiometria).length
-    : 0;
+  /** Backend sigue contando 4 docs requeridos (cédula anverso/reverso, selfie,
+      comprobante) por compatibilidad histórica — esa lógica habría que ajustar
+      en backend en otro pasada. Acá calculamos el progreso "visible" para el
+      socio: si la biometría está aprobada, los 3 docs de identidad ya están
+      cubiertos por Didit. */
+  const DOCS_CUBIERTOS_POR_BIOMETRIA = 3; // cédula anverso, cédula reverso, selfie
+  const docsCubiertosPorBiometria = biometriaAprobada ? DOCS_CUBIERTOS_POR_BIOMETRIA : 0;
   const docsValidosCalculados = (estadoKYC?.documentosValidos ?? 0) + docsCubiertosPorBiometria;
 
   return (
@@ -345,19 +353,20 @@ export default function DashboardKYCPagina() {
             </div>
           )}
 
-          {/* Documentos manuales: complemento del paso biométrico — si la
-              biometría está APROBADA, solo pedimos los documentos que Didit
-              NO captura (comprobante de domicilio). El resto se considera
-              cubierto por la verificación biométrica. */}
+          {/* Comprobante de domicilio: único documento que Didit no puede
+              capturar (la factura de servicios, contrato de alquiler, etc).
+              La cédula y la selfie las obtenemos del paso biométrico — ya no
+              se permite subirlas manualmente para evitar que el socio cargue
+              screenshots inválidos y dispare el auto-EN_REVISION del backend. */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 px-1 flex-wrap">
               <Upload className="h-4 w-4 text-green-600" />
               <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                Paso 2 · Documentos
+                Paso 2 · Comprobante de domicilio
               </h2>
-              {biometriaAprobada && (
+              {!biometriaAprobada && (
                 <span className="text-xs text-gray-500">
-                  · cédula y selfie ya cubiertos por la verificación facial
+                  · completá la verificación facial primero
                 </span>
               )}
             </div>
@@ -424,7 +433,19 @@ export default function DashboardKYCPagina() {
                                 setTargetTipo(doc.tipo);
                                 fileInputRef.current?.click();
                               }}
-                              disabled={subiendoDocumento !== null || !puedeSubirDocumentos}
+                              // Bloqueado hasta que pase la biometría — forzamos
+                              // el orden "verificación facial → comprobante" para
+                              // que el socio no pueda saltarse el paso 1.
+                              disabled={
+                                subiendoDocumento !== null ||
+                                !puedeSubirDocumentos ||
+                                !biometriaAprobada
+                              }
+                              title={
+                                !biometriaAprobada
+                                  ? 'Completá la verificación facial (Paso 1) antes de subir el comprobante'
+                                  : undefined
+                              }
                             >
                               {subiendoDocumento === doc.tipo ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
