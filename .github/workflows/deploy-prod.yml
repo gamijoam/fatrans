@@ -26,6 +26,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Copia el script de deploy del repo al VPS antes de ejecutarlo.
+      # Así el repo es la fuente de verdad: cualquier cambio en
+      # `infrastructure/scripts/deploy-prod.sh` se aplica en el
+      # siguiente deploy automáticamente, sin tocar el VPS a mano.
+      - name: Subir script de deploy al VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          source: "infrastructure/scripts/deploy-prod.sh"
+          target: "/opt/fatrans/"
+          strip_components: 2
+
       - name: Deploy vía SSH al VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -35,6 +50,7 @@ jobs:
           port: 22
           timeout: 20m
           script: |
+            chmod +x /opt/fatrans/deploy-prod.sh
             bash /opt/fatrans/deploy-prod.sh ${{ github.sha }}
 
       - name: Verificar Producción
