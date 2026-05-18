@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { registroSchema } from '@/lib/utils/validators';
+import { enforceOriginPolicy } from '@/lib/security/origin-check';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 
@@ -49,36 +50,14 @@ function getClientIp(request: NextRequest): string | null {
 }
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get('origin');
-  const referer = request.headers.get('referer');
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:13000',
-    process.env.NEXT_PUBLIC_APP_URL,
-    process.env.NEXT_PUBLIC_ADMIN_URL,
-    process.env.NEXT_PUBLIC_AUTH_URL,
-  ].filter(Boolean);
-
-  // El referer llega como "https://qa-auth.fatrans.com.ve/registro". Parseamos su origin
-  // y lo comparamos con la misma whitelist de allowedOrigins (evita drift entre listas).
-  // OJO con startsWith: "https://auth.fatrans.com.ve.evil.com" también empezaría con
-  // "https://auth.fatrans.com.ve" — por eso usamos URL.origin que extrae esquema+host+puerto.
-  function refererOriginAllowed(headerValue: string): boolean {
-    try {
-      const refOrigin = new URL(headerValue).origin;
-      return allowedOrigins.includes(refOrigin);
-    } catch {
-      return false;
-    }
-  }
-
-  if (origin && !allowedOrigins.includes(origin)) {
-    return NextResponse.json({ message: 'Origen no permitido' }, { status: 403 });
-  }
-
-  if (referer && !refererOriginAllowed(referer)) {
-    return NextResponse.json({ message: 'Referer no permitido' }, { status: 403 });
-  }
+  // Whitelist centralizada en `lib/security/origin-check`. Antes vivía
+  // inline en cada route, derivada de `NEXT_PUBLIC_*_URL` — y como esos
+  // env vars se inlinen al BUILD (no runtime), bastaba con que el deploy
+  // no pasara un build-arg para que el bundle quedara con la lista mal.
+  // El 18-may-2026 los usuarios que entraban por `www.fatrans.com.ve` no
+  // podían registrarse por eso.
+  const blocked = enforceOriginPolicy(request);
+  if (blocked) return blocked;
 
   try {
     const body = await request.json();
