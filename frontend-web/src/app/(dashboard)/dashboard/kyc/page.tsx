@@ -7,10 +7,38 @@ import { Button } from '@/components/ui/button';
 import { ProgressBar } from '@/components/ui/progress';
 import {
   Shield, Upload, FileText, CheckCircle, XCircle, Clock, AlertTriangle,
-  Loader2, Calendar, Send, Camera
+  Loader2, Calendar, Send, Camera, ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BiometricCapture } from '@/components/features/kyc/biometric-capture';
+
+/**
+ * Rediseño KYC (19-may-2026)
+ * ============================
+ *
+ * Problema reportado en QA y PROD: socios completan verificación facial pero
+ * la UI no se entera (queda pidiendo consent o "volver a verificar") y los
+ * botones de comprobante quedan bloqueados sin explicación visible. Caso real:
+ * Carlos en PROD subió selfie, vio "APROBADA" en BD vía SQL manual, pero el
+ * frontend nunca actualizó porque dependía de webhook que no llegaba.
+ *
+ * Esta página ahora muestra:
+ *  1. Un stepper visual arriba ("Paso 1 → Paso 2 → Listo") que el socio
+ *     entiende sin leer texto. El paso activo destaca; los completados se
+ *     marcan en verde con un check.
+ *  2. Solo el paso activo se renderiza expandido (la verificación facial o
+ *     el comprobante de domicilio). Antes ambos se mostraban siempre y el
+ *     socio se perdía entre dos cards similares.
+ *  3. Mensajes de estado en lenguaje plano, sin jerga técnica (KYC, OCR,
+ *     liveness, etc).
+ *  4. Cuando la biometría aprueba, la transición a "Paso 2" es automática
+ *     gracias al polling de pull-sync del componente BiometricCapture
+ *     (ver biometric-capture.tsx).
+ *
+ * El backend hace pull-sync a Didit cada 5s vía /api/kyc/biometric/refresh —
+ * si por alguna razón el webhook no llegó (no configurado en dashboard de
+ * Didit, network, etc), la UI sigue actualizándose sin intervención manual.
+ */
 
 interface DocumentoEstado {
   id: string;
@@ -36,29 +64,48 @@ interface EstadoKYC {
   documentos: DocumentoEstado[];
   comentarioRevision: string | null;
   motivoRechazo: string | null;
-  /** Estado biométrico (Didit) — usado para ocultar documentos ya capturados
-      por la verificación facial y para reflejar el estado del widget en la UI. */
   estadoBiometria: 'NO_INICIADA' | 'EN_PROGRESO' | 'APROBADA' | 'RECHAZADA' | 'EXPIRADA' | null;
 }
 
-/** Documentos que el socio sube **manualmente** desde esta UI.
- *
- *  Histórico (18-may-2026): antes había 4 entradas — cédula anverso/reverso,
- *  selfie con cédula y comprobante de domicilio. Los 3 primeros estaban
- *  marcados `cubrePorBiometria=true` y se ocultaban una vez que la biometría
- *  pasaba. Problema: si el socio subía screenshots/fotos malas **antes** de
- *  hacer la biometría, el backend interpretaba que ya estaban "los 4 docs"
- *  y movía la verificación a EN_REVISION automáticamente. A partir de ahí
- *  el socio quedaba bloqueado: ya no podía subir más documentos NI hacer
- *  biometría sin intervención manual del admin. Caso real: ronni.ronni en
- *  PROD subió 4 screenshots y quedó en EN_REVISION con biometría sin iniciar.
- *
- *  Fix: la cédula y la selfie YA NO se suben manualmente. La única forma
- *  de aportar esos datos es vía verificación biométrica (Didit). Acá solo
- *  queda el comprobante de domicilio, que Didit no puede capturar.
- */
+/** Único documento manual: comprobante de domicilio (Didit no captura facturas). */
 const TIPOS_DOCUMENTO = [
-  { tipo: 'COMPROBANTE_DOMICILIO', label: 'Comprobante de Domicilio', required: true, cubrePorBiometria: false },
+  { tipo: 'COMPROBANTE_DOMICILIO', label: 'Comprobante de Domicilio' },
+];
+
+/** Stepper visual con 3 pasos: verificación facial, comprobante, revisión. */
+type StepKey = 'biometria' | 'comprobante' | 'revision';
+type StepEstado = 'completado' | 'activo' | 'pendiente';
+
+interface StepDef {
+  key: StepKey;
+  numero: number;
+  titulo: string;
+  descripcionCorta: string;
+  icon: typeof Camera;
+}
+
+const STEPS: StepDef[] = [
+  {
+    key: 'biometria',
+    numero: 1,
+    titulo: 'Verificación facial',
+    descripcionCorta: 'Selfie + foto de tu cédula',
+    icon: Camera,
+  },
+  {
+    key: 'comprobante',
+    numero: 2,
+    titulo: 'Comprobante de domicilio',
+    descripcionCorta: 'Factura de servicios o contrato',
+    icon: FileText,
+  },
+  {
+    key: 'revision',
+    numero: 3,
+    titulo: 'Revisión final',
+    descripcionCorta: 'Te avisamos por correo',
+    icon: Shield,
+  },
 ];
 
 export default function DashboardKYCPagina() {
@@ -66,7 +113,6 @@ export default function DashboardKYCPagina() {
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [subiendoDocumento, setSubiendoDocumento] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [targetTipo, setTargetTipo] = useState<string | null>(null);
 
@@ -79,10 +125,10 @@ export default function DashboardKYCPagina() {
       } else if (res.status === 404) {
         setEstadoKYC(null);
       } else {
-        toast.error('Error al cargar estado KYC');
+        toast.error('No pudimos cargar el estado de tu verificación');
       }
     } catch {
-      toast.error('Error al cargar estado KYC');
+      toast.error('No pudimos cargar el estado de tu verificación');
     } finally {
       setLoading(false);
     }
@@ -91,47 +137,6 @@ export default function DashboardKYCPagina() {
   useEffect(() => {
     cargarEstado();
   }, [cargarEstado]);
-
-  const getEstadoBadge = (estado: string) => {
-    switch (estado) {
-      case 'APROBADO':
-        return <Badge className="bg-green-100 text-green-800">Aprobado</Badge>;
-      case 'RECHAZADO':
-        return <Badge className="bg-red-100 text-red-800">Rechazado</Badge>;
-      case 'EN_REVISION':
-        return <Badge className="bg-blue-100 text-blue-800">En Revisión</Badge>;
-      case 'PENDIENTE':
-        return <Badge className="bg-yellow-100 text-yellow-800">Pendiente</Badge>;
-      case 'EXPIRADO':
-        return <Badge className="bg-gray-100 text-gray-800">Expirado</Badge>;
-      default:
-        return <Badge variant="secondary">{estado}</Badge>;
-    }
-  };
-
-  const getDocumentoEstadoIcon = (estado: string) => {
-    switch (estado) {
-      case 'VALIDADO':
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case 'RECHAZADO':
-        return <XCircle className="h-5 w-5 text-red-600" />;
-      default:
-        return <Clock className="h-5 w-5 text-yellow-600" />;
-    }
-  };
-
-  const getDocumentoStatusBadge = (estado: string) => {
-    switch (estado) {
-      case 'VALIDADO':
-        return <Badge className="bg-green-100 text-green-800 text-xs">Válido</Badge>;
-      case 'RECHAZADO':
-        return <Badge className="bg-red-100 text-red-800 text-xs">Rechazado</Badge>;
-      case 'PENDIENTE':
-        return <Badge className="bg-yellow-100 text-yellow-800 text-xs">Pendiente</Badge>;
-      default:
-        return <Badge variant="secondary" className="text-xs">{estado}</Badge>;
-    }
-  };
 
   const handleEnviarRevision = async () => {
     if (!estadoKYC?.verificacionId) {
@@ -148,14 +153,16 @@ export default function DashboardKYCPagina() {
       });
 
       if (res.ok) {
-        toast.success('Documentos enviados para revisión');
+        toast.success('Enviado a revisión', {
+          description: 'Te avisaremos por correo cuando el equipo termine.',
+        });
         cargarEstado();
       } else {
         const error = await res.json();
-        toast.error(error.message || 'Error al enviar');
+        toast.error(error.message || 'No pudimos enviar a revisión');
       }
     } catch {
-      toast.error('Error al enviar documentos');
+      toast.error('No pudimos enviar a revisión');
     } finally {
       setEnviando(false);
     }
@@ -166,12 +173,12 @@ export default function DashboardKYCPagina() {
 
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     if (!validTypes.includes(file.type)) {
-      toast.error('Formato no válido. Use: JPG, PNG, WEBP o PDF');
+      toast.error('Formato no válido', { description: 'Usá JPG, PNG, WEBP o PDF.' });
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('El archivo excede 10MB');
+      toast.error('Archivo demasiado grande', { description: 'Máximo 10 MB.' });
       return;
     }
 
@@ -182,8 +189,6 @@ export default function DashboardKYCPagina() {
 
     setSubiendoDocumento(tipo);
     try {
-      // Mandamos verificacionId al BFF porque el backend lo necesita en el
-      // payload JSON que arma el BFF (el endpoint no acepta multipart).
       const formData = new FormData();
       formData.append('verificacionId', estadoKYC.verificacionId);
       formData.append('tipoDocumento', tipo);
@@ -196,292 +201,495 @@ export default function DashboardKYCPagina() {
       });
 
       if (res.ok) {
-        toast.success('Documento subido exitosamente');
+        toast.success('Comprobante subido', {
+          description: 'Ya podés enviar tu verificación a revisión.',
+        });
         cargarEstado();
       } else {
         const error = await res.json();
-        toast.error(error.message || 'Error al subir documento');
+        toast.error(error.message || 'No pudimos subir el comprobante');
       }
     } catch {
-      toast.error('Error al subir documento');
+      toast.error('No pudimos subir el comprobante');
     } finally {
       setSubiendoDocumento(null);
     }
   };
 
-  const puedeEnviar = estadoKYC && estadoKYC.estado === 'PENDIENTE';
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-10 w-10 animate-spin text-green-600" />
       </div>
     );
   }
 
-  /** Documentos: el socio puede subir si KYC está PENDIENTE o RECHAZADO (re-subida).
-      No bloqueamos en EN_REVISION para no perder cambios si la sesión expiró. */
-  const puedeSubirDocumentos = estadoKYC?.estado === 'PENDIENTE' || estadoKYC?.estado === 'RECHAZADO';
-  /** Biométrica: la mostramos siempre que el KYC NO esté APROBADO. Para EN_REVISION
-      la dejamos visible porque el componente ya gestiona internamente su estado
-      (consentimiento → ready → in_progress → submitted). */
-  const puedeBiometrica = estadoKYC && estadoKYC.estado !== 'APROBADO';
-
-  const biometriaAprobada = estadoKYC?.estadoBiometria === 'APROBADA';
-  /** Cédula+selfie ya no son uploads manuales — solo se proveen vía biometría.
-      El array siempre devuelve solo `[COMPROBANTE_DOMICILIO]` independientemente
-      del estado biométrico. Mantengo `documentosVisibles` como nombre por
-      compatibilidad con el render abajo. */
-  const documentosVisibles = TIPOS_DOCUMENTO;
-
-  /** Backend sigue contando 4 docs requeridos (cédula anverso/reverso, selfie,
-      comprobante) por compatibilidad histórica — esa lógica habría que ajustar
-      en backend en otro pasada. Acá calculamos el progreso "visible" para el
-      socio: si la biometría está aprobada, los 3 docs de identidad ya están
-      cubiertos por Didit. */
-  const DOCS_CUBIERTOS_POR_BIOMETRIA = 3; // cédula anverso, cédula reverso, selfie
-  const docsCubiertosPorBiometria = biometriaAprobada ? DOCS_CUBIERTOS_POR_BIOMETRIA : 0;
-  const docsValidosCalculados = (estadoKYC?.documentosValidos ?? 0) + docsCubiertosPorBiometria;
-
-  return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-4xl mx-auto">
-      {/* Header simplificado: el shell ya muestra "Verificación KYC" arriba,
-          aquí solo aportamos contexto (estado actual + progreso). */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Verificación de identidad</h1>
-          <p className="text-sm text-gray-500">Confirma tu identidad para habilitar todos los servicios.</p>
-        </div>
-        {estadoKYC && getEstadoBadge(estadoKYC.estado)}
-      </div>
-
-      {!estadoKYC ? (
+  if (!estadoKYC) {
+    return (
+      <div className="p-4 lg:p-6 max-w-3xl mx-auto">
         <Card>
-          <CardContent className="py-12">
-            <div className="text-center">
-              <Shield className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">KYC no iniciado</h3>
-              <p className="text-gray-500">Aún no tienes un proceso de verificación activo. Contacta al administrador.</p>
+          <CardContent className="py-16">
+            <div className="text-center space-y-3">
+              <div className="inline-flex p-4 rounded-full bg-gray-100">
+                <Shield className="h-10 w-10 text-gray-400" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Aún no tenés una verificación activa
+              </h2>
+              <p className="text-sm text-gray-500 max-w-md mx-auto">
+                El administrador todavía no aprobó tu solicitud de registro.
+                Cuando lo haga, vas a poder iniciar tu verificación de identidad
+                desde acá.
+              </p>
             </div>
           </CardContent>
         </Card>
-      ) : (
-        <>
-          {/* Card unificada: badge + alertas (rechazo/comentario) + progreso de
-              documentos + fecha de expiración cuando aplica. Reemplaza a las
-              cards "Información" (ID/Fecha) y "Estado del Proceso" (stepper)
-              que mostraban datos sin valor para el socio. */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FileText className="h-5 w-5 text-gray-500" />
-                Resumen
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Nivel</p>
-                  <p className="font-medium">{estadoKYC.nivel}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Documentos</p>
-                  <p className="font-medium">
-                    {docsValidosCalculados} / {estadoKYC.documentosRequeridos} válidos
-                    {biometriaAprobada && (
-                      <span className="text-xs text-gray-500 font-normal ml-1">
-                        ({docsCubiertosPorBiometria} por biometría)
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
+      </div>
+    );
+  }
 
-              <ProgressBar
-                value={estadoKYC.documentosRequeridos > 0
-                  ? (docsValidosCalculados / estadoKYC.documentosRequeridos) * 100
-                  : 0}
-                className="h-2"
-              />
+  // -----------------------------------------------------------------
+  // Cálculo del paso activo y estado por paso.
+  // -----------------------------------------------------------------
+  const biometriaAprobada = estadoKYC.estadoBiometria === 'APROBADA';
+  const biometriaRechazada =
+    estadoKYC.estadoBiometria === 'RECHAZADA' ||
+    estadoKYC.estadoBiometria === 'EXPIRADA';
 
-              {estadoKYC.fechaExpiracion && estadoKYC.estado === 'APROBADO' && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Calendar className="h-4 w-4" />
-                  <span>Vigente hasta el {new Date(estadoKYC.fechaExpiracion).toLocaleDateString('es-VE')}</span>
-                  {estadoKYC.diasRestantes > 0 && (
-                    <Badge variant="outline">{estadoKYC.diasRestantes} días</Badge>
+  const comprobanteDoc = estadoKYC.documentos.find(
+    (d) => d.tipo === 'COMPROBANTE_DOMICILIO'
+  );
+  const comprobanteSubido = !!comprobanteDoc;
+  const comprobanteValido = comprobanteDoc?.estado === 'VALIDADO';
+  const comprobanteRechazado = comprobanteDoc?.estado === 'RECHAZADO';
+
+  const enviadoARevision = estadoKYC.estado === 'EN_REVISION';
+  const kycAprobado = estadoKYC.estado === 'APROBADO';
+  const kycRechazado = estadoKYC.estado === 'RECHAZADO';
+
+  /**
+   * Determina el paso activo según el estado actual del KYC.
+   *
+   * Importante: si el comprobante está subido pero el KYC todavía está en
+   * PENDIENTE (el socio no apretó "Enviar a revisión" aún), nos quedamos en
+   * el paso "comprobante" para que el botón de envío sea visible. Antes el
+   * fallthrough mandaba al paso "revisión" y el socio no encontraba cómo
+   * mandar su verificación.
+   */
+  const pasoActivo: StepKey = (() => {
+    if (kycAprobado) return 'revision';
+    if (enviadoARevision) return 'revision';
+    if (!biometriaAprobada) return 'biometria';
+    if (!comprobanteSubido || comprobanteRechazado) return 'comprobante';
+    if (estadoKYC.estado === 'PENDIENTE') return 'comprobante';
+    return 'revision';
+  })();
+
+  const estadoDePaso = (key: StepKey): StepEstado => {
+    if (key === 'biometria') {
+      if (biometriaAprobada) return 'completado';
+      return pasoActivo === 'biometria' ? 'activo' : 'pendiente';
+    }
+    if (key === 'comprobante') {
+      if (comprobanteValido) return 'completado';
+      if (!biometriaAprobada) return 'pendiente';
+      return pasoActivo === 'comprobante' ? 'activo' : 'pendiente';
+    }
+    if (key === 'revision') {
+      if (kycAprobado) return 'completado';
+      return pasoActivo === 'revision' ? 'activo' : 'pendiente';
+    }
+    return 'pendiente';
+  };
+
+  // Porcentaje de progreso global — usado en la barra superior.
+  const totalPasos = STEPS.length;
+  const pasosCompletados = STEPS.filter(
+    (s) => estadoDePaso(s.key) === 'completado'
+  ).length;
+  const porcentaje = (pasosCompletados / totalPasos) * 100;
+
+  return (
+    <div className="p-4 lg:p-6 max-w-3xl mx-auto space-y-6">
+      {/* ============================================================
+            HEADER — título + estado global + progreso
+          ============================================================ */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Verificación de identidad
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Confirmá quién sos para habilitar todos los servicios de Fatrans.
+          {' '}
+          Toma 2 minutos.
+        </p>
+      </div>
+
+      {/* Alertas de estado global */}
+      {kycAprobado && (
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-green-200 bg-green-50">
+          <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold text-green-900">¡Listo! Tu identidad fue verificada</p>
+            <p className="text-sm text-green-800 mt-1">
+              Ya tenés acceso completo a todos los servicios.
+              {estadoKYC.fechaExpiracion && (
+                <>
+                  {' '}Vigente hasta el{' '}
+                  <span className="font-medium">
+                    {new Date(estadoKYC.fechaExpiracion).toLocaleDateString('es-VE')}
+                  </span>
+                  {estadoKYC.diasRestantes > 0 && ` (${estadoKYC.diasRestantes} días)`}
+                  .
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {kycRechazado && estadoKYC.motivoRechazo && (
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-red-200 bg-red-50">
+          <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold text-red-900">Necesitamos que corrijas algo</p>
+            <p className="text-sm text-red-800 mt-1">{estadoKYC.motivoRechazo}</p>
+          </div>
+        </div>
+      )}
+
+      {enviadoARevision && !kycAprobado && !kycRechazado && (
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-blue-200 bg-blue-50">
+          <Clock className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold text-blue-900">En revisión</p>
+            <p className="text-sm text-blue-800 mt-1">
+              Nuestro equipo está revisando tu información. Te avisamos por
+              correo cuando esté lista — generalmente en menos de 24 horas.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================
+            STEPPER VISUAL — 3 pasos con número, ícono y estado
+          ============================================================ */}
+      <Card>
+        <CardContent className="p-4 lg:p-6">
+          <div className="flex items-center gap-2 mb-3 text-xs text-gray-500 uppercase tracking-wide font-semibold">
+            <span>Progreso</span>
+            <span className="text-gray-300">·</span>
+            <span>
+              {pasosCompletados} de {totalPasos} pasos completados
+            </span>
+          </div>
+          <ProgressBar value={porcentaje} className="h-2 mb-5" />
+
+          <ol className="flex flex-col sm:flex-row sm:items-stretch gap-3 sm:gap-0">
+            {STEPS.map((step, idx) => {
+              const estado = estadoDePaso(step.key);
+              return (
+                <li key={step.key} className="flex sm:flex-1 items-center">
+                  <button
+                    type="button"
+                    aria-current={estado === 'activo' ? 'step' : undefined}
+                    className={`
+                      flex-1 flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-colors
+                      ${estado === 'activo'
+                        ? 'border-blue-400 bg-blue-50'
+                        : estado === 'completado'
+                        ? 'border-green-300 bg-green-50/60'
+                        : 'border-gray-200 bg-white opacity-60'}
+                    `}
+                  >
+                    <div
+                      className={`
+                        flex items-center justify-center h-9 w-9 rounded-full flex-shrink-0 font-bold text-sm
+                        ${estado === 'completado'
+                          ? 'bg-green-600 text-white'
+                          : estado === 'activo'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-200 text-gray-500'}
+                      `}
+                    >
+                      {estado === 'completado' ? (
+                        <CheckCircle className="h-5 w-5" />
+                      ) : (
+                        step.numero
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p
+                        className={`text-sm font-semibold ${
+                          estado === 'completado'
+                            ? 'text-green-900'
+                            : estado === 'activo'
+                            ? 'text-blue-900'
+                            : 'text-gray-700'
+                        }`}
+                      >
+                        {step.titulo}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">
+                        {step.descripcionCorta}
+                      </p>
+                    </div>
+                  </button>
+                  {idx < STEPS.length - 1 && (
+                    <ChevronRight className="hidden sm:block h-5 w-5 text-gray-300 mx-1 flex-shrink-0" />
                   )}
-                </div>
-              )}
+                </li>
+              );
+            })}
+          </ol>
+        </CardContent>
+      </Card>
 
-              {estadoKYC.motivoRechazo && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-center gap-2 text-red-800">
-                    <AlertTriangle className="h-4 w-4" />
-                    <span className="font-medium text-sm">Motivo del rechazo</span>
-                  </div>
-                  <p className="text-sm text-red-700 mt-1">{estadoKYC.motivoRechazo}</p>
-                </div>
-              )}
+      {/* ============================================================
+            CONTENIDO DEL PASO ACTIVO
+          ============================================================ */}
 
-              {estadoKYC.comentarioRevision && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-700">{estadoKYC.comentarioRevision}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Captura biométrica vía Didit (passive liveness + face match + OCR cédula).
-              Es el camino más rápido para verificar identidad — si pasa, el analista
-              tiene mucho más contexto antes de revisar los documentos manuales. */}
-          {puedeBiometrica && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 px-1">
-                <Camera className="h-4 w-4 text-blue-600" />
-                <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                  Paso 1 · Verificación biométrica
-                </h2>
-                {!biometriaAprobada && (
-                  <span className="text-xs text-gray-400">(recomendado)</span>
-                )}
+      {/* --- PASO 1: BIOMETRÍA --- */}
+      {pasoActivo === 'biometria' && (
+        <>
+          {biometriaRechazada && (
+            <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-200 bg-amber-50">
+              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-semibold text-amber-900">
+                  La verificación anterior no pasó
+                </p>
+                <p className="text-sm text-amber-800 mt-1">
+                  No te preocupes — intentalo de nuevo. Asegurate de estar en un
+                  lugar con buena luz y que la cédula se vea completa.
+                </p>
               </div>
-              <BiometricCapture
-                onCompleted={cargarEstado}
-                estadoBackend={estadoKYC.estadoBiometria}
-              />
             </div>
           )}
 
-          {/* Comprobante de domicilio: único documento que Didit no puede
-              capturar (la factura de servicios, contrato de alquiler, etc).
-              La cédula y la selfie las obtenemos del paso biométrico — ya no
-              se permite subirlas manualmente para evitar que el socio cargue
-              screenshots inválidos y dispare el auto-EN_REVISION del backend. */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 px-1 flex-wrap">
-              <Upload className="h-4 w-4 text-green-600" />
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                Paso 2 · Comprobante de domicilio
-              </h2>
-              {!biometriaAprobada && (
-                <span className="text-xs text-gray-500">
-                  · completá la verificación facial primero
-                </span>
-              )}
-            </div>
-            <Card>
-              <CardContent className="p-4 lg:p-6">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,application/pdf"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file && targetTipo) {
-                      handleSubirDocumento(targetTipo, file);
-                      e.target.value = '';
-                    }
-                  }}
-                />
-                <div className="space-y-3">
-                  {documentosVisibles.map((doc) => {
-                    const uploaded = estadoKYC.documentos?.find(d => d.tipo === doc.tipo);
-                    return (
-                      <div
-                        key={doc.tipo}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          {uploaded ? (
-                            getDocumentoEstadoIcon(uploaded.estado)
-                          ) : (
-                            <div className="p-2 bg-gray-100 rounded-lg">
-                              <FileText className="h-5 w-5 text-gray-400" />
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium text-sm">{doc.label}</p>
-                            {uploaded && (
-                              <p className="text-xs text-gray-500 truncate">{uploaded.nombreOriginal}</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {uploaded ? (
-                            <>
-                              {getDocumentoStatusBadge(uploaded.estado)}
-                              {uploaded.estado === 'RECHAZADO' && puedeSubirDocumentos && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setTargetTipo(doc.tipo);
-                                    fileInputRef.current?.click();
-                                  }}
-                                >
-                                  <Upload className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setTargetTipo(doc.tipo);
-                                fileInputRef.current?.click();
-                              }}
-                              // Bloqueado hasta que pase la biometría — forzamos
-                              // el orden "verificación facial → comprobante" para
-                              // que el socio no pueda saltarse el paso 1.
-                              disabled={
-                                subiendoDocumento !== null ||
-                                !puedeSubirDocumentos ||
-                                !biometriaAprobada
-                              }
-                              title={
-                                !biometriaAprobada
-                                  ? 'Completá la verificación facial (Paso 1) antes de subir el comprobante'
-                                  : undefined
-                              }
-                            >
-                              {subiendoDocumento === doc.tipo ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Upload className="h-4 w-4 mr-1" />
-                              )}
-                              Subir
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+          <BiometricCapture
+            onCompleted={cargarEstado}
+            estadoBackend={estadoKYC.estadoBiometria}
+          />
 
-                {puedeEnviar && (
-                  <div className="mt-6 pt-4 border-t">
-                    <Button
-                      className="w-full bg-green-600 hover:bg-green-700"
-                      onClick={handleEnviarRevision}
-                      disabled={enviando}
-                    >
-                      {enviando ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <Send className="h-4 w-4 mr-2" />
-                      )}
-                      Enviar a revisión
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          <div className="text-xs text-gray-500 text-center px-4">
+            Tus imágenes se procesan en{' '}
+            <span className="font-medium text-gray-700">Didit</span> (proveedor
+            europeo certificado) bajo política LOPDP. Se eliminan a los 90 días.
           </div>
         </>
       )}
+
+      {/* --- PASO 2: COMPROBANTE --- */}
+      {pasoActivo === 'comprobante' && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-green-600" />
+              <CardTitle>Comprobante de domicilio</CardTitle>
+            </div>
+            <p className="text-sm text-gray-500 mt-1">
+              Subí una factura de servicios (luz, agua, internet) o un contrato
+              de alquiler con tu nombre y dirección. Debe ser de los{' '}
+              <span className="font-medium">últimos 3 meses</span>.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file && targetTipo) {
+                  handleSubirDocumento(targetTipo, file);
+                  e.target.value = '';
+                }
+              }}
+            />
+
+            {TIPOS_DOCUMENTO.map((doc) => {
+              const uploaded = estadoKYC.documentos?.find((d) => d.tipo === doc.tipo);
+              const rechazado = uploaded?.estado === 'RECHAZADO';
+              const validado = uploaded?.estado === 'VALIDADO';
+              const pendiente = uploaded && !validado && !rechazado;
+
+              return (
+                <div key={doc.tipo} className="space-y-3">
+                  {uploaded && (
+                    <div
+                      className={`
+                        flex items-start gap-3 p-3 rounded-lg border
+                        ${validado
+                          ? 'border-green-200 bg-green-50'
+                          : rechazado
+                          ? 'border-red-200 bg-red-50'
+                          : 'border-blue-200 bg-blue-50'}
+                      `}
+                    >
+                      {validado ? (
+                        <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      ) : rechazado ? (
+                        <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      ) : (
+                        <Clock className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {uploaded.nombreOriginal}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {validado && 'Validado por el equipo'}
+                          {rechazado && uploaded.motivoRechazo}
+                          {pendiente && 'Esperando revisión'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setTargetTipo(doc.tipo);
+                      fileInputRef.current?.click();
+                    }}
+                    disabled={subiendoDocumento !== null || validado}
+                    className="w-full h-12 text-base bg-green-600 hover:bg-green-700"
+                    variant={uploaded && !rechazado ? 'outline' : 'default'}
+                  >
+                    {subiendoDocumento === doc.tipo ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Subiendo...
+                      </>
+                    ) : validado ? (
+                      <>
+                        <CheckCircle className="mr-2 h-5 w-5" />
+                        Comprobante validado
+                      </>
+                    ) : uploaded ? (
+                      <>
+                        <Upload className="mr-2 h-5 w-5" />
+                        Subir otro archivo
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-5 w-5" />
+                        Subir comprobante
+                      </>
+                    )}
+                  </Button>
+                </div>
+              );
+            })}
+
+            {/* Botón "Enviar a revisión" — solo cuando todo está listo. */}
+            {comprobanteSubido && !comprobanteRechazado && estadoKYC.estado === 'PENDIENTE' && (
+              <>
+                <div className="mt-6 pt-4 border-t">
+                  <p className="text-sm text-gray-600 mb-3">
+                    Ya tenemos todo lo que necesitamos. Cuando estés listo,
+                    enviá tu información para que el equipo la revise.
+                  </p>
+                  <Button
+                    onClick={handleEnviarRevision}
+                    disabled={enviando}
+                    className="w-full h-12 bg-blue-600 hover:bg-blue-700"
+                  >
+                    {enviando ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-5 w-5" />
+                        Enviar a revisión
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* --- PASO 3: REVISIÓN / RESULTADO --- */}
+      {pasoActivo === 'revision' && !kycAprobado && (
+        <Card>
+          <CardContent className="py-10 text-center space-y-4">
+            <div className="inline-flex p-4 rounded-full bg-blue-100">
+              <Clock className="h-10 w-10 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">
+                Tu verificación está en revisión
+              </h2>
+              <p className="text-sm text-gray-600 mt-2 max-w-md mx-auto">
+                Nuestro equipo está revisando tu información. Te enviaremos un
+                correo apenas terminemos — generalmente en menos de 24 horas
+                hábiles.
+              </p>
+            </div>
+
+            {estadoKYC.comentarioRevision && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-left max-w-md mx-auto">
+                <p className="text-xs font-semibold text-blue-900 mb-1">
+                  Comentario del revisor
+                </p>
+                <p className="text-sm text-blue-700">
+                  {estadoKYC.comentarioRevision}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* --- Resumen permanente (datos de la verificación) --- */}
+      <details className="text-sm">
+        <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
+          Ver detalles de mi verificación
+        </summary>
+        <div className="mt-2 p-4 bg-gray-50 rounded-lg space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">Nivel</span>
+            <span className="font-medium">{estadoKYC.nivel}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">Estado</span>
+            <Badge
+              className={
+                kycAprobado
+                  ? 'bg-green-100 text-green-800'
+                  : kycRechazado
+                  ? 'bg-red-100 text-red-800'
+                  : enviadoARevision
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-yellow-100 text-yellow-800'
+              }
+            >
+              {estadoKYC.descripcionEstado}
+            </Badge>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">Iniciado</span>
+            <span className="font-medium">
+              {new Date(estadoKYC.fechaInicio).toLocaleDateString('es-VE')}
+            </span>
+          </div>
+          {estadoKYC.fechaExpiracion && (
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500">Vence</span>
+              <span className="font-medium">
+                {new Date(estadoKYC.fechaExpiracion).toLocaleDateString('es-VE')}
+              </span>
+            </div>
+          )}
+        </div>
+      </details>
     </div>
   );
 }
