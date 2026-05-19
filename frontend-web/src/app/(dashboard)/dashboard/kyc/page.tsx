@@ -118,7 +118,16 @@ export default function DashboardKYCPagina() {
 
   const cargarEstado = useCallback(async () => {
     try {
-      const res = await fetch('/api/kyc/estado', { credentials: 'include' });
+      // `cache: 'no-store'` + cache-buster — sin esto, el navegador cachea la
+      // primera respuesta (estadoBiometria=NO_INICIADA) y el polling del
+      // BiometricCapture nunca observa la transición a APROBADA aunque el
+      // backend la haya persistido. Bug reportado por Gabriel en QA el
+      // 19-may-2026 (mismo patrón que el bug de /me en el modal de password).
+      const res = await fetch(`/api/kyc/estado?t=${Date.now()}`, {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
       if (res.ok) {
         const data = await res.json();
         setEstadoKYC(data);

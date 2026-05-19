@@ -30,10 +30,25 @@ export async function POST(request: NextRequest) {
     const errorData = await backendResponse.json().catch(() => ({}));
     return NextResponse.json(
       { message: errorData.message || 'No pudimos sincronizar la verificación' },
-      { status: backendResponse.status },
+      { status: backendResponse.status, headers: noCacheHeaders() },
     );
   }
 
   const data = await backendResponse.json();
-  return NextResponse.json(data, { status: 200 });
+  // No-cache headers en defense in depth — POSTs no se cachean por default
+  // pero algunos intermediarios o service workers pueden romper esa regla.
+  return NextResponse.json(data, { status: 200, headers: noCacheHeaders() });
+}
+
+/**
+ * Headers anti-cache para responses con estado volátil — mismo patrón que
+ * /api/auth/me y /api/kyc/estado. Sin esto el frontend puede ver respuestas
+ * viejas durante el polling de estado biométrico.
+ */
+function noCacheHeaders(): Record<string, string> {
+  return {
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
+  };
 }

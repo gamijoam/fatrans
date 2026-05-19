@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 
+/**
+ * Headers anti-cache para responses con estado volátil. Patrón aplicado
+ * también en /api/auth/me — busca evitar que el navegador o intermediarios
+ * sirvan respuestas viejas mientras hay polling activo de cambios de estado
+ * (KYC biométrico, debeCambiarPassword, etc).
+ */
+function noCacheHeaders(): Record<string, string> {
+  return {
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const accessToken = request.cookies.get('access_token')?.value;
@@ -25,16 +39,30 @@ export async function GET(request: NextRequest) {
       const errorData = await backendResponse.json().catch(() => ({}));
       // Backend retorna 500 + KYC_000 cuando el socio no tiene KYC iniciado
       if (errorData.error === 'KYC_000' || backendResponse.status === 500) {
-        return NextResponse.json({ estado: 'SIN_KYC', mensaje: 'No has iniciado el proceso KYC' }, { status: 200 });
+        return NextResponse.json(
+          { estado: 'SIN_KYC', mensaje: 'No has iniciado el proceso KYC' },
+          {
+            status: 200,
+            headers: noCacheHeaders(),
+          },
+        );
       }
       return NextResponse.json(
         { message: errorData.message || 'Error al obtener estado KYC' },
-        { status: backendResponse.status }
+        { status: backendResponse.status, headers: noCacheHeaders() },
       );
     }
 
     const data = await backendResponse.json();
-    return NextResponse.json(data, { status: 200 });
+    // No-cache: el frontend polea este endpoint mientras la verificación
+    // biométrica está en progreso. Sin estos headers, el navegador devuelve
+    // la respuesta cacheada del primer load (estadoBiometria=NO_INICIADA) y
+    // el polling nunca "ve" la transición a APROBADA aunque el backend la haya
+    // persistido (caso real Gabriel QA 19-may-2026).
+    return NextResponse.json(data, {
+      status: 200,
+      headers: noCacheHeaders(),
+    });
 
   } catch (error) {
     console.error('KYC estado error:', error);
