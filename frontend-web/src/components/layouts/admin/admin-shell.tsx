@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { ProtectedRoute } from '@/components/shared/protected-route';
 import { LogoutButton } from '@/components/shared/logout-button';
+import { ChangePasswordModal } from '@/components/shared/change-password-modal';
 import {
   LayoutDashboard,
   Users,
@@ -95,8 +96,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   const unreadCount = mockNotifications.filter((n) => !n.read).length;
 
+  // Modal forzado al primer login si `debeCambiarPassword=true` (control
+  // interno del componente). Mismo principio que en SocioShell.
   return (
     <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN', 'CAJERO', 'ANALISTA_KYC']}>
+      <ChangePasswordModal open />
       <div className="flex h-screen bg-slate-100">
         {/* Sidebar */}
         <aside className="hidden lg:flex w-64 bg-[#0F2744] text-white flex-col fixed h-full z-40">

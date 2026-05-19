@@ -8,6 +8,7 @@ import { ProtectedRoute } from '@/components/shared/protected-route';
 import { LogoutButton } from '@/components/shared/logout-button';
 import { IdleTimeoutWatcher } from '@/components/shared/idle-timeout-watcher';
 import { NotificationBell } from '@/components/shared/notification-bell';
+import { ChangePasswordModal } from '@/components/shared/change-password-modal';
 import {
   LayoutDashboard,
   Wallet,
@@ -87,8 +88,14 @@ export function SocioShell({ children }: { children: React.ReactNode }) {
     month: 'long',
   });
 
+  // Si el socio entra por primera vez (password temporal del admin / reset),
+  // forzamos cambio antes de dejarlo navegar el dashboard. El modal se monta
+  // SIEMPRE pero se renderiza solo si `user.debeCambiarPassword=true` (control
+  // interno del componente). Después de cambiarla, el store actualiza el flag
+  // y el modal se oculta sin recargar.
   return (
     <ProtectedRoute allowedRoles={['SOCIO', 'ADMIN', 'SUPER_ADMIN']}>
+      <ChangePasswordModal open />
       {/* Issue #221: auto-logout por inactividad (banking standard) */}
       <IdleTimeoutWatcher idleMinutes={10} warningSeconds={60} />
       <div className="flex min-h-screen bg-slate-100">

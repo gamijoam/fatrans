@@ -69,27 +69,40 @@ public class EmailNotificationServiceImpl implements EmailNotificationService {
                     nombreUsuario);
             return;
         }
-        String html = """
-                <p>Hola,</p>
-                <p>Tu cuenta del <strong>Fondo de Ahorro Fatrans</strong> ya está activa.</p>
-                <p><strong>Usuario:</strong> %s<br/>
-                <strong>Contraseña temporal:</strong> %s</p>
-                <p>Por seguridad, al ingresar por primera vez vas a tener que cambiar la
-                contraseña.</p>
-                <p style="margin-top: 20px;">
-                  <a href="%s/login" style="background:#16A34A;color:#fff;padding:10px 20px;
-                  text-decoration:none;border-radius:6px;display:inline-block;">
-                    Iniciar sesión
-                  </a>
+        String preheader = "Tu cuenta del Fondo de Ahorro ya está activa. Cambia tu contraseña al primer ingreso.";
+        String contenido = """
+                <h1 style="margin:0 0 16px;font-size:22px;color:#0F2744;">¡Bienvenido al Fondo de Ahorro!</h1>
+                <p style="margin:0 0 16px;color:#475569;line-height:1.5;">
+                  Tu solicitud de registro fue aprobada. A continuación tus credenciales de acceso —
+                  guardalas en un lugar seguro.
                 </p>
-                <hr style="border:none;border-top:1px solid #ddd;margin:24px 0;"/>
-                <p style="font-size:11px;color:#666;">
-                  Si no solicitaste esta cuenta, ignorá este correo. Asociación de Ahorro y
-                  Crédito Fatrans (RIF J-50516835-5).
+                <table cellpadding="0" cellspacing="0" border="0" role="presentation"
+                  style="width:100%%;border-collapse:separate;border-spacing:0;border:1px solid #e2e8f0;
+                  border-radius:8px;background:#f8fafc;margin:8px 0 20px;">
+                  <tr>
+                    <td style="padding:14px 18px;border-bottom:1px solid #e2e8f0;
+                      font-family:'SF Mono','Consolas',monospace;font-size:14px;">
+                      <span style="color:#64748b;font-size:11px;text-transform:uppercase;
+                        letter-spacing:0.5px;display:block;margin-bottom:4px;">Usuario</span>
+                      <strong style="color:#0F2744;font-size:16px;">%s</strong>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:14px 18px;
+                      font-family:'SF Mono','Consolas',monospace;font-size:14px;">
+                      <span style="color:#64748b;font-size:11px;text-transform:uppercase;
+                        letter-spacing:0.5px;display:block;margin-bottom:4px;">Contraseña temporal</span>
+                      <strong style="color:#0F2744;font-size:16px;">%s</strong>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 24px;color:#475569;line-height:1.5;font-size:14px;">
+                  <strong>Importante:</strong> por seguridad, al ingresar por primera vez vamos a
+                  pedirte que cambies esta contraseña por una propia.
                 </p>
-                """.formatted(escapeHtml(nombreUsuario), escapeHtml(passwordTemporal), appBaseUrl);
-
-        boolean ok = sendHtml(email, "Tu cuenta del Fondo de Ahorro está activa", html);
+                """.formatted(escapeHtml(nombreUsuario), escapeHtml(passwordTemporal));
+        String html = renderEmail(preheader, contenido, "Iniciar sesión", appBaseUrl + "/login");
+        boolean ok = sendHtml(email, "Tu cuenta del Fondo de Ahorro Fatrans está activa", html);
         if (ok) {
             log.info("Email de credenciales enviado vía SMTP a usuario={}", nombreUsuario);
         }
@@ -101,20 +114,28 @@ public class EmailNotificationServiceImpl implements EmailNotificationService {
             log.info("Email de rechazo enviado (MOCK) a {}", email);
             return;
         }
-        String html = """
-                <p>Hola,</p>
-                <p>Lamentamos informarte que tu <strong>solicitud de registro</strong> en el
-                Fondo de Ahorro Fatrans no pudo ser aprobada.</p>
-                <p><strong>Motivo:</strong> %s</p>
-                <p>Si pensás que es un error o querés intentar de nuevo, escribinos a
-                <a href="mailto:soporte@fatrans.com.ve">soporte@fatrans.com.ve</a> con tu
-                cédula y los datos relevantes.</p>
-                <hr style="border:none;border-top:1px solid #ddd;margin:24px 0;"/>
-                <p style="font-size:11px;color:#666;">
-                  Asociación de Ahorro y Crédito Fatrans (RIF J-50516835-5).
+        String preheader = "Tu solicitud de registro no fue aprobada.";
+        String motivoSeguro = escapeHtml(motivo == null || motivo.isBlank() ? "(sin motivo especificado)" : motivo);
+        String contenido = """
+                <h1 style="margin:0 0 16px;font-size:22px;color:#0F2744;">Sobre tu solicitud</h1>
+                <p style="margin:0 0 16px;color:#475569;line-height:1.5;">
+                  Lamentamos informarte que tu solicitud de registro en el Fondo de Ahorro Fatrans
+                  no pudo ser aprobada en esta oportunidad.
                 </p>
-                """.formatted(escapeHtml(motivo == null ? "(sin motivo especificado)" : motivo));
-
+                <div style="background:#fef2f2;border-left:4px solid #ef4444;padding:14px 16px;
+                  border-radius:4px;margin:16px 0 24px;">
+                  <p style="margin:0 0 6px;color:#991b1b;font-size:12px;font-weight:600;
+                    text-transform:uppercase;letter-spacing:0.5px;">Motivo</p>
+                  <p style="margin:0;color:#7f1d1d;line-height:1.5;">%s</p>
+                </div>
+                <p style="margin:0 0 8px;color:#475569;line-height:1.5;font-size:14px;">
+                  Si pensás que es un error o querés intentar nuevamente, escribinos a
+                  <a href="mailto:soporte@fatrans.com.ve" style="color:#16A34A;font-weight:600;
+                    text-decoration:none;">soporte@fatrans.com.ve</a>
+                  con tu cédula y los datos relevantes.
+                </p>
+                """.formatted(motivoSeguro);
+        String html = renderEmail(preheader, contenido, null, null);
         boolean ok = sendHtml(email, "Tu solicitud de registro no fue aprobada", html);
         if (ok) {
             log.info("Email de rechazo enviado vía SMTP a {}", email);
@@ -127,19 +148,20 @@ public class EmailNotificationServiceImpl implements EmailNotificationService {
             log.info("Email 'solicitud recibida' enviado (MOCK) a {}", email);
             return;
         }
-        String html = """
-                <p>Hola,</p>
-                <p>Recibimos tu <strong>solicitud de registro</strong> en el Fondo de Ahorro
-                Fatrans. Un administrador la va a revisar pronto.</p>
-                <p>Cuando esté aprobada vas a recibir otro correo con tus credenciales de
-                acceso.</p>
-                <hr style="border:none;border-top:1px solid #ddd;margin:24px 0;"/>
-                <p style="font-size:11px;color:#666;">
-                  Asociación de Ahorro y Crédito Fatrans (RIF J-50516835-5).
+        String preheader = "Recibimos tu solicitud de registro. Te avisaremos cuando esté aprobada.";
+        String contenido = """
+                <h1 style="margin:0 0 16px;font-size:22px;color:#0F2744;">Recibimos tu solicitud</h1>
+                <p style="margin:0 0 16px;color:#475569;line-height:1.5;">
+                  Gracias por solicitar tu registro en el <strong>Fondo de Ahorro Fatrans</strong>.
+                  Un administrador revisará tu solicitud en las próximas horas.
+                </p>
+                <p style="margin:0 0 24px;color:#475569;line-height:1.5;">
+                  Cuando esté aprobada vas a recibir otro correo con tus credenciales de acceso.
+                  No necesitás hacer nada más por ahora.
                 </p>
                 """;
-
-        boolean ok = sendHtml(email, "Recibimos tu solicitud de registro", html);
+        String html = renderEmail(preheader, contenido, null, null);
+        boolean ok = sendHtml(email, "Recibimos tu solicitud de registro · Fatrans", html);
         if (ok) {
             log.info("Email 'solicitud recibida' enviado vía SMTP a {}", email);
         }
@@ -152,6 +174,111 @@ public class EmailNotificationServiceImpl implements EmailNotificationService {
     /** Sólo manda vía SMTP si está habilitado Y el sender se construyó. */
     private boolean isReal() {
         return enabled && sender != null;
+    }
+
+    /**
+     * Wrapper común para todos los emails: header con logo + contenido + CTA
+     * opcional + footer institucional.
+     *
+     * HTML cuidadosamente compatible con clientes problemáticos (Outlook,
+     * Gmail strip estilos, etc): solo `<table>` para layout, estilos INLINE
+     * (las `<style>` tag se ignoran en muchos clientes), sin imágenes
+     * críticas (las imágenes pueden no cargarse — el logo es decorativo,
+     * no transporta info).
+     *
+     * El logo se sirve desde `MAIL_APP_BASE_URL + /logo-fatrans.png`. Si el
+     * cliente bloquea imágenes, ven el `alt="Fatrans"` y el header sigue
+     * legible gracias al título textual debajo.
+     *
+     * `preheader` es texto invisible al principio del mail que los clientes
+     * muestran como preview en la bandeja de entrada (Gmail, Apple Mail).
+     * Truco estándar de email marketing.
+     */
+    private String renderEmail(String preheader, String contenidoHtml, String ctaText, String ctaUrl) {
+        String logoUrl = appBaseUrl + "/logo-fatrans.png";
+        String ctaHtml = "";
+        if (ctaText != null && ctaUrl != null) {
+            ctaHtml = """
+                    <table cellpadding="0" cellspacing="0" border="0" role="presentation"
+                      style="margin:0 0 24px;">
+                      <tr>
+                        <td style="background:#16A34A;border-radius:8px;">
+                          <a href="%s" style="display:inline-block;padding:12px 28px;
+                            font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:600;
+                            color:#ffffff;text-decoration:none;">
+                            %s →
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                    """.formatted(ctaUrl, escapeHtml(ctaText));
+        }
+
+        return """
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                  <meta charset="UTF-8"/>
+                  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+                  <title>Fatrans</title>
+                </head>
+                <body style="margin:0;padding:0;background:#f1f5f9;
+                  font-family:'Segoe UI',Tahoma,Geneva,Verdana,Arial,sans-serif;
+                  color:#0F2744;">
+                  <span style="display:none !important;visibility:hidden;opacity:0;color:transparent;
+                    height:0;max-height:0;overflow:hidden;mso-hide:all;">%s</span>
+                  <table cellpadding="0" cellspacing="0" border="0" role="presentation"
+                    style="width:100%%;background:#f1f5f9;">
+                    <tr>
+                      <td align="center" style="padding:24px 12px;">
+                        <table cellpadding="0" cellspacing="0" border="0" role="presentation"
+                          style="width:100%%;max-width:560px;background:#ffffff;
+                          border-radius:12px;overflow:hidden;
+                          box-shadow:0 1px 3px rgba(15,39,68,0.08);">
+                          <tr>
+                            <td style="background:#0F2744;padding:24px;text-align:center;">
+                              <img src="%s" alt="Fatrans" width="48" height="48"
+                                style="display:inline-block;border:0;outline:none;
+                                text-decoration:none;width:48px;height:48px;"/>
+                              <div style="margin-top:8px;color:#ffffff;font-size:18px;
+                                font-weight:600;letter-spacing:0.3px;">Fatrans</div>
+                              <div style="margin-top:2px;color:#94a3b8;font-size:11px;
+                                text-transform:uppercase;letter-spacing:1px;">
+                                Asociación de Ahorro y Crédito
+                              </div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding:32px 32px 8px;font-size:14px;line-height:1.5;">
+                              %s
+                              %s
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="background:#f8fafc;padding:20px 32px;
+                              border-top:1px solid #e2e8f0;color:#64748b;font-size:11px;
+                              line-height:1.5;">
+                              <strong style="color:#475569;">Fatrans</strong> · Asociación de
+                              Ahorro y Crédito · RIF J-50516835-5<br/>
+                              Si no esperabas este correo, podés ignorarlo o escribirnos a
+                              <a href="mailto:soporte@fatrans.com.ve"
+                                style="color:#16A34A;text-decoration:none;">soporte@fatrans.com.ve</a>
+                              <br/><br/>
+                              Este mensaje fue enviado automáticamente — no respondas a este buzón.
+                            </td>
+                          </tr>
+                        </table>
+                        <p style="margin:14px 0 0;color:#94a3b8;font-size:10px;
+                          font-family:Arial,Helvetica,sans-serif;">
+                          © 2026 Fatrans — Plataforma digital para socios del sector transporte
+                          venezolano.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(escapeHtml(preheader), logoUrl, contenidoHtml, ctaHtml);
     }
 
     /**
