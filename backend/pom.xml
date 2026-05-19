@@ -50,6 +50,14 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- Email — JavaMailSender + SMTP. Solo se activa si `fatrans.mail.enabled=true`
+             y hay credenciales `MAIL_USERNAME`/`MAIL_PASSWORD` en env. Caso contrario el
+             EmailNotificationServiceImpl cae a modo mock (loguea, no manda). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
