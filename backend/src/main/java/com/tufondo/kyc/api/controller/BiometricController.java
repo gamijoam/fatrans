@@ -7,6 +7,8 @@ import com.tufondo.kyc.application.usecase.IniciarVerificacionBiometricaUseCase;
 import com.tufondo.kyc.application.usecase.ProcesarWebhookBiometricoUseCase;
 import com.tufondo.kyc.application.usecase.RegistrarConsentimientoBiometricoUseCase;
 import com.tufondo.kyc.application.usecase.RevocarConsentimientoBiometricoUseCase;
+import com.tufondo.kyc.application.usecase.SincronizarVerificacionBiometricaUseCase;
+import com.tufondo.kyc.domain.model.enums.EstadoBiometria;
 import com.tufondo.kyc.domain.model.port.BiometricVerificatorPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -46,6 +48,7 @@ public class BiometricController {
     private final IniciarVerificacionBiometricaUseCase iniciarBiometriaUseCase;
     private final ProcesarWebhookBiometricoUseCase procesarWebhookUseCase;
     private final RevocarConsentimientoBiometricoUseCase revocarConsentimientoUseCase;
+    private final SincronizarVerificacionBiometricaUseCase sincronizarBiometriaUseCase;
     private final BiometricVerificatorPort biometricPort;
 
     @PostMapping("/consentimiento")
@@ -111,6 +114,23 @@ public class BiometricController {
         procesarWebhookUseCase.ejecutar(rawBody, sig, timestamp);
         return ResponseEntity.ok().build();
     }
+
+    /**
+     * Fuerza sincronización del estado biométrico consultando al proveedor.
+     * Usado por el frontend (polling cada 5s) para suplir al webhook cuando
+     * éste no está configurado o no llegó a tiempo. Idempotente.
+     */
+    @PostMapping("/refresh")
+    @PreAuthorize("hasRole('SOCIO')")
+    @Operation(summary = "Sincronizar estado biométrico desde el proveedor (pull)")
+    public ResponseEntity<RefreshResponse> refresh(Authentication auth) {
+        UUID socioId = extraerSocioId(auth);
+        EstadoBiometria estado = sincronizarBiometriaUseCase.sincronizar(socioId);
+        return ResponseEntity.ok(new RefreshResponse(estado.name()));
+    }
+
+    /** Response del endpoint /refresh — solo el estado actual, sin metadata. */
+    public record RefreshResponse(String estadoBiometria) {}
 
     @PostMapping("/revocar")
     @PreAuthorize("hasRole('SOCIO')")

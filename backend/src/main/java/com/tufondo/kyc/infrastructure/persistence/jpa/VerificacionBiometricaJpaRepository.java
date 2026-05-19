@@ -17,5 +17,7 @@ public interface VerificacionBiometricaJpaRepository extends JpaRepository<Verif
 
     List<VerificacionBiometricaEntity> findBySocioId(UUID socioId);
 
+    Optional<VerificacionBiometricaEntity> findFirstBySocioIdOrderByFechaInicioDesc(UUID socioId);
+
     void deleteAllBySocioId(UUID socioId);
 }

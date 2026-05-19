@@ -1,10 +1,12 @@
 package com.tufondo.notificaciones.application.service;
 
+import com.tufondo.auth.domain.model.Usuario;
 import com.tufondo.auth.domain.repository.UsuarioRepository;
 import com.tufondo.notificaciones.domain.model.Notificacion;
 import com.tufondo.notificaciones.domain.model.enums.PrioridadNotificacion;
 import com.tufondo.notificaciones.domain.model.enums.TipoNotificacion;
 import com.tufondo.notificaciones.domain.repository.NotificacionRepository;
+import com.tufondo.socios.infrastructure.notification.EmailNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,6 +40,13 @@ public class NotificacionPublisher {
 
     private final NotificacionRepository notificacionRepository;
     private final UsuarioRepository usuarioRepository;
+    /**
+     * Servicio de envío de email. Inyectado para que las notificaciones de
+     * KYC (y otras de alto valor para el socio) también lleguen por correo
+     * además de la notificación in-app. El servicio es best-effort: si SMTP
+     * falla, el flujo del caller NO se ve afectado.
+     */
+    private final EmailNotificationService emailService;
 
     // === Notificaciones a SOCIO (resuelven socioId → usuarioId) ===
 
@@ -49,6 +58,12 @@ public class NotificacionPublisher {
                 .linkAccion("/dashboard/kyc")
                 .prioridad(PrioridadNotificacion.NORMAL)
                 .build());
+        // Email además de notificación in-app: el KYC aprobado es un evento de
+        // alto valor que el socio espera por mail (caso real reportado por el
+        // admin de QA, 19-may-2026 — el socio no se enteraba de la aprobación
+        // porque solo se guardaba la notificación interna).
+        enviarEmailASocio(socioId, (email, nombre) -> emailService.enviarKycAprobado(email, nombre),
+                "KYC_APROBADO");
     }
 
     public void notificarSocioKycRechazado(UUID socioId, String motivo) {
@@ -62,6 +77,8 @@ public class NotificacionPublisher {
                 .linkAccion("/dashboard/kyc")
                 .prioridad(PrioridadNotificacion.URGENTE)
                 .build());
+        enviarEmailASocio(socioId, (email, nombre) -> emailService.enviarKycRechazado(email, nombre, motivo),
+                "KYC_RECHAZADO");
     }
 
     public void notificarSocioKycRequiereInfo(UUID socioId, String detalle) {
@@ -75,6 +92,8 @@ public class NotificacionPublisher {
                 .linkAccion("/dashboard/kyc")
                 .prioridad(PrioridadNotificacion.NORMAL)
                 .build());
+        enviarEmailASocio(socioId, (email, nombre) -> emailService.enviarKycRequiereInfo(email, nombre, detalle),
+                "KYC_REQUIERE_INFO");
     }
 
     public void notificarSocioCreditoAprobado(UUID socioId, BigDecimal monto, String moneda, String numeroSolicitud) {
@@ -183,5 +202,57 @@ public class NotificacionPublisher {
 
     private static String safe(String s) {
         return s != null ? s : "";
+    }
+
+    // === Email helpers ===
+
+    /**
+     * Functional interface usada por {@link #enviarEmailASocio} para parametrizar
+     * el método específico del EmailNotificationService que queremos invocar
+     * (aprobado / rechazado / requiere info) sin duplicar la resolución
+     * socioId → (email, nombreCompleto).
+     */
+    @FunctionalInterface
+    private interface EmailSender {
+        void send(String email, String nombreCompleto);
+    }
+
+    /**
+     * Resuelve socioId → (email del usuario, nombreCompleto) y delega al
+     * {@code emailSender}. Best-effort: cualquier excepción se loguea y se
+     * traga — nunca debe romper el flujo del use case que llamó al publisher.
+     *
+     * <p>Notar que esto NO está en una @Transactional propia: solo lee del
+     * UsuarioRepository (idempotente) y llama al SMTP (efecto externo). El
+     * mail no es transaccional con la BD — si el COMMIT del KYC falla, el
+     * mail YA pudo haberse mandado (al revés también puede pasar). Para el
+     * caso de KYC eso es aceptable: el peor escenario es un email enviado
+     * sin cambio persistente, que el socio interpreta como un error puntual
+     * y vuelve a verificar en la app.</p>
+     */
+    private void enviarEmailASocio(UUID socioId, EmailSender emailSender, String tipoTag) {
+        try {
+            if (socioId == null) {
+                log.debug("Skip email {}: socioId null", tipoTag);
+                return;
+            }
+            Optional<Usuario> usuario = usuarioRepository.buscarPorSocioId(socioId);
+            if (usuario.isEmpty()) {
+                log.warn("Skip email {}: no hay usuario para socioId={}", tipoTag, socioId);
+                return;
+            }
+            String email = usuario.get().correoElectronico();
+            String nombre = usuario.get().nombreCompleto();
+            if (email == null || email.isBlank()) {
+                log.warn("Skip email {}: usuario {} sin correo", tipoTag, usuario.get().id());
+                return;
+            }
+            emailSender.send(email, nombre);
+        } catch (Throwable t) {
+            // Defensivo: cualquier excepción del SMTP o resolución debe quedar
+            // contenida acá — el flujo del use case que disparó la notificación
+            // sigue su curso.
+            log.error("Falló envío de email {} a socioId={}: {}", tipoTag, socioId, t.getMessage(), t);
+        }
     }
 }

@@ -7,6 +7,7 @@ import com.tufondo.notificaciones.domain.model.Notificacion;
 import com.tufondo.notificaciones.domain.model.enums.PrioridadNotificacion;
 import com.tufondo.notificaciones.domain.model.enums.TipoNotificacion;
 import com.tufondo.notificaciones.domain.repository.NotificacionRepository;
+import com.tufondo.socios.infrastructure.notification.EmailNotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,9 @@ class NotificacionPublisherTest {
 
     @Mock
     private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private EmailNotificationService emailService;
 
     @InjectMocks
     private NotificacionPublisher publisher;
@@ -171,6 +175,55 @@ class NotificacionPublisherTest {
         // Verificamos que SÍ intentó persistir (no fue skip)
         verify(notificacionRepository).guardar(any());
         // Sin assert sobre exception — el punto es que NO lanzó
+    }
+
+    @Test
+    @DisplayName("KYC aprobado: ADEMÁS de notificación in-app, dispara email al socio (mayo-2026)")
+    void kyc_aprobado_dispara_email() {
+        stubUsuarioParaSocio();
+
+        publisher.notificarSocioKycAprobado(socioId);
+
+        // Notificación in-app: 1 vez
+        verify(notificacionRepository).guardar(any());
+        // Email: 1 vez con email + nombre del usuario resuelto
+        verify(emailService).enviarKycAprobado("socio@test.com", "Test");
+    }
+
+    @Test
+    @DisplayName("KYC rechazado: dispara email pasando el motivo del analista")
+    void kyc_rechazado_dispara_email_con_motivo() {
+        stubUsuarioParaSocio();
+        String motivo = "Comprobante de domicilio vencido";
+
+        publisher.notificarSocioKycRechazado(socioId, motivo);
+
+        verify(emailService).enviarKycRechazado("socio@test.com", "Test", motivo);
+    }
+
+    @Test
+    @DisplayName("KYC requiere info: dispara email pasando el detalle del analista")
+    void kyc_requiere_info_dispara_email() {
+        stubUsuarioParaSocio();
+        String detalle = "Subí un selfie con la cédula visible";
+
+        publisher.notificarSocioKycRequiereInfo(socioId, detalle);
+
+        verify(emailService).enviarKycRequiereInfo("socio@test.com", "Test", detalle);
+    }
+
+    @Test
+    @DisplayName("RESILIENCIA: si el email falla, la notificación in-app YA quedó guardada y el flujo no aborta")
+    void email_fail_no_propaga() {
+        stubUsuarioParaSocio();
+        doThrow(new RuntimeException("SMTP caído"))
+                .when(emailService).enviarKycAprobado(any(), any());
+
+        // No debe lanzar
+        publisher.notificarSocioKycAprobado(socioId);
+
+        // La notificación in-app igual se guardó (el publicarASocio corre antes del email)
+        verify(notificacionRepository).guardar(any());
     }
 
     @Test

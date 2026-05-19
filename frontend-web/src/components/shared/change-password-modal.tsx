@@ -20,7 +20,7 @@ export function ChangePasswordModal({ open }: ChangePasswordModalProps) {
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
   const logout = useAuthStore((state) => state.logout);
-  
+
   const [passwordActual, setPasswordActual] = useState('');
   const [nuevoPassword, setNuevoPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -92,7 +92,7 @@ export function ChangePasswordModal({ open }: ChangePasswordModalProps) {
       });
 
       let errorMessage = 'Error al cambiar contraseña';
-      
+
       if (!response.ok) {
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
@@ -108,9 +108,56 @@ export function ChangePasswordModal({ open }: ChangePasswordModalProps) {
         throw new Error(errorMessage);
       }
 
-      const updatedUser = { ...user!, debeCambiarPassword: false };
-      setUser(updatedUser);
-      
+      // Re-sincronizar estado canónico del backend en lugar de hacer update
+      // optimista. Antes (bug reportado mayo-2026): si por cualquier motivo
+      // el backend no persistía `debe_cambiar_password=false` (rollback en
+      // transacción, conflicto con la UPDATE @Modifying de `intentosFallidos`
+      // dentro del mismo transactional context, etc), el frontend mostraba el
+      // modal cerrado en memoria pero al refrescar la página volvía a aparecer
+      // porque `/me` retornaba `true` desde DB. Pullear /me obliga a usar la
+      // verdad del backend — si quedó `true` ahí, el modal NO se cierra y
+      // mostramos el error real al socio en vez de fingir que pasó.
+      //
+      // Caso real reportado en QA (Gabriel, 19-may-2026): la BD persistió
+      // `debe_cambiar_password=false`, pero `/me` devolvía la respuesta
+      // cacheada del primer hidrate de ProtectedRoute (donde aún era `true`).
+      // El socio veía "el sistema aceptó tu nueva contraseña pero no la guardó"
+      // pese a que sí se había guardado. Forzamos `cache: 'no-store'` +
+      // cache-buster para garantizar que vamos siempre al backend.
+      const meRes = await fetch(`/api/auth/me?t=${Date.now()}`, {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
+      if (meRes.ok) {
+        const fresh = await meRes.json();
+        if (fresh.debeCambiarPassword === true) {
+          // Backend dice que sigue obligatorio cambiar password → algo falló
+          // en la persistencia aunque el endpoint haya devuelto 200.
+          throw new Error(
+            'El sistema aceptó tu nueva contraseña pero no la guardó. ' +
+            'Intentá de nuevo o contactá a soporte.'
+          );
+        }
+        setUser({
+          id: fresh.id,
+          nombreUsuario: fresh.nombreUsuario,
+          correoElectronico: fresh.correoElectronico,
+          nombreCompleto: fresh.nombreCompleto,
+          rol: fresh.rol,
+          socioId: fresh.socioId,
+          debeCambiarPassword: fresh.debeCambiarPassword ?? false,
+        });
+      } else {
+        // Fallback: si /me falla (network, etc), aplicamos update optimista
+        // para no dejar al socio atrapado con el modal.
+        setUser({ ...user!, debeCambiarPassword: false });
+      }
+
+      toast.success('Contraseña actualizada', {
+        description: 'Ya podés usar tu nueva contraseña.',
+      });
+
       setPasswordActual('');
       setNuevoPassword('');
       setConfirmPassword('');
@@ -127,7 +174,14 @@ export function ChangePasswordModal({ open }: ChangePasswordModalProps) {
 
   return (
     <Dialog open={open}>
-      <DialogContent className="sm:max-w-[425px]" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent
+        className="sm:max-w-[425px]"
+        onInteractOutside={(e) => e.preventDefault()}
+        // Bloquear cierre con Escape — el modal es obligatorio y dejarlo
+        // cerrar dejaba al socio con `debeCambiarPassword=true` en backend
+        // pero modal oculto en frontend hasta el próximo refresh (UX confusa).
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

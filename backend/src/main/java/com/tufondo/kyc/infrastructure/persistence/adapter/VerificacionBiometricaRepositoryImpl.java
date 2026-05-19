@@ -50,6 +50,12 @@ public class VerificacionBiometricaRepositoryImpl implements VerificacionBiometr
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<VerificacionBiometrica> findLastBySocioId(UUID socioId) {
+        return jpaRepository.findFirstBySocioIdOrderByFechaInicioDesc(socioId).map(this::toDomain);
+    }
+
+    @Override
     @Transactional
     public void deleteAllBySocioId(UUID socioId) {
         jpaRepository.deleteAllBySocioId(socioId);

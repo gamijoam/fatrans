@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -108,21 +108,75 @@ export function BiometricCapture({
     setStep(deriveStepFromBackend(estadoBackend));
   }, [estadoBackend]);
 
-  // Polling automático mientras estamos esperando el webhook de Didit.
-  // Cada 5s pide al padre que refetch — si el webhook ya llegó, el
-  // useEffect anterior nos transiciona a `aprobada` o `rechazada`.
-  // Se detiene cuando salimos de `en_progreso` y al desmontar.
-  useEffect(() => {
-    if (step === 'en_progreso' && onCompleted) {
-      pollingRef.current = setInterval(() => onCompleted(), 5000);
+  // Polling activo mientras estamos esperando el resultado de Didit.
+  // En lugar de solo refetch /api/kyc/estado (que lee BD pasiva), llamamos
+  // a /api/kyc/biometric/refresh que FUERZA al backend a consultar Didit
+  // por pull. Eso suple al webhook cuando no está configurado o tarda —
+  // sin esto, los socios quedaban atascados en EN_PROGRESO eternamente
+  // y había que hacer UPDATE manual a la BD (caso real reportado en PROD
+  // con carlos, alexander, gabriel).
+  //
+  // Cada 5s: POST /refresh → backend pulla Didit → si Approved/Rejected,
+  // actualiza BD localmente + devuelve el nuevo estado → el padre hace
+  // refetch para que el useEffect de arriba transicione el step.
+  //
+  // 19-may-2026 — además de pollear en `en_progreso`, hacemos un tick
+  // inmediato al montar el componente SIEMPRE (excepto si ya estamos en
+  // estado terminal). Esto cubre el caso: socio cierra app, vuelve más
+  // tarde, KYC en DB dice EN_PROGRESO pero Didit ya tiene la decisión —
+  // sin este tick inicial el socio veía "Esperando resultado" eternamente
+  // hasta que algo dispare el polling.
+  const triggerRefresh = useCallback(async () => {
+    try {
+      const res = await fetch('/api/kyc/biometric/refresh', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
+      // Si el backend devuelve 200 y un estadoBiometria, lo loggeamos —
+      // útil para debug ("refresh devolvió APROBADA pero la UI seguía en
+      // pending" indica que el padre no llamó cargarEstado).
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.estadoBiometria) {
+          // No mutamos state acá — dejamos que el padre maneje el refetch.
+          // Pero loggear ayuda al diagnóstico en producción.
+          // eslint-disable-next-line no-console
+          console.debug('[biometric/refresh]', data.estadoBiometria);
+        }
+      }
+    } catch {
+      // Silencioso: el polling es best-effort. Si el endpoint falla,
+      // el próximo tick lo reintenta.
     }
+    // Independientemente del resultado del refresh, pedimos al padre que
+    // refetch /api/kyc/estado para reflejar el cache local actualizado.
+    onCompleted?.();
+  }, [onCompleted]);
+
+  // Tick inmediato al montar si hay riesgo de estado desincronizado.
+  // Cubre: usuario vuelve a la app después de completar Didit, DB todavía
+  // dice EN_PROGRESO porque webhook no llegó o no está configurado.
+  useEffect(() => {
+    if (step === 'aprobada' || step === 'rechazada') return;
+    triggerRefresh();
+    // Solo en mount — para refetch continuo, el efecto de polling de abajo
+    // se encarga.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Polling continuo mientras estamos en progreso.
+  useEffect(() => {
+    if (step !== 'en_progreso') return;
+    pollingRef.current = setInterval(triggerRefresh, 5000);
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
         pollingRef.current = null;
       }
     };
-  }, [step, onCompleted]);
+  }, [step, triggerRefresh]);
 
   /**
    * Inicia verificación: registra consent + crea sesión Didit + abre pestaña.

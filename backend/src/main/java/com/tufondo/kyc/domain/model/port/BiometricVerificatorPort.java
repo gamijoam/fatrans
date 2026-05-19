@@ -36,6 +36,23 @@ public interface BiometricVerificatorPort {
     BiometricWebhookResult procesarWebhook(byte[] rawBody, String signatureHeader, String timestampHeader);
 
     /**
+     * Consulta el estado actual de una sesión directamente al proveedor (pull).
+     *
+     * Se usa para suplir el webhook cuando éste no está configurado o no llega
+     * a tiempo: el frontend hace polling y el backend pregunta a Didit en cada
+     * tick. Idempotente: si la sesión sigue en pending del lado del proveedor,
+     * devuelve `outcome=EN_PROGRESO` sin efectos secundarios.
+     *
+     * El resultado tiene el mismo shape que el del webhook
+     * ({@link BiometricWebhookResult}) para que el use case pueda aplicarlo
+     * con la misma lógica de transición de estado.
+     *
+     * @param proveedorSessionId session id devuelto por {@link #iniciarSesion}
+     * @return resultado normalizado (puede ser EN_PROGRESO si aún no terminó)
+     */
+    BiometricWebhookResult consultarDecision(String proveedorSessionId);
+
+    /**
      * Solicita al proveedor que borre todos los datos asociados al session id.
      * Se invoca cuando el socio revoca su consentimiento biométrico (LOPDP Art. 7).
      */
