@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CookieConsentBanner } from '@/components/legal/cookie-consent-banner';
 import { leerCookieConsent } from '@/lib/utils/cookie-consent-storage';
+import { useAuthStore } from '@/stores/auth-store';
 
 /**
  * Tests del banner de consentimiento de cookies (issue #218 PR-A).
@@ -14,6 +15,34 @@ import { leerCookieConsent } from '@/lib/utils/cookie-consent-storage';
 describe('CookieConsentBanner', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    // Reset auth store entre tests para evitar leak del flag debeCambiarPassword.
+    useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
+  });
+
+  it('NO aparece cuando el usuario tiene debeCambiarPassword=true (modal obligatorio abierto, evita conflicto z-index reportado en PROD 19-may-2026)', async () => {
+    // Sin preferencia guardada → normalmente el banner aparecería
+    useAuthStore.setState({
+      user: {
+        id: 'user-1',
+        nombreUsuario: 'socio_prueba',
+        correoElectronico: 'socio@test.com',
+        nombreCompleto: 'Socio Prueba',
+        rol: 'SOCIO',
+        socioId: 'socio-1',
+        debeCambiarPassword: true,
+      },
+      isAuthenticated: true,
+      isLoading: false,
+    });
+
+    render(<CookieConsentBanner />);
+    await new Promise((r) => setTimeout(r, 50));
+
+    // El banner debe permanecer oculto porque el modal de cambio de
+    // password está sobre la pantalla — su z-index entra en conflicto
+    // con el del banner y bloquea ambos. El socio ya aceptó cookies en
+    // el form de registro (LOPDP); el banner es informativo y puede esperar.
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('aparece cuando no hay preferencia guardada', async () => {
