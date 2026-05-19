@@ -119,8 +119,11 @@ describe('ChangePasswordModal', () => {
         expect.objectContaining({ method: 'POST' })
       );
       expect(global.fetch).toHaveBeenCalledWith(
-        '/api/auth/me',
-        expect.objectContaining({ credentials: 'include' })
+        expect.stringMatching(/^\/api\/auth\/me\?t=/),
+        expect.objectContaining({
+          credentials: 'include',
+          cache: 'no-store',
+        })
       );
     });
 
