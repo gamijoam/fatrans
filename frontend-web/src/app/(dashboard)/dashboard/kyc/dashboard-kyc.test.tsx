@@ -93,8 +93,11 @@ describe('DashboardKYCPagina (rediseño wizard)', () => {
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(
-          '/api/kyc/estado',
-          expect.any(Object)
+          expect.stringMatching(/^\/api\/kyc\/estado\?t=/),
+          expect.objectContaining({
+            credentials: 'include',
+            cache: 'no-store',
+          })
         );
       });
     });

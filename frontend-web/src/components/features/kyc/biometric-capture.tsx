@@ -131,6 +131,8 @@ export function BiometricCapture({
       const res = await fetch('/api/kyc/biometric/refresh', {
         method: 'POST',
         credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
       });
       // Si el backend devuelve 200 y un estadoBiometria, lo loggeamos —
       // útil para debug ("refresh devolvió APROBADA pero la UI seguía en
