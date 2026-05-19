@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// `export const dynamic = 'force-dynamic'` desactiva el cache automático de
+// fetch() del lado del server en Next.js 14. Sin esto, los GET internos del BFF
+// al backend Java se cachean por URL+headers, devolviendo respuestas viejas tras
+// mutaciones (caso real Ronni QA 19-may-2026: KYC aprobado en BD pero el admin
+// veía la solicitud aún en la cola).
+export const dynamic = 'force-dynamic';
+
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 
 /**
@@ -23,6 +30,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'No autenticado' }, { status: 401 });
     }
 
+    // `cache: 'no-store'` evita que Next.js 14 cachee la respuesta del
+    // backend en el server side (el cache de Next.js es por URL+headers y
+    // se comparte entre requests). Sin esto, el polling de KYC sirve el
+    // estado del primer GET (NO_INICIADA/EN_PROGRESO) eternamente, aunque
+    // el backend ya haya cambiado a APROBADA.
     const backendResponse = await fetch(
       `${BACKEND_URL}/api/v1/kyc/estado`,
       {
@@ -32,6 +44,7 @@ export async function GET(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
+        cache: 'no-store',
       }
     );
 

@@ -9,6 +9,7 @@ import {
   rechazarOpcionales,
   guardarCookieConsent,
 } from '@/lib/utils/cookie-consent-storage';
+import { useAuthStore } from '@/stores/auth-store';
 
 /**
  * Banner de consentimiento de cookies (issue #218 PR-A).
@@ -36,6 +37,21 @@ export function CookieConsentBanner() {
   const [analiticas, setAnaliticas] = useState(false);
   const [marketing, setMarketing] = useState(false);
 
+  /**
+   * Si el socio tiene `debeCambiarPassword=true`, hay un modal obligatorio
+   * de cambio de contraseña abierto sobre la pantalla. Bug reportado en PROD
+   * (19-may-2026): el banner (`z-[100]`) quedaba encima del modal Radix
+   * (`z-50`), capturando los clicks que deberían ir al modal — el socio no
+   * podía ni cerrar el banner (no veía sus botones) ni completar el form
+   * (los inputs no recibían focus). Solución: posponer el banner hasta que
+   * el socio termine de cambiar la clave. Las cookies ya fueron aceptadas
+   * implícitamente en el formulario de registro (LOPDP), así que el banner
+   * es informativo y puede esperar.
+   */
+  const debeCambiarPassword = useAuthStore(
+    (state) => state.user?.debeCambiarPassword ?? false,
+  );
+
   useEffect(() => {
     // Solo en cliente — leerCookieConsent retorna null en SSR
     const consent = leerCookieConsent();
@@ -43,6 +59,7 @@ export function CookieConsentBanner() {
   }, []);
 
   if (visible !== true) return null;
+  if (debeCambiarPassword) return null;
 
   const handleAceptarTodas = () => {
     aceptarTodas();
@@ -64,7 +81,10 @@ export function CookieConsentBanner() {
       role="dialog"
       aria-labelledby="cookie-banner-title"
       aria-describedby="cookie-banner-desc"
-      className="fixed inset-x-0 bottom-0 z-[100] border-t border-slate-200 bg-white shadow-2xl"
+      // z-40 < z-50 de Radix Dialog para que cualquier modal crítico
+      // (cambio de password obligatorio, etc.) quede siempre por encima
+      // del banner aunque la guarda de `debeCambiarPassword` arriba falle.
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white shadow-2xl"
     >
       <div className="mx-auto max-w-6xl px-4 py-4 lg:py-5">
         {!expandido ? (

@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// `export const dynamic = 'force-dynamic'` desactiva el cache automático de
+// fetch() del lado del server en Next.js 14. Sin esto, los GET internos del BFF
+// al backend Java se cachean por URL+headers, devolviendo respuestas viejas tras
+// mutaciones (caso real Ronni QA 19-may-2026: KYC aprobado en BD pero el admin
+// veía la solicitud aún en la cola).
+export const dynamic = 'force-dynamic';
+
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18080';
 
 export async function GET(request: NextRequest) {
@@ -16,10 +23,18 @@ export async function GET(request: NextRequest) {
     let accessTokenValue = accessToken.value;
     accessTokenValue = accessTokenValue.replace(/^"|"$/g, '');
 
+    // `cache: 'no-store'` es CRÍTICO acá. Next.js 14 cachea GET fetch() del
+    // lado del server por default — el cache es por URL+headers y se comparte
+    // entre requests. Bug reportado en QA (Ronni, 19-may-2026): cambió su
+    // password, la BD persistió debe_cambiar_password=false, pero el BFF
+    // /me devolvía true porque Next.js servía la respuesta cacheada del
+    // primer GET (cuando aún era true). Sin esta línea, el "fix de cache"
+    // de PR #301/#302 no funciona para flows post-mutation.
     const backendResponse = await fetch(`${BACKEND_URL}/api/v1/auth/me`, {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${accessTokenValue}` },
       credentials: 'include',
+      cache: 'no-store',
     });
 
     if (!backendResponse.ok) {
