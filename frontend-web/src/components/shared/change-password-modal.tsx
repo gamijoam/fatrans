@@ -117,7 +117,18 @@ export function ChangePasswordModal({ open }: ChangePasswordModalProps) {
       // porque `/me` retornaba `true` desde DB. Pullear /me obliga a usar la
       // verdad del backend — si quedó `true` ahí, el modal NO se cierra y
       // mostramos el error real al socio en vez de fingir que pasó.
-      const meRes = await fetch('/api/auth/me', { credentials: 'include' });
+      //
+      // Caso real reportado en QA (Gabriel, 19-may-2026): la BD persistió
+      // `debe_cambiar_password=false`, pero `/me` devolvía la respuesta
+      // cacheada del primer hidrate de ProtectedRoute (donde aún era `true`).
+      // El socio veía "el sistema aceptó tu nueva contraseña pero no la guardó"
+      // pese a que sí se había guardado. Forzamos `cache: 'no-store'` +
+      // cache-buster para garantizar que vamos siempre al backend.
+      const meRes = await fetch(`/api/auth/me?t=${Date.now()}`, {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
       if (meRes.ok) {
         const fresh = await meRes.json();
         if (fresh.debeCambiarPassword === true) {

@@ -31,7 +31,20 @@ export async function GET(request: NextRequest) {
 
     const userData = await backendResponse.json();
 
-    return NextResponse.json(userData, { status: 200 });
+    // No-cache headers: el cliente (incluido el modal de cambio de password)
+    // necesita poder re-sincronizar con el backend inmediatamente después de
+    // mutaciones de usuario (cambio de password, actualización de perfil, etc).
+    // Sin esto, el navegador puede servir una versión vieja del usuario
+    // (caso real Gabriel QA 19-may-2026: vio `debeCambiarPassword=true`
+    // cacheado después de haberlo cambiado correctamente).
+    return NextResponse.json(userData, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0',
+      },
+    });
 
   } catch (error) {
     console.error('Get user error:', error);
