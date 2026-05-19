@@ -145,6 +145,110 @@ public class EmailNotificationServiceImpl implements EmailNotificationService {
         }
     }
 
+    @Override
+    public void enviarKycAprobado(String email, String nombreCompleto) {
+        if (!isReal()) {
+            log.info("Email 'KYC aprobado' enviado (MOCK) a {}", email);
+            return;
+        }
+        String nombre = nombreCompleto == null || nombreCompleto.isBlank() ? "Hola" : "Hola " + escapeHtml(nombreCompleto);
+        String html = """
+                <p>%s,</p>
+                <p>¡Buenas noticias! Tu <strong>verificación de identidad</strong> fue
+                aprobada por nuestro equipo. Ya podés usar todos los servicios del
+                Fondo de Ahorro Fatrans:</p>
+                <ul>
+                  <li>Depósitos y retiros sin límites adicionales</li>
+                  <li>Solicitud de créditos</li>
+                  <li>Gestión de beneficiarios</li>
+                </ul>
+                <p style="margin-top: 20px;">
+                  <a href="%s/dashboard" style="background:#16A34A;color:#fff;padding:10px 20px;
+                  text-decoration:none;border-radius:6px;display:inline-block;">
+                    Ir a mi panel
+                  </a>
+                </p>
+                <hr style="border:none;border-top:1px solid #ddd;margin:24px 0;"/>
+                <p style="font-size:11px;color:#666;">
+                  Asociación de Ahorro y Crédito Fatrans (RIF J-50516835-5).
+                </p>
+                """.formatted(nombre, appBaseUrl);
+
+        boolean ok = sendHtml(email, "Tu identidad fue verificada — Fatrans", html);
+        if (ok) {
+            log.info("Email 'KYC aprobado' enviado vía SMTP a {}", email);
+        }
+    }
+
+    @Override
+    public void enviarKycRechazado(String email, String nombreCompleto, String motivo) {
+        if (!isReal()) {
+            log.info("Email 'KYC rechazado' enviado (MOCK) a {}", email);
+            return;
+        }
+        String nombre = nombreCompleto == null || nombreCompleto.isBlank() ? "Hola" : "Hola " + escapeHtml(nombreCompleto);
+        String textoMotivo = motivo == null || motivo.isBlank()
+                ? "Revisá los detalles desde tu panel y volvé a enviar."
+                : "Motivo: " + escapeHtml(motivo);
+        String html = """
+                <p>%s,</p>
+                <p>Tu <strong>verificación de identidad</strong> no pasó la revisión.</p>
+                <p>%s</p>
+                <p>No te preocupes — podés volver a intentarlo. Asegurate de subir documentos
+                legibles, completos y vigentes.</p>
+                <p style="margin-top: 20px;">
+                  <a href="%s/dashboard/kyc" style="background:#DC2626;color:#fff;padding:10px 20px;
+                  text-decoration:none;border-radius:6px;display:inline-block;">
+                    Reintentar verificación
+                  </a>
+                </p>
+                <hr style="border:none;border-top:1px solid #ddd;margin:24px 0;"/>
+                <p style="font-size:11px;color:#666;">
+                  Si tenés dudas, escribinos a
+                  <a href="mailto:soporte@fatrans.com.ve">soporte@fatrans.com.ve</a>.
+                  Asociación de Ahorro y Crédito Fatrans (RIF J-50516835-5).
+                </p>
+                """.formatted(nombre, textoMotivo, appBaseUrl);
+
+        boolean ok = sendHtml(email, "Tu verificación de identidad no pasó la revisión — Fatrans", html);
+        if (ok) {
+            log.info("Email 'KYC rechazado' enviado vía SMTP a {}", email);
+        }
+    }
+
+    @Override
+    public void enviarKycRequiereInfo(String email, String nombreCompleto, String detalle) {
+        if (!isReal()) {
+            log.info("Email 'KYC requiere info' enviado (MOCK) a {}", email);
+            return;
+        }
+        String nombre = nombreCompleto == null || nombreCompleto.isBlank() ? "Hola" : "Hola " + escapeHtml(nombreCompleto);
+        String textoDetalle = detalle == null || detalle.isBlank()
+                ? "El analista necesita información adicional para continuar."
+                : "El analista necesita lo siguiente: " + escapeHtml(detalle);
+        String html = """
+                <p>%s,</p>
+                <p>Estamos revisando tu <strong>verificación de identidad</strong> y necesitamos
+                un poco más de información.</p>
+                <p>%s</p>
+                <p style="margin-top: 20px;">
+                  <a href="%s/dashboard/kyc" style="background:#2563EB;color:#fff;padding:10px 20px;
+                  text-decoration:none;border-radius:6px;display:inline-block;">
+                    Completar verificación
+                  </a>
+                </p>
+                <hr style="border:none;border-top:1px solid #ddd;margin:24px 0;"/>
+                <p style="font-size:11px;color:#666;">
+                  Asociación de Ahorro y Crédito Fatrans (RIF J-50516835-5).
+                </p>
+                """.formatted(nombre, textoDetalle, appBaseUrl);
+
+        boolean ok = sendHtml(email, "Necesitamos más información para tu verificación — Fatrans", html);
+        if (ok) {
+            log.info("Email 'KYC requiere info' enviado vía SMTP a {}", email);
+        }
+    }
+
     // ────────────────────────────────────────────────────────
     //  Helpers privados
     // ────────────────────────────────────────────────────────
