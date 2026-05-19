@@ -28,6 +28,25 @@ spring:
     baseline-on-migrate: true
     baseline-version: 1
 
+  # SMTP de Zoho — credenciales en .env.{prod,qa} via MAIL_USERNAME/MAIL_PASSWORD.
+  # Si están vacías, JavaMailSender se construye igual pero `enviar` falla con
+  # AuthenticationFailedException — `EmailNotificationServiceImpl` chequea
+  # `fatrans.mail.enabled` antes de intentar, así que en dev/test no rompe.
+  mail:
+    host: ${MAIL_HOST:smtp.zoho.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          starttls:
+            enable: false
+        debug: ${MAIL_DEBUG:false}
+
 springdoc:
   api-docs:
     path: /v3/api-docs
@@ -79,6 +98,22 @@ fatrans:
       base-url: ${DIDIT_BASE_URL:https://verification.didit.me/v2}
       callback-url: ${DIDIT_CALLBACK_URL:}
       webhook-timestamp-tolerance-seconds: 300
+  # ============================================
+  # NOTIFICACIONES POR EMAIL (Zoho SMTP)
+  # ============================================
+  # Si `enabled=false` o faltan credenciales, EmailNotificationServiceImpl cae a
+  # modo mock (loguea, no manda). Permite que la app arranque sin credenciales
+  # y que los tests no toquen SMTP real.
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:no-reply@fatrans.com.ve}
+    from-name: ${MAIL_FROM_NAME:Fatrans}
+    # URL pública del frontend protected — usada en los emails para links
+    # (login, dashboard). Cambia entre PROD y QA.
+    app-base-url: ${MAIL_APP_BASE_URL:https://app.fatrans.com.ve}
+    # Email del super admin para notificaciones operacionales (nueva solicitud
+    # pendiente de aprobar, etc.). Vacío = no manda emails al admin.
+    admin-notification: ${MAIL_ADMIN_NOTIFICATION:}
 
 # ============================================
 # MÓDULO DOCUMENTOS PDF - CONFIGURACIÓN
