@@ -20,6 +20,13 @@ public interface VerificacionBiometricaRepository {
     List<VerificacionBiometrica> findBySocioId(UUID socioId);
 
     /**
+     * Devuelve el último intento biométrico del socio (mayor fecha_inicio).
+     * Usado por el use case de sincronización vía pull al proveedor: el frontend
+     * hace polling y necesitamos saber qué sesión consultarle a Didit.
+     */
+    Optional<VerificacionBiometrica> findLastBySocioId(UUID socioId);
+
+    /**
      * Borra todos los intentos biométricos asociados a un socio. Lo usa el flujo de
      * revocación de consentimiento (LOPDP Art. 7 — derecho al olvido).
      */

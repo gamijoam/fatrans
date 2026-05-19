@@ -166,6 +166,69 @@ public class DiditKycAdapter implements BiometricVerificatorPort {
     }
 
     /**
+     * Consulta el estado actual de una sesión vía GET a {@code /v2/session/{id}/decision/}.
+     *
+     * Usado por {@link com.tufondo.kyc.application.usecase.SincronizarVerificacionBiometricaUseCase}
+     * cuando el frontend hace polling — suple al webhook cuando éste no está
+     * configurado o no llegó a tiempo. Idempotente.
+     *
+     * El payload de /decision/ tiene shape DIFERENTE al de webhook:
+     *  - Webhook: `{status, decision: {liveness_checks: [{score}], face_matches: [{score}]}}`
+     *  - Decision: `{status, liveness: {status, score}, face_match: {status, score}}`
+     * y los scores van 0-100 (no 0-1). Por eso normalizamos.
+     */
+    @Override
+    public BiometricWebhookResult consultarDecision(String proveedorSessionId) {
+        ensureEnabled();
+        if (proveedorSessionId == null || proveedorSessionId.isBlank()) {
+            throw new KYCException("session_id requerido para consultar decisión");
+        }
+        HttpHeaders headers = baseHeaders();
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    props.getBaseUrl() + "/session/" + proveedorSessionId + "/decision/",
+                    HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    JsonNode.class
+            );
+            JsonNode payload = response.getBody();
+            if (payload == null) {
+                throw new KYCException("Didit devolvió payload vacío al consultar decisión");
+            }
+            String status = textOrNull(payload, "status");
+            BiometricOutcome outcome = mapStatus(status);
+
+            // Scores del /decision/ vienen 0-100 → readScore normaliza a 0-1.
+            BigDecimal livenessScore = readScore(payload, "liveness", "score");
+            BigDecimal faceMatchScore = readScore(payload, "face_match", "score");
+            // documentOcrScore se omite — el endpoint /decision/ no expone un
+            // score plano para el documento (vienen sub-scores) y el use case
+            // no lo necesita para decidir aprobar/rechazar.
+            BigDecimal documentOcrScore = null;
+
+            String motivoFallo = null;
+            if (outcome == BiometricOutcome.RECHAZADO) {
+                // Si vino rechazado, intentar capturar la razón. Didit la pone en
+                // un campo "warnings" o "reasons" según el tipo de check.
+                motivoFallo = textOrNull(payload, "decline_reason");
+            }
+
+            return new BiometricWebhookResult(
+                    proveedorSessionId, outcome,
+                    livenessScore, faceMatchScore, documentOcrScore,
+                    motivoFallo, null
+            );
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            log.error("Didit /decision/ error: HTTP {} body={}",
+                    e.getStatusCode().value(), e.getResponseBodyAsString());
+            throw new KYCException("Error consultando decisión biométrica con el proveedor");
+        } catch (RestClientException e) {
+            log.error("Didit /decision/ error (network/transport): {}", e.getMessage());
+            throw new KYCException("Error consultando decisión biométrica con el proveedor");
+        }
+    }
+
+    /**
      * Procesa un webhook de Didit. Soporta DOS esquemas de firma:
      *
      * <ol>
