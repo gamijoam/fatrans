@@ -136,6 +136,19 @@ done
 log "   Redis QA OK"
 
 log "→ Levantando Backend QA (con healthcheck)..."
+# Secrets de proveedores externos (Didit, etc.) viven en /opt/fatrans-qa/.env.qa
+# con chmod 600 — fuera del repo. Histórico: las credenciales DIDIT_* originales
+# se perdieron en el recreate del container PROD (sep 2026) porque nunca
+# estuvieron versionadas. Ahora vivimos del archivo, no del shell.
+QA_ENV_FILE="/opt/fatrans-qa/.env.qa"
+ENV_FILE_FLAG=""
+if [ -f "$QA_ENV_FILE" ]; then
+  ENV_FILE_FLAG="--env-file $QA_ENV_FILE"
+  log "   Cargando secrets desde $QA_ENV_FILE"
+else
+  log "   ⚠️ $QA_ENV_FILE no existe — Didit y otras integraciones quedarán sin credenciales"
+fi
+# shellcheck disable=SC2086  # Queremos word-splitting de $ENV_FILE_FLAG
 docker run -d \
   --name fatrans-qa-backend \
   --network fatrans-network \
@@ -146,6 +159,7 @@ docker run -d \
   --health-timeout 10s \
   --health-retries 3 \
   --health-start-period 60s \
+  $ENV_FILE_FLAG \
   -e SPRING_PROFILES_ACTIVE=dev \
   -e DB_URL=jdbc:postgresql://fatrans-postgres:5432/fondo_qa \
   -e DB_USER=app \

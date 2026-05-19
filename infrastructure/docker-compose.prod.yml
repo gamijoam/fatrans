@@ -61,6 +61,14 @@ services:
   backend:
     image: fatrans-backend:latest
     container_name: fatrans-backend
+    # Secrets de proveedores externos (Didit, etc.) van en `.env.prod` con
+    # chmod 600 — fuera del repo. Histórico (sep 2026): el backend tenía las
+    # credenciales DIDIT_* hardcoded en el `docker run -e ...` original;
+    # nunca quedaron versionadas. Al recrear el container con
+    # `compose up --force-recreate`, las env vars se perdieron y la biometría
+    # dejó de funcionar sin explicación. Ahora vivimos del archivo.
+    env_file:
+      - .env.prod
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://fatrans-postgres:5432/fondo
