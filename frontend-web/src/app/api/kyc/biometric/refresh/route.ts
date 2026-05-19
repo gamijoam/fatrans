@@ -17,11 +17,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'No autenticado' }, { status: 401 });
   }
 
+  // `cache: 'no-store'` por defensa en profundidad. POSTs no se cachean
+  // normalmente, pero Next.js a veces hace cosas raras con server fetch.
   const backendResponse = await fetch(`${BACKEND_URL}/api/v1/kyc/biometric/refresh`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token.replace(/^"|"$/g, '')}`,
     },
+    cache: 'no-store',
   });
 
   // No traducimos 5xx a 502 acá: el componente está en polling, queremos

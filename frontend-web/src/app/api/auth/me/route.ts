@@ -16,10 +16,18 @@ export async function GET(request: NextRequest) {
     let accessTokenValue = accessToken.value;
     accessTokenValue = accessTokenValue.replace(/^"|"$/g, '');
 
+    // `cache: 'no-store'` es CRÍTICO acá. Next.js 14 cachea GET fetch() del
+    // lado del server por default — el cache es por URL+headers y se comparte
+    // entre requests. Bug reportado en QA (Ronni, 19-may-2026): cambió su
+    // password, la BD persistió debe_cambiar_password=false, pero el BFF
+    // /me devolvía true porque Next.js servía la respuesta cacheada del
+    // primer GET (cuando aún era true). Sin esta línea, el "fix de cache"
+    // de PR #301/#302 no funciona para flows post-mutation.
     const backendResponse = await fetch(`${BACKEND_URL}/api/v1/auth/me`, {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${accessTokenValue}` },
       credentials: 'include',
+      cache: 'no-store',
     });
 
     if (!backendResponse.ok) {
