@@ -108,14 +108,38 @@ export function BiometricCapture({
     setStep(deriveStepFromBackend(estadoBackend));
   }, [estadoBackend]);
 
-  // Polling automático mientras estamos esperando el webhook de Didit.
-  // Cada 5s pide al padre que refetch — si el webhook ya llegó, el
-  // useEffect anterior nos transiciona a `aprobada` o `rechazada`.
-  // Se detiene cuando salimos de `en_progreso` y al desmontar.
+  // Polling activo mientras estamos esperando el resultado de Didit.
+  // En lugar de solo refetch /api/kyc/estado (que lee BD pasiva), llamamos
+  // a /api/kyc/biometric/refresh que FUERZA al backend a consultar Didit
+  // por pull. Eso suple al webhook cuando no está configurado o tarda —
+  // sin esto, los socios quedaban atascados en EN_PROGRESO eternamente
+  // y había que hacer UPDATE manual a la BD (caso real reportado en PROD
+  // con carlos, alexander, gabriel).
+  //
+  // Cada 5s: POST /refresh → backend pulla Didit → si Approved/Rejected,
+  // actualiza BD localmente + devuelve el nuevo estado → el padre hace
+  // refetch para que el useEffect de arriba transicione el step.
   useEffect(() => {
-    if (step === 'en_progreso' && onCompleted) {
-      pollingRef.current = setInterval(() => onCompleted(), 5000);
-    }
+    if (step !== 'en_progreso' || !onCompleted) return;
+    const tick = async () => {
+      try {
+        await fetch('/api/kyc/biometric/refresh', {
+          method: 'POST',
+          credentials: 'include',
+        });
+      } catch {
+        // Silencioso: el polling es best-effort. Si el endpoint falla,
+        // el próximo tick lo reintenta.
+      }
+      // Independientemente del resultado del refresh, pedimos al padre que
+      // refetch /api/kyc/estado para reflejar el cache local actualizado.
+      onCompleted();
+    };
+    // Primer tick inmediato — útil cuando el socio vuelve a la pantalla
+    // después de completar Didit en otra pestaña. Sin esto, esperaría
+    // 5s para ver el cambio.
+    tick();
+    pollingRef.current = setInterval(tick, 5000);
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
