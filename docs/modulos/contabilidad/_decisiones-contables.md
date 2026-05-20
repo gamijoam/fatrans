@@ -237,6 +237,50 @@ HABER 4.1.05 Comisiones Otras (cuenta a crear)
 
 ---
 
+## D-006 — Libro Diario incluye anulados por defecto + formato visual anual del correlativo
+
+**Fecha:** 2026-05-20
+**Sub-issue:** [[05-libro-diario|#269]]
+**Estado:** ✅ Aprobada e implementada
+**Revisor:** [[_contador-fatrans|contador-fatrans]] (rol asumido en sesión, archivo activo)
+
+### Contexto
+Al diseñar el Libro Diario surgieron dos preguntas:
+1. ¿Incluir asientos ANULADOS o solo REGISTRADOS?
+2. ¿El correlativo debe resetearse anualmente como exige SUDECA?
+
+### Decisión
+
+**1. Incluir ANULADOS por defecto, con marca visual.**
+
+El parámetro `incluirAnulados` default es `true`. Los anulados aparecen con
+fondo rojo claro, texto rojo, tag `[ANULADO]` y motivo visible.
+
+**Razón regulatoria**: SUDECA exige auditoría completa. La inmutabilidad legal
+aplica a TODO lo registrado, no solo a lo activo. Censurar anulados del Libro
+Diario sería hallazgo de auditoría.
+
+**2. Formato anual visual del correlativo (sin cambiar BD por ahora).**
+
+El campo `numeroFormateado` muestra el número como `AÑO-NNNNNN` (ej. `2026-000001`),
+construido como `{año de fechaContable}-{numero a 6 dígitos}`. La SEQUENCE
+BD `seq_asiento_numero` sigue corriendo continua.
+
+**Razón temporal**: cambiar la SEQUENCE para reset anual requiere migration
++ posiblemente cambio del modelo `AsientoContable` (agregar campo `año_fiscal`).
+Es trabajo no trivial. Para esta iteración, formateamos visualmente como
+quick win. Bloqueante real: antes del primer cierre fiscal serio.
+
+### Consecuencias
+
+- Endpoint `GET /libro-diario?incluirAnulados=true|false` permite a admin
+  toggear si necesita vista limpia.
+- PDF marca visualmente los anulados.
+- **Pendiente P1 abierto**: "Reset anual del correlativo de asientos" en
+  [[_pendientes-criticos]]. Sub-issue dedicado antes del primer cierre.
+
+---
+
 ## D-005 — (PENDIENTE) Criterio de caja vs devengo para intereses de cartera
 
 **Fecha:** 2026-05-20

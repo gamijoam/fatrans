@@ -98,6 +98,57 @@ HABER 2.1.01 Cuentas de Ahorro Bs (o el destino real del pago)
 - [ ] Implementar `DevengarInteresesAhorrosJob`.
 - [ ] Cuando #267 madure: hook `OrigenAsiento.AHORRO_INTERES` para el pago.
 
+### Reset anual del correlativo de asientos
+**Decisión origen:** [[_decisiones-contables#D-006|D-006]]
+**Sub-issue:** sin asignar — abrir antes del primer cierre fiscal
+**Prioridad:** P1 (bloqueante antes del primer cierre)
+
+SUDECA exige que el correlativo del Libro Diario se reinicie en 1 al inicio
+de cada año fiscal. Actualmente la SEQUENCE `seq_asiento_numero` corre
+continua desde siempre y nunca se resetea.
+
+El sub-issue **#269** parchó esto visualmente formateando el número como
+`AÑO-NNNNNN` (ej. `2026-000123` aunque internamente el número sea `47891`).
+Esto es aceptable para mostrar reportes pero NO para auditoría formal.
+
+**Implementación correcta**:
+
+**Opción A — Cambiar el modelo**: agregar campo `año_fiscal` y `numero_anual`
+a `asientos_contables`. SEQUENCE separada por año o lógica de aplicación
+para asignar el siguiente número del año en curso.
+
+**Opción B — Reset físico de SEQUENCE**: job al inicio de cada año fiscal:
+```sql
+ALTER SEQUENCE seq_asiento_numero RESTART WITH 1;
+```
+Combinado con un campo `numero_anual` que se inserta en el asiento.
+
+**Tareas**:
+- [ ] Decidir opción A vs B con contador colegiado.
+- [ ] Migration nueva (V23+) con el cambio.
+- [ ] Modificar `AsientoContableRepositoryImpl` para usar el nuevo correlativo.
+- [ ] Actualizar `GenerarLibroDiarioUseCase.formatearNumero()` para usar el
+  campo persistido en lugar del cálculo visual.
+- [ ] Job `@Scheduled` que ejecute el reset el 1 de enero a las 00:00 UTC-4.
+
+### Crear rol CONTADOR dedicado
+**Sub-issue:** sin asignar
+**Prioridad:** P2 (mejora de control de acceso)
+
+El enum `Rol` actual tiene `SOCIO, ADMIN, SUPER_ADMIN, CAJERO, ANALISTA_KYC,
+ANALISTA_CREDITO, SISTEMA`. Falta `CONTADOR` dedicado.
+
+Hoy los endpoints contables (`/libro-diario`, futuros `/libro-mayor`,
+`/balance-general`) usan `ADMIN/SUPER_ADMIN/SISTEMA`. Ideal: `CONTADOR`
+puede leer reportes pero NO ejecutar operaciones operativas como crear
+socios, modificar tasas, etc.
+
+**Tareas**:
+- [ ] Agregar `CONTADOR` al enum `Rol`.
+- [ ] Definir permisos en `SecurityConfig` (lectura contable + asientos manuales).
+- [ ] Actualizar `@PreAuthorize` de controllers contables.
+- [ ] UI admin: pantalla para asignar rol CONTADOR.
+
 ### Provisión de cartera de créditos
 **Prioridad:** P1
 
