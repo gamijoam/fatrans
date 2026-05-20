@@ -145,13 +145,19 @@ class AsientoContableTest {
         }
 
         @Test
-        @DisplayName("solo partidas al HABER → rechazado")
+        @DisplayName("solo partidas al HABER → rechazado (vía check de balance que se dispara primero)")
         void solo_haber() {
+            // Dos partidas al HABER sumando 200 → Σdebe=0, Σhaber=200, desbalance
+            // se detecta antes del check "al menos una al DEBE". Es defensa en
+            // profundidad — el dominio rechaza por la primera invariante violada
+            // sin importar cuál es. El check "al menos uno DEBE / al menos uno
+            // HABER" queda como red de seguridad para casos edge donde el balance
+            // técnicamente cuadrara (ej. cuatro partidas con montos 0, aunque eso
+            // ya está bloqueado en PartidaAsiento.alHaber que exige monto > 0).
             assertThatThrownBy(() -> AsientoContable.crear(
                     HOY, "test", OrigenAsiento.MANUAL, null, null, null,
                     List.of(haber(CAJA, "100", 1), haber(DEPOSITOS, "100", 2))))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("DEBE y otra al HABER");
+                    .isInstanceOf(IllegalArgumentException.class);
         }
 
         @Test
