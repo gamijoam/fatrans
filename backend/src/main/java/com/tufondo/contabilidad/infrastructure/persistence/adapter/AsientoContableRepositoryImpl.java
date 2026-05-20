@@ -1,6 +1,7 @@
 package com.tufondo.contabilidad.infrastructure.persistence.adapter;
 
 import com.tufondo.contabilidad.domain.model.AsientoContable;
+import com.tufondo.contabilidad.domain.model.SaldoCuenta;
 import com.tufondo.contabilidad.domain.model.enums.EstadoAsiento;
 import com.tufondo.contabilidad.domain.model.enums.OrigenAsiento;
 import com.tufondo.contabilidad.domain.repository.AsientoContableRepository;
@@ -8,10 +9,13 @@ import com.tufondo.contabilidad.infrastructure.persistence.entity.AsientoContabl
 import com.tufondo.contabilidad.infrastructure.persistence.entity.PartidaAsientoEntity;
 import com.tufondo.contabilidad.infrastructure.persistence.jpa.AsientoContableJpaRepository;
 import com.tufondo.contabilidad.infrastructure.persistence.jpa.PartidaAsientoJpaRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.HashMap;
@@ -35,6 +39,10 @@ public class AsientoContableRepositoryImpl implements AsientoContableRepository 
 
     private final AsientoContableJpaRepository asientoJpa;
     private final PartidaAsientoJpaRepository partidaJpa;
+
+    /** EntityManager para las queries nativas del Libro Mayor (#270). */
+    @PersistenceContext
+    private EntityManager em;
 
     @Override
     @Transactional
@@ -116,6 +124,77 @@ public class AsientoContableRepositoryImpl implements AsientoContableRepository 
     @Transactional(readOnly = true)
     public long contar() {
         return asientoJpa.count();
+    }
+
+    // ─── Queries para el Libro Mayor (#270) ────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public SaldoCuenta calcularSaldoCuentaHasta(UUID cuentaId, LocalDate fechaCorte) {
+        // Native SQL: SUM agregado en una sola query. Excluye ANULADOS.
+        // COALESCE para devolver 0 si no hay filas (cuenta sin movimientos).
+        Object[] row = (Object[]) em.createNativeQuery(
+                "SELECT COALESCE(SUM(p.debe), 0) AS total_debe, " +
+                "       COALESCE(SUM(p.haber), 0) AS total_haber " +
+                "FROM partidas_asientos p " +
+                "JOIN asientos_contables a ON a.id = p.asiento_id " +
+                "WHERE p.cuenta_id = :cuentaId " +
+                "  AND a.fecha_contable <= :fechaCorte " +
+                "  AND a.estado = 'REGISTRADO'")
+                .setParameter("cuentaId", cuentaId)
+                .setParameter("fechaCorte", fechaCorte)
+                .getSingleResult();
+
+        BigDecimal totalDebe  = toBigDecimal(row[0]);
+        BigDecimal totalHaber = toBigDecimal(row[1]);
+        return new SaldoCuenta(totalDebe, totalHaber);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AsientoContable> listarAsientosDeCuentaEnRango(
+            UUID cuentaId, LocalDate desde, LocalDate hasta) {
+
+        // 1. Identificar IDs de los asientos REGISTRADOS que tocaron esa cuenta.
+        //    Native SQL con DISTINCT para evitar duplicados si la cuenta aparece
+        //    más de una vez en el asiento (cosa rara pero posible si está en
+        //    ambos lados — lo que el dominio permite).
+        @SuppressWarnings("unchecked")
+        List<UUID> asientoIds = em.createNativeQuery(
+                "SELECT DISTINCT a.id " +
+                "FROM asientos_contables a " +
+                "JOIN partidas_asientos p ON p.asiento_id = a.id " +
+                "WHERE p.cuenta_id = :cuentaId " +
+                "  AND a.fecha_contable BETWEEN :desde AND :hasta " +
+                "  AND a.estado = 'REGISTRADO' " +
+                "ORDER BY a.id")
+                .setParameter("cuentaId", cuentaId)
+                .setParameter("desde", desde)
+                .setParameter("hasta", hasta)
+                .getResultList();
+
+        if (asientoIds.isEmpty()) return List.of();
+
+        // 2. Cargar las cabeceras de esos asientos en una sola query JPA
+        //    + hidratar con todas sus partidas (batch).
+        List<AsientoContableEntity> cabeceras = asientoJpa.findAllById(asientoIds);
+        // Ordenar por fechaContable asc, numero asc (no se garantiza por findAllById)
+        cabeceras.sort((a, b) -> {
+            int byFecha = a.getFechaContable().compareTo(b.getFechaContable());
+            if (byFecha != 0) return byFecha;
+            return Long.compare(
+                    a.getNumero() == null ? 0L : a.getNumero(),
+                    b.getNumero() == null ? 0L : b.getNumero());
+        });
+        return hidratarConPartidas(cabeceras);
+    }
+
+    /** Convierte el valor crudo de la BD (puede venir Number o BigDecimal) a BigDecimal. */
+    private static BigDecimal toBigDecimal(Object raw) {
+        if (raw == null) return BigDecimal.ZERO;
+        if (raw instanceof BigDecimal bd) return bd;
+        if (raw instanceof Number n) return new BigDecimal(n.toString());
+        return new BigDecimal(raw.toString());
     }
 
     /**

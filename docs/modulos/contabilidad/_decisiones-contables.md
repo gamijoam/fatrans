@@ -281,6 +281,72 @@ quick win. Bloqueante real: antes del primer cierre fiscal serio.
 
 ---
 
+## D-007 — Libro Mayor: saldo inicial real, solo hojas, ANULADOS excluidos
+
+**Fecha:** 2026-05-20
+**Sub-issue:** [[06-libro-mayor|#270]]
+**Estado:** ✅ Aprobada e implementada
+**Revisor:** [[_contador-fatrans|contador-fatrans]] (rol asumido en sesión)
+
+### Contexto
+Al diseñar el Libro Mayor (siguiente reporte después del Diario), surgieron
+varias decisiones clave que cambian el comportamiento respecto al Diario.
+
+### Decisiones
+
+**1. Saldo inicial REAL (no asumir cero).**
+
+Se calcula con `SUM` agregado de todas las partidas previas a `desde-1`,
+una sola query nativa SQL por cuenta. Excluye ANULADOS.
+
+*Razón*: el Libro Mayor sin saldo inicial real es un dato falso. Si pides
+el Mayor de Mayo, necesitas ver el saldo arrastrado desde antes. Exigencia
+VEN-NIF.
+
+**2. Solo cuentas HOJA (operativas) por default.**
+
+Las totalizadoras (nivel 1-2) se calculan sumando hijas — eso pertenece al
+Balance General (#271), no al Mayor. Parámetro `incluirTotalizadoras=true`
+opcional.
+
+**3. Cuentas SIN movimientos excluidas por default.**
+
+Reporte limpio. Parámetro `incluirSinMovimientos=true` para vista completa.
+
+**4. Asientos ANULADOS EXCLUIDOS del Mayor.**
+
+A diferencia del Diario (que los incluye con marca para auditoría completa),
+el Mayor refleja saldos vigentes — un asiento anulado NO afecta saldos.
+Esto se enforza a nivel query: el repo solo cuenta los `REGISTRADO`.
+
+*Razón*: separación clara Diario (historial) vs Mayor (saldo). El contador
+que quiere ver el historial completo va al Diario.
+
+**5. Saldos en formato absoluto + tag (D/A/—).**
+
+Convención SUDECA: `3,800.00 (D)` en lugar de signos. La cuenta sabe por su
+naturaleza si el saldo es "esperado" (D para deudoras, A para acreedoras).
+Si el saldo queda del lado opuesto (caso atípico pero válido), el tag se
+invierte.
+
+**6. Contracuenta resuelta y visible por movimiento.**
+
+Para cada partida de la cuenta del mayor, se busca la cuenta del lado
+opuesto en el mismo asiento. Si hay > 1 (ej. desembolso con comisión),
+se toma la de mayor monto + tag `(múltiple)`. Mejora UX masivamente.
+
+### Consecuencias
+
+- 2 queries nuevas en `AsientoContableRepository` port:
+  `calcularSaldoCuentaHasta()` y `listarAsientosDeCuentaEnRango()`.
+- Record nuevo `SaldoCuenta` en `domain.model`.
+- DTOs nuevos `LibroMayorFilter` y `LibroMayorResponse`.
+- Performance: `2N+1` queries para N cuentas. Aceptable para ~50 cuentas
+  hoja típicas. Optimización futura: cachear saldos cerrados (parte de #272).
+- Adapter PDF unificado en `LibroDiarioPdfAdapter` (renombre a futuro).
+
+---
+
 ## D-005 — (PENDIENTE) Criterio de caja vs devengo para intereses de cartera
 
 **Fecha:** 2026-05-20

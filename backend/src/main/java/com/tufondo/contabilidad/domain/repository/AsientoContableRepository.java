@@ -1,6 +1,7 @@
 package com.tufondo.contabilidad.domain.repository;
 
 import com.tufondo.contabilidad.domain.model.AsientoContable;
+import com.tufondo.contabilidad.domain.model.SaldoCuenta;
 import com.tufondo.contabilidad.domain.model.enums.EstadoAsiento;
 import com.tufondo.contabilidad.domain.model.enums.OrigenAsiento;
 
@@ -65,4 +66,35 @@ public interface AsientoContableRepository {
     List<AsientoContable> buscarReversionesDe(UUID asientoOriginalId);
 
     long contar();
+
+    // ─── Queries para el Libro Mayor (#270) ────────────────────────────────
+
+    /**
+     * Calcula el saldo acumulado de una cuenta a una fecha de corte (inclusive).
+     *
+     * <p>Suma TODAS las partidas DEBE/HABER que tocaron la cuenta hasta la
+     * {@code fechaCorte}, excluyendo asientos {@link EstadoAsiento#ANULADO}.
+     * Una sola query SQL agregada — eficiente incluso con miles de partidas.</p>
+     *
+     * <p>Si la cuenta no tiene movimientos hasta esa fecha, devuelve
+     * {@link SaldoCuenta#cero()}.</p>
+     */
+    SaldoCuenta calcularSaldoCuentaHasta(UUID cuentaId, LocalDate fechaCorte);
+
+    /**
+     * Lista los asientos COMPLETOS (con todas sus partidas) que tocaron una
+     * cuenta específica en un rango de fechas.
+     *
+     * <p>Excluye asientos {@link EstadoAsiento#ANULADO} — el Libro Mayor
+     * muestra saldos vigentes, no historial. Para historial de anulados ver
+     * Libro Diario (#269).</p>
+     *
+     * <p>El use case del Libro Mayor extrae las partidas de la cuenta y
+     * resuelve la contracuenta mirando las otras partidas del mismo asiento
+     * (ya cargadas batch — sin N+1).</p>
+     *
+     * <p>Orden: por fecha contable ascendente, luego por número correlativo.</p>
+     */
+    List<AsientoContable> listarAsientosDeCuentaEnRango(
+            UUID cuentaId, LocalDate desde, LocalDate hasta);
 }
