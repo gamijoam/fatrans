@@ -123,16 +123,23 @@ class AsientoContableRepositoryImplTest {
     @DisplayName("guardar + buscarPorId — preserva cabecera y partidas completas")
     void round_trip() {
         AsientoContable original = nuevoAsientoDeposito(new BigDecimal("500.00"));
-        AsientoContable saved = asientoJpa.save(
-                com.tufondo.contabilidad.infrastructure.persistence.entity
-                        .AsientoContableEntity.fromDomain(original)).toDomain(List.of());
-        // Partidas a mano (saltea el siguienteNumeroAsiento que H2 no tiene aún)
+        // Persistir cabecera y partidas por separado (saltea siguienteNumeroAsiento()
+        // que requiere la secuencia BD que H2 no crea automáticamente desde la
+        // migration en el perfil 'test' con ddl-auto=create-drop).
+        // NO llamamos a entity.toDomain() acá porque el dominio rechaza listas
+        // vacías de partidas (invariante "≥ 2 partidas") y queremos persistir
+        // la cabecera ANTES de las partidas para respetar la FK.
+        var entityCabecera = com.tufondo.contabilidad.infrastructure.persistence.entity
+                .AsientoContableEntity.fromDomain(original);
+        asientoJpa.save(entityCabecera);
         for (PartidaAsiento p : original.getPartidas()) {
             partidaJpa.save(com.tufondo.contabilidad.infrastructure.persistence.entity
-                    .PartidaAsientoEntity.fromDomain(p, saved.getId()));
+                    .PartidaAsientoEntity.fromDomain(p, entityCabecera.getId()));
         }
+        em.flush();
+        em.clear();
 
-        AsientoContable leido = repository.buscarPorId(saved.getId()).orElseThrow();
+        AsientoContable leido = repository.buscarPorId(entityCabecera.getId()).orElseThrow();
 
         assertThat(leido.getNumero()).isEqualTo(original.getNumero());
         assertThat(leido.getFechaContable()).isEqualTo(original.getFechaContable());
