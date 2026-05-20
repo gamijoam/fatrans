@@ -4,6 +4,7 @@ package com.tufondo.creditos.application.usecase;
 import com.tufondo.creditos.application.dto.PagoCuotaRequest;
 import com.tufondo.creditos.application.dto.PagoCuotaResponse;
 import com.tufondo.creditos.application.mapper.CreditosDTOMapper;
+import com.tufondo.creditos.application.port.output.CreditosContabilidadPort;
 import com.tufondo.creditos.domain.exception.*;
 import com.tufondo.creditos.domain.model.Amortizacion;
 import com.tufondo.creditos.domain.model.PlanAmortizacion;
@@ -39,6 +40,8 @@ public class RegistrarPagoCuotaUseCase {
     private final SolicitudCreditoRepository solicitudRepository;
     private final CuentaGarantiaRepository cuentaGarantiaRepository;
     private final CreditosDTOMapper mapper;
+    // Issue #268 — hook contable (mismo @Transactional)
+    private final CreditosContabilidadPort contabilidadPort;
 
     @Transactional
     public PagoCuotaResponse ejecutar(UUID cuotaId, PagoCuotaRequest request,
@@ -102,32 +105,38 @@ public class RegistrarPagoCuotaUseCase {
         plan.registrarPago(monto);
         planRepository.guardar(plan);
 
+        // 6b. Cargar solicitud (usada por el hook contable y, si aplica, por el cierre)
+        SolicitudCredito solicitud = solicitudRepository.buscarPorId(plan.getSolicitudId())
+            .orElseThrow(() -> new CreditoNoEncontradoException(plan.getSolicitudId().toString()));
+
         // 7. Verificar si es última cuota para liberar colateral
         if (plan.estaCompletamentePagado()) {
             plan.marcarFinalizado();
             planRepository.guardar(plan);
-            
-            // Liberar colateral si existe
-            SolicitudCredito solicitud = solicitudRepository.buscarPorId(plan.getSolicitudId())
-                .orElseThrow(() -> new CreditoNoEncontradoException(plan.getSolicitudId().toString()));
-            
+
             if (solicitud.tieneColateral() && solicitud.getColateralCuentaId() != null) {
                 // Liberar el saldo retenido del colateral
                 cuentaGarantiaRepository.liberarSaldo(
-                    solicitud.getColateralCuentaId(), 
+                    solicitud.getColateralCuentaId(),
                     solicitud.getColateralMontoRetenido()
                 );
-                log.info("Colateral liberado: {} para solicitud {}", 
+                log.info("Colateral liberado: {} para solicitud {}",
                     solicitud.getColateralMontoRetenido(), solicitud.getNumeroSolicitud());
             }
-            
+
             // Transicionar solicitud a DESEMBOLSADO (crédito completado)
             solicitud.transicionarA(EstadoSolicitud.DESEMBOLSADO);
             solicitud.setUpdatedAt(LocalDateTime.now());
             solicitudRepository.guardar(solicitud);
         }
 
-        log.info("Pago registrado: cuota {} por monto {} - Ref: {} - Canal: {}", 
+        // 8. Hook contable (#268): asiento de partida doble del cobro.
+        // Mismo @Transactional → si falla, rollback completo del pago (amortización
+        // + plan + solicitud + asiento parcial). La contabilidad debe estar
+        // sincronizada con la cartera por exigencia SUDECA.
+        contabilidadPort.registrarPagoCuota(solicitud, amortizacion, monto, referenciaPago);
+
+        log.info("Pago registrado: cuota {} por monto {} - Ref: {} - Canal: {}",
             amortizacion.getNumeroCuota(), monto, referenciaPago, canalOrigen);
 
         return PagoCuotaResponse.builder()

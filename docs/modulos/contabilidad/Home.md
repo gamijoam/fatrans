@@ -66,8 +66,8 @@ backend/src/main/java/com/tufondo/ahorros/
 |---|---|---|---|
 | [[01-plan-cuentas\|#264]] | ✅ Merged (PR #313) | Plan de cuentas VEN-NIF (V21) — ~55 cuentas seed | [[_decisiones-contables#D-001\|D-001]] V21 congelado |
 | [[02-asientos-contables\|#265 + #266]] | ✅ Merged (PR #314) | Tablas + dominio + service + 50+ tests | Asientos inmutables, ON DELETE RESTRICT |
-| [[03-hooks-ahorros\|#267]] | 🚧 PR #315 abierto | Hooks de Ahorros: depósito/retiro → asiento auto | [[_decisiones-contables#D-002\|D-002]] usar `1.1.03` no `1.1.01` |
-| [[04-hooks-creditos\|#268]] | 🚧 En diseño | Hooks de Créditos | [[_decisiones-contables#D-003\|D-003]] [[_decisiones-contables#D-004\|D-004]] |
+| [[03-hooks-ahorros\|#267]] | ✅ Merged (PR #315) | Hooks de Ahorros: depósito/retiro → asiento auto | [[_decisiones-contables#D-002\|D-002]] usar `1.1.03` no `1.1.01` |
+| [[04-hooks-creditos\|#268]] | 🚧 En PR | Hooks de Créditos: desembolso + pago cuota → asiento auto | [[_decisiones-contables#D-003\|D-003]] [[_decisiones-contables#D-004\|D-004]] |
 | #269 | ⏳ Pending | Libro Diario + export PDF SUDECA | |
 | #270 | ⏳ Pending | Libro Mayor (saldos por cuenta) | |
 | #271 | ⏳ Pending | Balance General + Estado de Resultados | |
@@ -122,7 +122,9 @@ docker run --rm `
 
 Última corrida verde:
 - **Módulo contabilidad solo**: 120 tests, 0 failures (2026-05-20)
-- **Suite completa backend**: 555 tests, 0 failures (2026-05-20, post #267)
+- **#267 (Ahorros)**: 28 tests nuevos, todos verde
+- **#268 (Créditos)**: 32 tests nuevos, todos verde — 13 adapter unit + 6 E2E + 7 desembolso hook + 6 pago hook
+- **Suite completa backend**: 555+ tests, 0 failures (2026-05-20)
 
 ## Cómo trabajar el módulo
 

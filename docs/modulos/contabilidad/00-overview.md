@@ -28,11 +28,11 @@ contable de partida doble. Eso significa:
 El EPIC #263 cierra esa brecha desde la base (plan de cuentas) hasta los
 reportes finales.
 
-## Estado actual (2026-05-20)
+## Estado actual (2026-05-20, post #268)
 
 ```
 Plan de cuentas (#264) ──► Asientos (#265+#266) ──► Hooks Ahorros (#267) ──► Hooks Créditos (#268) ──► Reportes (#269-#271) ──► Cierre (#272+#273)
-       ✅                       ✅                        🚧 (PR #315)              ⏳                       ⏳                        ⏳
+       ✅                       ✅                        ✅                        🚧 (PR)                  ⏳                        ⏳
 ```
 
 ## Timeline cronológico de decisiones y entregas
@@ -107,16 +107,27 @@ Este hallazgo desencadenó:
 3. La identificación de varios pendientes regulatorios que documenté en
    [[_pendientes-criticos]].
 
-### 2026-05-20 — Próximo: #268 Hooks de Créditos
+### 2026-05-20 — #268 Hooks de Créditos (IMPLEMENTADO)
 
-**[[04-hooks-creditos|#268 — Hooks Créditos]]** (en diseño)
+**[[04-hooks-creditos|#268 — Hooks Créditos]]** (PR en revisión)
 
-Mismo patrón que #267 pero con operaciones del módulo Créditos:
-- **Desembolso**: DEBE `1.3.01` Cartera / HABER `1.1.03` Bancos / HABER `4.1.02` Comisión
-- **Pago cuota**: DEBE `1.1.03` Bancos / HABER `1.3.01` (capital) / HABER `4.1.01` (intereses) / HABER `4.1.03` (mora si aplica)
+Mismo patrón que #267 aplicado al módulo Créditos, con mapping previamente
+aprobado por [[_contador-fatrans]] ([[_decisiones-contables#D-003|D-003]] y
+[[_decisiones-contables#D-004|D-004]]):
+- **Desembolso**: DEBE `1.3.01` Cartera / HABER `1.1.03` Bancos / HABER `4.1.02` Comisión (si > 0)
+- **Pago cuota**: DEBE `1.1.03` Bancos / HABER `1.3.01` capital / HABER `4.1.01` intereses / HABER `4.1.03` mora (si > 0)
 
-Mapping **aprobado** por contador-fatrans con observaciones documentadas en
-[[_decisiones-contables#D-003|D-003]] y [[_decisiones-contables#D-004|D-004]].
+**Decisiones de implementación adicionales**:
+- Adapter valida localmente el cuadre antes de invocar contabilidad → mensajes de error claros indicando si es problema de cálculo del use case vs. plan de cuentas.
+- En `RegistrarPagoCuotaUseCase`: refactor mínimo para cargar `SolicitudCredito` siempre (antes solo se cargaba si era el último pago).
+- Hook contable se invoca **antes** de la notificación al socio (verificado con `InOrder`), para que un rollback contable evite notificar un desembolso que no ocurrió.
+
+**Tests**: 32 nuevos, todos verde.
+
+**Pendientes deliberadamente fuera de scope** (documentados en `04-hooks-creditos.md`):
+- Crédito en USD (modelo no tiene campo `moneda`)
+- Ejecución de colateral (use case existe pero sin hook)
+- Pago parcial (flujo actual exige completo)
 
 ## Lo que viene después de #268
 
