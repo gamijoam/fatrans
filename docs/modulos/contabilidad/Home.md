@@ -28,7 +28,8 @@ estado: en-construccion
 - 📋 [[01-plan-cuentas]] — #264 — Plan de cuentas VEN-NIF (V21, ~55 cuentas)
 - 🧾 [[02-asientos-contables]] — #265 + #266 — Tablas + dominio + service partida doble
 - 🔌 [[03-hooks-ahorros]] — #267 — Hooks Ahorros: depósito/retiro → asiento auto
-- 🔌 [[04-hooks-creditos]] — #268 — Hooks Créditos: desembolso/cobro → asiento auto (en diseño)
+- 🔌 [[04-hooks-creditos]] — #268 — Hooks Créditos: desembolso/cobro → asiento auto
+- 📖 [[05-libro-diario]] — #269 — Reporte Libro Diario JSON + PDF SUDECA
 
 ## Mapa del módulo (código)
 
@@ -67,8 +68,8 @@ backend/src/main/java/com/tufondo/ahorros/
 | [[01-plan-cuentas\|#264]] | ✅ Merged (PR #313) | Plan de cuentas VEN-NIF (V21) — ~55 cuentas seed | [[_decisiones-contables#D-001\|D-001]] V21 congelado |
 | [[02-asientos-contables\|#265 + #266]] | ✅ Merged (PR #314) | Tablas + dominio + service + 50+ tests | Asientos inmutables, ON DELETE RESTRICT |
 | [[03-hooks-ahorros\|#267]] | ✅ Merged (PR #315) | Hooks de Ahorros: depósito/retiro → asiento auto | [[_decisiones-contables#D-002\|D-002]] usar `1.1.03` no `1.1.01` |
-| [[04-hooks-creditos\|#268]] | 🚧 En PR | Hooks de Créditos: desembolso + pago cuota → asiento auto | [[_decisiones-contables#D-003\|D-003]] [[_decisiones-contables#D-004\|D-004]] |
-| #269 | ⏳ Pending | Libro Diario + export PDF SUDECA | |
+| [[04-hooks-creditos\|#268]] | ✅ Merged (PR #316) | Hooks de Créditos: desembolso/cobro → asiento auto | [[_decisiones-contables#D-003\|D-003]] [[_decisiones-contables#D-004\|D-004]] |
+| [[05-libro-diario\|#269]] | 🚧 PR #317 abierto | Libro Diario JSON + PDF SUDECA | [[_decisiones-contables#D-006\|D-006]] incluir anulados |
 | #270 | ⏳ Pending | Libro Mayor (saldos por cuenta) | |
 | #271 | ⏳ Pending | Balance General + Estado de Resultados | |
 | #272 | ⏳ Pending | Cierre mensual / anual con bloqueo de período | |

@@ -28,11 +28,11 @@ contable de partida doble. Eso significa:
 El EPIC #263 cierra esa brecha desde la base (plan de cuentas) hasta los
 reportes finales.
 
-## Estado actual (2026-05-20, post #268)
+## Estado actual (2026-05-20, post #269)
 
 ```
-Plan de cuentas (#264) ──► Asientos (#265+#266) ──► Hooks Ahorros (#267) ──► Hooks Créditos (#268) ──► Reportes (#269-#271) ──► Cierre (#272+#273)
-       ✅                       ✅                        ✅                        🚧 (PR)                  ⏳                        ⏳
+Plan de cuentas (#264) ──► Asientos (#265+#266) ──► Hooks Ahorros (#267) ──► Hooks Créditos (#268) ──► Libro Diario (#269) ──► Resto reportes (#270-#271) ──► Cierre (#272+#273)
+       ✅                       ✅                        ✅                        ✅                     🚧 PR #317              ⏳                           ⏳
 ```
 
 ## Timeline cronológico de decisiones y entregas
@@ -107,9 +107,9 @@ Este hallazgo desencadenó:
 3. La identificación de varios pendientes regulatorios que documenté en
    [[_pendientes-criticos]].
 
-### 2026-05-20 — #268 Hooks de Créditos (IMPLEMENTADO)
+### 2026-05-20 — #268 Hooks de Créditos (PR #316, MERGED)
 
-**[[04-hooks-creditos|#268 — Hooks Créditos]]** (PR en revisión)
+**[[04-hooks-creditos|#268 — Hooks Créditos]]** (merged)
 
 Mismo patrón que #267 aplicado al módulo Créditos, con mapping previamente
 aprobado por [[_contador-fatrans]] ([[_decisiones-contables#D-003|D-003]] y
@@ -129,11 +129,35 @@ aprobado por [[_contador-fatrans]] ([[_decisiones-contables#D-003|D-003]] y
 - Ejecución de colateral (use case existe pero sin hook)
 - Pago parcial (flujo actual exige completo)
 
-## Lo que viene después de #268
+### 2026-05-20 — #269 Libro Diario (PR #317 — primer reporte SUDECA)
+
+**[[05-libro-diario|#269 — Libro Diario]]** (PR en revisión)
+
+Primer reporte contable exigido por SUDECA: listado secuencial de todos los
+asientos del período. Endpoint `GET /api/v1/contabilidad/libro-diario` (JSON)
+y `/pdf` (descarga). Solo ADMIN/SUPER_ADMIN/SISTEMA por ahora.
+
+**Decisiones tomadas** ([[_decisiones-contables#D-006|D-006]]):
+- Incluir asientos ANULADOS por defecto con marca visual (SUDECA exige auditoría completa, no censura).
+- Correlativo formateado como `AÑO-NNNNNN` visualmente. Reset anual real
+  queda como pendiente P1 antes del primer cierre fiscal.
+- Puerto PDF dedicado al módulo contabilidad (no reutilizar `documentospdf`).
+- Razón social y RIF vía properties configurables en `application.yml`.
+
+**21 tests nuevos, todos verde**:
+- `LibroDiarioFilterTest` (7) — validaciones de rango
+- `GenerarLibroDiarioUseCaseTest` (9) — Mockito
+- `LibroDiarioPdfAdapterTest` (5) — verificación de bytes PDF
+
+**Pendientes abiertos**:
+- Reset anual real del correlativo (P1, antes de cierre fiscal)
+- Crear rol `CONTADOR` dedicado (P2)
+- Firma digital del PDF (sub-issue futuro)
+
+## Lo que viene después de #269
 
 | # | Tema | Comentario |
 |---|---|---|
-| #269 | Libro Diario + PDF SUDECA | Reporte por rango de fechas con totales del período |
 | #270 | Libro Mayor | Saldos acumulados por cuenta a una fecha de corte |
 | #271 | Balance General + Estado de Resultados | Reportes finales VEN-NIF |
 | #272 | Cierre mensual/anual | Bloqueo de período + asientos de cierre |
