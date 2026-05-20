@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Plus, Pencil, Trash2, DollarSign, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, DollarSign, TrendingUp, TrendingDown, AlertCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -58,6 +58,7 @@ export default function AdminTiposCambioPage() {
   const [form, setForm] = useState<TipoCambioForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [syncingBcv, setSyncingBcv] = useState(false);
 
   const cargarTiposCambio = useCallback(async () => {
     setLoading(true);
@@ -79,6 +80,47 @@ export default function AdminTiposCambioPage() {
   useEffect(() => {
     cargarTiposCambio();
   }, [cargarTiposCambio]);
+
+  /**
+   * Dispara una sincronización inmediata del scraper BCV. Útil cuando el cron
+   * automático no ha corrido todavía (deploy reciente, error de red previo) y
+   * el admin necesita la tasa actualizada YA. El backend es idempotente: si la
+   * tasa para la fecha valor ya existe, no la duplica.
+   */
+  const handleSyncBcv = async () => {
+    setSyncingBcv(true);
+    try {
+      const res = await fetch('/api/admin/tipos-cambio/sync-bcv', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        toast.error(data.mensaje || data.message || 'No pudimos sincronizar con el BCV', {
+          description: data.error || `HTTP ${res.status}`,
+        });
+        return;
+      }
+
+      if (data.insertada) {
+        toast.success('Tasa BCV actualizada', {
+          description: `Fecha ${data.fecha}: Bs ${data.tasa}`,
+        });
+      } else {
+        toast.info('Sin cambios', {
+          description: `La tasa de ${data.fecha} ya estaba en BD (Bs ${data.tasa}).`,
+        });
+      }
+      await cargarTiposCambio();
+    } catch (err) {
+      console.error('Error syncing BCV:', err);
+      toast.error('Error de red al sincronizar BCV');
+    } finally {
+      setSyncingBcv(false);
+    }
+  };
 
   const handleOpenDialog = (tc?: TipoCambio) => {
     if (tc) {
@@ -210,10 +252,25 @@ export default function AdminTiposCambioPage() {
               <DollarSign className="h-5 w-5" />
               Tasas VES/USD
             </CardTitle>
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Tasa
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleSyncBcv}
+                disabled={syncingBcv}
+                variant="outline"
+                title="Forzar consulta inmediata al BCV (sin esperar al cron)"
+              >
+                {syncingBcv ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Sincronizar BCV ahora
+              </Button>
+              <Button onClick={() => handleOpenDialog()}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Tasa
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
