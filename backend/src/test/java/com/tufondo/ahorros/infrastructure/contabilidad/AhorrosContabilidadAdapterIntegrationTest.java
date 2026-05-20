@@ -45,8 +45,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * <p><strong>Lo que cubre:</strong></p>
  * <ul>
- *   <li>Depósito Bs end-to-end → asiento persistido con DEBE 1.1.01 / HABER 2.1.01</li>
- *   <li>Retiro Bs end-to-end → asiento persistido con DEBE 2.1.01 / HABER 1.1.01</li>
+ *   <li>Depósito Bs end-to-end → asiento persistido con DEBE 1.1.03 / HABER 2.1.01</li>
+ *   <li>Retiro Bs end-to-end → asiento persistido con DEBE 2.1.01 / HABER 1.1.03</li>
  *   <li>Depósito USD usa cuentas 1.1.05 / 2.1.02</li>
  *   <li>Cuenta contable inexistente → AsientoContableException (defensa contra
  *       desincronización entre plan y código del adapter)</li>
@@ -75,7 +75,8 @@ class AhorrosContabilidadAdapterIntegrationTest {
     @Autowired private CuentaContableRepositoryImpl cuentaRepoAdapter;
     @Autowired private EntityManager em;
 
-    private UUID cajaId, bancoUsdId, depositosBsId, depositosUsdId;
+    private UUID bancoBsId, bancoUsdId, depositosBsId, depositosUsdId;
+    // (bancoBsId apunta a "1.1.03 Bancos Cta Corriente Bs" — antes era cajaId 1.1.01 pre D-002)
 
     @BeforeEach
     void setUp() {
@@ -95,7 +96,8 @@ class AhorrosContabilidadAdapterIntegrationTest {
                 TipoCuentaContable.ACTIVO, NaturalezaSaldo.DEUDORA, null, false);
         UUID grupoDisponible = persistirCuenta("1.1", "DISPONIBLE",
                 TipoCuentaContable.ACTIVO, NaturalezaSaldo.DEUDORA, rubroActivo, false);
-        cajaId = persistirCuenta("1.1.01", "Caja Principal",
+        // Post D-002: usar 1.1.03 Bancos Cta Corriente Bs (NO 1.1.01 Caja).
+        bancoBsId = persistirCuenta("1.1.03", "Bancos Cuenta Corriente Bs",
                 TipoCuentaContable.ACTIVO, NaturalezaSaldo.DEUDORA, grupoDisponible, true);
         bancoUsdId = persistirCuenta("1.1.05", "Bancos USD",
                 TipoCuentaContable.ACTIVO, NaturalezaSaldo.DEUDORA, grupoDisponible, true);
@@ -113,7 +115,7 @@ class AhorrosContabilidadAdapterIntegrationTest {
     // ─── Depósito ──────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("E2E depósito Bs: asiento persistido con DEBE 1.1.01 / HABER 2.1.01")
+    @DisplayName("E2E depósito Bs: asiento persistido con DEBE 1.1.03 / HABER 2.1.01")
     void e2e_deposito_bs() {
         CuentaAhorro cuenta = cuentaBs("AHO-2026-000001");
         Movimiento mov = movimientoConMonto("MOV-2026-000001", "1500.00");
@@ -136,7 +138,7 @@ class AhorrosContabilidadAdapterIntegrationTest {
         PartidaAsiento haber = asiento.getPartidas().stream()
                 .filter(PartidaAsiento::esDeHaber).findFirst().orElseThrow();
 
-        assertThat(debe.getCuentaId()).isEqualTo(cajaId);
+        assertThat(debe.getCuentaId()).isEqualTo(bancoBsId);
         assertThat(debe.getDebe()).isEqualByComparingTo("1500.00");
         assertThat(haber.getCuentaId()).isEqualTo(depositosBsId);
         assertThat(haber.getHaber()).isEqualByComparingTo("1500.00");
@@ -163,7 +165,7 @@ class AhorrosContabilidadAdapterIntegrationTest {
     // ─── Retiro ────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("E2E retiro Bs: asiento con DEBE 2.1.01 / HABER 1.1.01 (espejo del depósito)")
+    @DisplayName("E2E retiro Bs: asiento con DEBE 2.1.01 / HABER 1.1.03 (espejo del depósito)")
     void e2e_retiro_bs() {
         CuentaAhorro cuenta = cuentaBs("AHO-2026-000010");
         Movimiento mov = movimientoConMonto("MOV-2026-000200", "300.00");
@@ -179,7 +181,7 @@ class AhorrosContabilidadAdapterIntegrationTest {
         PartidaAsiento haber = asiento.getPartidas().stream()
                 .filter(PartidaAsiento::esDeHaber).findFirst().orElseThrow();
         assertThat(debe.getCuentaId()).isEqualTo(depositosBsId);
-        assertThat(haber.getCuentaId()).isEqualTo(cajaId);
+        assertThat(haber.getCuentaId()).isEqualTo(bancoBsId);
     }
 
     // ─── Casos negativos ────────────────────────────────────────────────────
@@ -187,8 +189,8 @@ class AhorrosContabilidadAdapterIntegrationTest {
     @Test
     @DisplayName("E2E error: cuenta contable inexistente → AsientoContableException")
     void e2e_error_cuenta_inexistente() {
-        // Borramos 1.1.01 para forzar el error
-        cuentaJpa.deleteById(cajaId);
+        // Borramos 1.1.03 para forzar el error (post D-002: el adapter usa Bancos Bs).
+        cuentaJpa.deleteById(bancoBsId);
         em.flush();
 
         CuentaAhorro cuenta = cuentaBs("AHO-2026-X");
@@ -196,7 +198,7 @@ class AhorrosContabilidadAdapterIntegrationTest {
 
         assertThatThrownBy(() -> adapter.registrarDeposito(cuenta, mov))
                 .isInstanceOf(AsientoContableException.class)
-                .hasMessageContaining("1.1.01");
+                .hasMessageContaining("1.1.03");
     }
 
     @Test

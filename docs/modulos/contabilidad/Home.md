@@ -14,10 +14,26 @@ estado: en-construccion
 > alineada al estándar, Fatrans no puede operar como caja de ahorro
 > habilitada por SUDECA.
 
-## Mapa del módulo
+## 📚 Documentación del módulo
+
+### Trazabilidad transversal (leer primero)
+
+- 🗺️ [[00-overview]] — **Historia y timeline** del EPIC, decisiones cronológicas, estado actual
+- 📚 [[_decisiones-contables]] — **Log de decisiones** D-001, D-002... con razones y revisiones
+- 🚨 [[_pendientes-criticos]] — **Red flags regulatorios** identificados (devengo, provisión, USD, etc)
+- 🧮 [[_contador-fatrans]] — Sub-agente especializado en contaduría — **invocar antes de cada decisión contable**
+
+### Sub-issues del EPIC
+
+- 📋 [[01-plan-cuentas]] — #264 — Plan de cuentas VEN-NIF (V21, ~55 cuentas)
+- 🧾 [[02-asientos-contables]] — #265 + #266 — Tablas + dominio + service partida doble
+- 🔌 [[03-hooks-ahorros]] — #267 — Hooks Ahorros: depósito/retiro → asiento auto
+- 🔌 [[04-hooks-creditos]] — #268 — Hooks Créditos: desembolso/cobro → asiento auto (en diseño)
+
+## Mapa del módulo (código)
 
 ```
-contabilidad/
+backend/src/main/java/com/tufondo/contabilidad/
 ├── domain/
 │   ├── model/
 │   │   ├── CuentaContable        ← Aggregate del plan de cuentas
@@ -38,31 +54,46 @@ contabilidad/
         ├── entity/   (JPA)
         ├── jpa/      (Spring Data)
         └── adapter/  (implementación del port)
+
+backend/src/main/java/com/tufondo/ahorros/
+├── application/port/output/AhorrosContabilidadPort.java         ← #267
+└── infrastructure/contabilidad/AhorrosContabilidadAdapter.java   ← #267
 ```
 
-## Sub-issues del EPIC
+## Estado de los sub-issues
 
-| # | Estado | Tema |
-|---|---|---|
-| [[01-plan-cuentas\|#264]] | ✅ Merged | Plan de cuentas VEN-NIF (V21) — ~55 cuentas seed |
-| [[02-asientos-contables\|#265 + #266]] | ✅ Merged | Tablas + dominio + service + 50+ tests |
-| [[03-hooks-ahorros\|#267]] | 🚧 In progress | Hooks de Ahorros: depósito/retiro → asiento auto |
-| #268 | ⏳ Pending | Hooks de Créditos (desembolso/cobro/intereses) |
-| #269 | ⏳ Pending | Libro Diario + export PDF SUDECA |
-| #270 | ⏳ Pending | Libro Mayor (saldos por cuenta) |
-| #271 | ⏳ Pending | Balance General + Estado de Resultados |
-| #272 | ⏳ Pending | Cierre mensual / anual con bloqueo de período |
-| #273 | ⏳ Pending | Reversión de asientos (asiento inverso, sin DELETE) |
-| #274 | ⚠️ **BLOCKER** | Confirmar naturaleza jurídica Fatrans (caja ahorro / cooperativa / fideicomiso) |
+| # | Estado | Tema | Decisiones clave |
+|---|---|---|---|
+| [[01-plan-cuentas\|#264]] | ✅ Merged (PR #313) | Plan de cuentas VEN-NIF (V21) — ~55 cuentas seed | [[_decisiones-contables#D-001\|D-001]] V21 congelado |
+| [[02-asientos-contables\|#265 + #266]] | ✅ Merged (PR #314) | Tablas + dominio + service + 50+ tests | Asientos inmutables, ON DELETE RESTRICT |
+| [[03-hooks-ahorros\|#267]] | 🚧 PR #315 abierto | Hooks de Ahorros: depósito/retiro → asiento auto | [[_decisiones-contables#D-002\|D-002]] usar `1.1.03` no `1.1.01` |
+| [[04-hooks-creditos\|#268]] | 🚧 En diseño | Hooks de Créditos | [[_decisiones-contables#D-003\|D-003]] [[_decisiones-contables#D-004\|D-004]] |
+| #269 | ⏳ Pending | Libro Diario + export PDF SUDECA | |
+| #270 | ⏳ Pending | Libro Mayor (saldos por cuenta) | |
+| #271 | ⏳ Pending | Balance General + Estado de Resultados | |
+| #272 | ⏳ Pending | Cierre mensual / anual con bloqueo de período | |
+| #273 | ⏳ Pending | Reversión de asientos (asiento inverso, sin DELETE) | |
+| #274 | ⚠️ **BLOCKER LEGAL** | Confirmar naturaleza jurídica Fatrans (caja ahorro / cooperativa / fideicomiso) | Ver [[_pendientes-criticos#Confirmar-naturaleza-jurídica-Fatrans\|aquí]] |
 
-## Principios de diseño
+## Principios de diseño (no negociables)
 
-> [!important] Reglas no negociables
+> [!important] Reglas de oro
 > 1. **Partida doble** — `Σdebe = Σhaber` siempre. Validado en dominio + DB CHECK.
 > 2. **Asientos NO se borran** — solo se `ANULAN`. FK `ON DELETE RESTRICT`.
 > 3. **Correlativo continuo** — SEQUENCE `seq_asiento_numero` (sin gaps) por exigencia SUDECA.
 > 4. **Cuentas hoja solo** — solo cuentas con `acepta_movimientos=TRUE` reciben partidas. Las totalizadoras (nivel 1-2) suman.
 > 5. **Atomicidad** — el asiento se persiste en la misma transacción que la operación que lo dispara. Si falla, todo revierte.
+> 6. **Contador-fatrans revisa antes de codear** — cada mapping operación → cuentas pasa por [[_contador-fatrans|el sub-agente]] antes de implementarse.
+
+## Realidad operativa Fatrans (contexto crítico)
+
+> [!warning] Fatrans NO opera con caja física relevante
+> Todo dinero se mueve por **transferencia bancaria interbancaria**. Las cuentas
+> bancarias del fondo (`1.1.03` Bancos Bs, `1.1.05` Bancos USD) son las
+> operativas. La cuenta `1.1.01` Caja Principal queda en cero en la práctica.
+>
+> Esto fue aclarado el 2026-05-20 y motivó la decisión [[_decisiones-contables#D-002|D-002]]
+> (corregir mapping #267 antes de mergear).
 
 ## Referencias normativas
 
@@ -78,7 +109,7 @@ contabilidad/
 
 ## Cómo correr los tests
 
-Backend, vía Docker (no requiere Maven local):
+Backend, vía Docker (no requiere Maven local — el host puede no tener Java instalado):
 
 ```powershell
 docker run --rm `
@@ -89,4 +120,15 @@ docker run --rm `
     mvn -B test "-Dtest=com.tufondo.contabilidad.**.*Test"
 ```
 
-Última corrida verde: **120 tests, 0 failures, 0 errors** (2026-05-20).
+Última corrida verde:
+- **Módulo contabilidad solo**: 120 tests, 0 failures (2026-05-20)
+- **Suite completa backend**: 555 tests, 0 failures (2026-05-20, post #267)
+
+## Cómo trabajar el módulo
+
+1. **Antes de cualquier código contable**: invocar [[_contador-fatrans]] para revisar el mapping.
+2. **Antes de cada PR del EPIC**: actualizar [[00-overview]] con la entrada en el timeline.
+3. **Cada decisión contable**: dejar entrada en [[_decisiones-contables]].
+4. **Cada red flag identificado**: agregar a [[_pendientes-criticos]].
+5. **Si se agregan cuentas al plan**: migration V22+, NUNCA editar V21.
+6. **Si se modifican operaciones existentes**: validar que los asientos siguen cuadrando.

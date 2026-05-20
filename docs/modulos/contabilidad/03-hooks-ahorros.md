@@ -1,9 +1,10 @@
 ---
 tags: [contabilidad, ahorros, hooks, integracion]
 sub-issue: "#267"
-pr: pending
+pr: "#315"
 estado: en-construccion
 created: 2026-05-20
+actualizado: 2026-05-20 (D-002 fix 1.1.01 → 1.1.03)
 ---
 
 # 🔌 Hooks contables — módulo Ahorros
@@ -13,7 +14,14 @@ created: 2026-05-20
 > genera **automáticamente** su [[02-asientos-contables|asiento contable]] de
 > partida doble, dentro de la **misma transacción** que mueve el saldo.
 
-## Mapping operación → asiento
+> [!danger] Decisión correctiva D-002 (2026-05-20)
+> El mapping inicial usaba `1.1.01` Caja Principal para operaciones Bs.
+> **Eso fue corregido** a `1.1.03` Bancos Cta Corriente Bs antes de mergear
+> el PR #315, porque **Fatrans no opera con caja física**. Ver
+> [[_decisiones-contables#D-002|D-002]] para razón completa y análisis del
+> contador-fatrans.
+
+## Mapping operación → asiento (POST-fix D-002)
 
 > [!important] Las 4 variantes
 > El adapter [`AhorrosContabilidadAdapter`](../../../backend/src/main/java/com/tufondo/ahorros/infrastructure/contabilidad/AhorrosContabilidadAdapter.java)
@@ -23,22 +31,48 @@ created: 2026-05-20
 
 | Moneda | DEBE (cuenta) | HABER (cuenta) | Significado |
 |---|---|---|---|
-| **VES** | `1.1.01` Caja Principal | `2.1.01` Cuentas de Ahorro Bs | Entra efectivo, sube obligación con socio |
+| **VES** | `1.1.03` Bancos Cta Corriente Bs | `2.1.01` Cuentas de Ahorro Bs | Entra transferencia, sube obligación con socio |
 | **USD** | `1.1.05` Bancos Cuentas USD | `2.1.02` Cuentas de Ahorro USD | Entra USD, sube obligación con socio |
 
 ### Retiro (origen `AHORRO_RETIRO`)
 
 | Moneda | DEBE (cuenta) | HABER (cuenta) | Significado |
 |---|---|---|---|
-| **VES** | `2.1.01` Cuentas de Ahorro Bs | `1.1.01` Caja Principal | Baja obligación con socio, sale efectivo |
+| **VES** | `2.1.01` Cuentas de Ahorro Bs | `1.1.03` Bancos Cta Corriente Bs | Baja obligación con socio, sale transferencia |
 | **USD** | `2.1.02` Cuentas de Ahorro USD | `1.1.05` Bancos Cuentas USD | Idem en dólares |
 
 > [!info] ¿Por qué este mapping?
 > Cuando un socio deposita Bs en su cuenta del fondo:
-> - **Activamente** el fondo recibe efectivo → Caja sube (ACTIVO, naturaleza DEUDORA → al **DEBE**)
+> - **Activamente** el fondo recibe una transferencia → Bancos Bs sube (ACTIVO, naturaleza DEUDORA → al **DEBE**)
 > - **Simultáneamente** el fondo le debe ese dinero al socio → Captaciones sube (PASIVO, naturaleza ACREEDORA → al **HABER**)
 >
-> Si el socio retira, es el espejo exacto: la deuda con el socio baja y la caja baja.
+> Si el socio retira, es el espejo exacto: la deuda con el socio baja y los bancos bajan.
+
+### Por qué bancos y no caja
+
+> Cita del [[_contador-fatrans|contador-fatrans]] (revisión 2026-05-20):
+>
+> **VEN-NIF NIC-1 (presentación razonable)** exige que las partidas reflejen
+> la sustancia económica, no la forma. Si la operación es una transferencia
+> interbancaria (que es lo que Fatrans hace), asentarla en Caja distorsiona
+> el rubro **Disponible** y rompe la conciliación bancaria.
+>
+> Consecuencias si se hubiera mergeado con `1.1.01`:
+> 1. La conciliación bancaria del fondo no cuadraría: Banesco mostraría el ingreso, pero el libro mayor lo tendría en Caja → diferencia permanente.
+> 2. Auditoría externa lo observaría en la primera revisión.
+> 3. Reportes a SUDECA (#271) mostrarían Caja inflada artificialmente y Bancos subevaluado.
+>
+> Ver decisión completa en [[_decisiones-contables#D-002|D-002]].
+
+### Caso futuro: si Fatrans abre caja física
+
+Si en el futuro Fatrans abre oficina con caja de cobranza (pagos en billete),
+se necesitaría:
+- Agregar `canalOrigen` distinto en `DepositoRequest` (EFECTIVO vs TRANSFERENCIA).
+- Mapeo condicional en el adapter.
+- Sub-issue dedicado.
+
+**Por ahora, NO anticipamos** — el adapter usa `1.1.03` fijo.
 
 ## Arquitectura
 
@@ -98,8 +132,9 @@ Si el adapter lanza `AsientoContableException`:
 
 > [!note] Moneda null (cuentas legacy)
 > Las cuentas creadas antes del enum `Moneda` no tienen valor. El adapter
-> hace **fallback a Bs** para no romper. Si esto es común en PROD, vale la
-> pena agregar un constraint `NOT NULL` en `cuentas_ahorro.moneda`.
+> hace **fallback a Bs** (usa `1.1.03` / `2.1.01`) para no romper. Si esto
+> es común en PROD, vale la pena agregar un constraint `NOT NULL` en
+> `cuentas_ahorro.moneda` (ver [[_pendientes-criticos#Constraint-NOT-NULL-en-cuentas_ahorromoneda|P4 cosmético]]).
 
 ## Tests
 
@@ -112,8 +147,8 @@ Si el adapter lanza `AsientoContableException`:
 
 ### Verificaciones específicas
 
-> [!check] Garantías que dan los tests
-> - ✅ Depósito Bs usa exactamente `1.1.01` / `2.1.01`
+> [!check] Garantías que dan los tests (post-fix D-002)
+> - ✅ Depósito Bs usa exactamente `1.1.03` / `2.1.01`
 > - ✅ Depósito USD usa exactamente `1.1.05` / `2.1.02`
 > - ✅ Retiro invierte (DEBE el pasivo, HABER el activo)
 > - ✅ Si la cuenta contable referenciada no existe → `AsientoContableException`
@@ -149,17 +184,25 @@ backend/src/test/java/com/tufondo/ahorros/
 > ya estaban listos desde el [[02-asientos-contables|PR #314]]. Solo
 > agregamos un consumidor de su API.
 
-## Sub-issues relacionados
+## Pendiente intencionalmente fuera de scope
 
-- ⏳ **#268** — Hooks de Créditos (desembolso/cobro/intereses). Mismo patrón
-  exactamente, distintos códigos (`1.3.01`, `4.1.01`, etc).
 - ⏳ **Aplicar rendimiento** — actualmente `CalcularRendimientoUseCase` solo
   calcula y persiste con estado `CALCULADO`. NO toca saldo ni genera asiento.
   Cuando se decida cómo "aplicar" (workflow de aprobación, batch nocturno),
   se agregará un hook con `OrigenAsiento.AHORRO_INTERES`.
+- ⏳ **Devengo mensual de intereses pasivos** (a pagar al socio sobre sus ahorros)
+  — ver [[_pendientes-criticos#Devengo-mensual-de-intereses-pasivos-a-pagar-cuentas-de-ahorro|P1]].
+
+## Sub-issues relacionados
+
+- 🚧 [[04-hooks-creditos|#268]] — Hooks de Créditos (desembolso/cobro/intereses).
+  Mismo patrón exactamente, distintos códigos (`1.3.01`, `4.1.01`, etc).
 
 ## Referencias
 
 - Issue: [[Home|#267]]
+- PR: [#315](https://github.com/gamijoam/fatrans/pull/315)
+- Decisión clave: [[_decisiones-contables#D-002|D-002 — usar 1.1.03 no 1.1.01]]
+- Revisión contable: [[_contador-fatrans]]
 - Dependencias: [[01-plan-cuentas|#264]], [[02-asientos-contables|#265 + #266]]
 - Use cases existentes (no creados aquí): `RealizarDepositoUseCase`, `RealizarRetiroUseCase`

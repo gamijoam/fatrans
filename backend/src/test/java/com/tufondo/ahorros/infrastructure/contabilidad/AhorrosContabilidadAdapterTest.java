@@ -95,8 +95,8 @@ class AhorrosContabilidadAdapterTest {
     class Deposito {
 
         @Test
-        @DisplayName("Bs: DEBE 1.1.01 Caja Principal / HABER 2.1.01 Cuentas de Ahorro Bs")
-        void deposito_bs_usa_caja_y_depositos_bs() {
+        @DisplayName("Bs: DEBE 1.1.03 Bancos Cta Corriente Bs / HABER 2.1.01 Cuentas de Ahorro Bs")
+        void deposito_bs_usa_banco_y_depositos_bs() {
             adapter.registrarDeposito(cuentaBs, depositoBs);
 
             RegistrarAsientoCommand cmd = capturarComando();
@@ -104,8 +104,9 @@ class AhorrosContabilidadAdapterTest {
             assertThat(cmd.referenciaExterna()).isEqualTo("MOV-2026-000001");
             assertThat(cmd.partidas()).hasSize(2);
 
+            // Post D-002: usar 1.1.03 Bancos (NO 1.1.01 Caja) — Fatrans opera por transferencia.
             var debe = cmd.partidas().get(0);
-            assertThat(debe.codigoCuenta()).isEqualTo("1.1.01");
+            assertThat(debe.codigoCuenta()).isEqualTo("1.1.03");
             assertThat(debe.debe()).isEqualByComparingTo("1500.50");
             assertThat(debe.haber()).isNull();
 
@@ -133,7 +134,8 @@ class AhorrosContabilidadAdapterTest {
             adapter.registrarDeposito(cuentaSinMoneda, depositoBs);
 
             RegistrarAsientoCommand cmd = capturarComando();
-            assertThat(cmd.partidas().get(0).codigoCuenta()).isEqualTo("1.1.01");
+            // Fallback Bs usa 1.1.03 Bancos (post D-002).
+            assertThat(cmd.partidas().get(0).codigoCuenta()).isEqualTo("1.1.03");
             assertThat(cmd.partidas().get(1).codigoCuenta()).isEqualTo("2.1.01");
         }
 
@@ -165,7 +167,7 @@ class AhorrosContabilidadAdapterTest {
     class Retiro {
 
         @Test
-        @DisplayName("Bs: DEBE 2.1.01 (baja captación) / HABER 1.1.01 (sale efectivo)")
+        @DisplayName("Bs: DEBE 2.1.01 (baja captación) / HABER 1.1.03 (sale transferencia bancaria)")
         void retiro_bs_invierte_cuentas_vs_deposito() {
             adapter.registrarRetiro(cuentaBs, retiroBs);
 
@@ -178,9 +180,9 @@ class AhorrosContabilidadAdapterTest {
             assertThat(debe.codigoCuenta()).isEqualTo("2.1.01");
             assertThat(debe.debe()).isEqualByComparingTo("250.00");
 
-            // HABER el ACTIVO (sale efectivo)
+            // HABER el ACTIVO — post D-002 va a Bancos 1.1.03, NO Caja 1.1.01.
             var haber = cmd.partidas().get(1);
-            assertThat(haber.codigoCuenta()).isEqualTo("1.1.01");
+            assertThat(haber.codigoCuenta()).isEqualTo("1.1.03");
             assertThat(haber.haber()).isEqualByComparingTo("250.00");
         }
 
@@ -200,12 +202,12 @@ class AhorrosContabilidadAdapterTest {
     @Test
     @DisplayName("excepción de AsientoContableService se propaga (NO se traga)")
     void error_contable_se_propaga_para_rollback() {
-        doThrow(new AsientoContableException("cuenta inexistente: 1.1.01"))
+        doThrow(new AsientoContableException("cuenta inexistente: 1.1.03"))
                 .when(asientoContableService).registrar(org.mockito.ArgumentMatchers.any());
 
         assertThatThrownBy(() -> adapter.registrarDeposito(cuentaBs, depositoBs))
                 .isInstanceOf(AsientoContableException.class)
-                .hasMessageContaining("1.1.01");
+                .hasMessageContaining("1.1.03");
     }
 
     @Test
