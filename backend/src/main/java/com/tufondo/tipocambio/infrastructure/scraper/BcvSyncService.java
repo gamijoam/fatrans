@@ -99,6 +99,23 @@ public class BcvSyncService {
     /**
      * Lógica del catch-up. Separado del @PostConstruct para que el thread
      * acceda al método @Transactional vía proxy Spring correctamente.
+     *
+     * <p>Estrategia: <b>scrapear SIEMPRE al arrancar</b>, sin condición de
+     * "fresca". El use case ya es idempotente — si ya existe tasa para la
+     * fecha valor que devuelve el BCV, simplemente loguea "ya existía" y
+     * no inserta duplicado. Esto:</p>
+     *
+     * <ul>
+     *   <li>Evita el bug 20-may-2026: comparaba {@code ultima.getFecha()}
+     *       (fecha valor BCV) contra hoy, y como BCV publica el día anterior
+     *       la tasa del día siguiente, "fecha valor = hoy" no significaba
+     *       "scrapeada hoy". Resultado: catch-up decía "fresca, skip" cuando
+     *       en realidad llevábamos 3 días sin scrapear.</li>
+     *   <li>Garantiza que cada deploy actualiza la tasa, sin importar la
+     *       hora.</li>
+     *   <li>No tiene costo: BCV es HTML público, 1 request extra al arrancar
+     *       es despreciable.</li>
+     * </ul>
      */
     public void ejecutarCatchUpStartup() {
         try {
@@ -106,30 +123,19 @@ public class BcvSyncService {
             // (HikariCP, etc.) — evita race conditions en logs muy tempranos.
             Thread.sleep(5_000);
 
-            LocalDate hoy = LocalDate.now(ZoneId.of("America/Caracas"));
             Optional<TipoCambio> ultima = tipoCambioRepository.buscarTasaActual();
-
-            boolean necesitaCatchUp;
-            if (ultima.isEmpty()) {
-                log.info("Catch-up BCV al arrancar: no hay ninguna tasa en BD, scrapeando…");
-                necesitaCatchUp = true;
+            if (ultima.isPresent()) {
+                LocalDate hoy = LocalDate.now(ZoneId.of("America/Caracas"));
+                long diasFechaValor = ChronoUnit.DAYS.between(ultima.get().getFecha(), hoy);
+                log.info("Catch-up BCV al arrancar: última fecha valor={} (Δ{}d vs hoy Caracas={}), " +
+                                "scrapeando para garantizar tasa fresca…",
+                        ultima.get().getFecha(), diasFechaValor, hoy);
             } else {
-                long diasSinActualizar = ChronoUnit.DAYS.between(ultima.get().getFecha(), hoy);
-                if (diasSinActualizar >= 1) {
-                    log.info("Catch-up BCV al arrancar: última tasa es de {} ({} días), scrapeando…",
-                            ultima.get().getFecha(), diasSinActualizar);
-                    necesitaCatchUp = true;
-                } else {
-                    log.info("Catch-up BCV al arrancar: última tasa es de {} (fresca), skip.",
-                            ultima.get().getFecha());
-                    necesitaCatchUp = false;
-                }
+                log.info("Catch-up BCV al arrancar: no hay ninguna tasa en BD, scrapeando…");
             }
 
-            if (necesitaCatchUp) {
-                SincronizacionResultado r = sincronizarDesdeBcv();
-                log.info("Catch-up BCV al arrancar completado: {}", r);
-            }
+            SincronizacionResultado r = sincronizarDesdeBcv();
+            log.info("Catch-up BCV al arrancar completado: {}", r);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
