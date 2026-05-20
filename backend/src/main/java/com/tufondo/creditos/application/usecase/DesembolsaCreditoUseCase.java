@@ -3,6 +3,7 @@ package com.tufondo.creditos.application.usecase;
 
 import com.tufondo.creditos.application.dto.DesembolsaRequest;
 import com.tufondo.creditos.application.mapper.CreditosDTOMapper;
+import com.tufondo.creditos.application.port.output.CreditosContabilidadPort;
 import com.tufondo.creditos.domain.exception.CreditoNoEncontradoException;
 import com.tufondo.creditos.domain.exception.EstadoCreditoInvalidoException;
 import com.tufondo.creditos.domain.model.PlanAmortizacion;
@@ -39,6 +40,8 @@ public class DesembolsaCreditoUseCase {
     private final CreditosDTOMapper mapper;
     // Issue #214 PR-C
     private final NotificacionPublisher notificacionPublisher;
+    // Issue #268 — hook contable (mismo @Transactional, propagación de errores)
+    private final CreditosContabilidadPort contabilidadPort;
 
     @Transactional
     public Map<String, Object> ejecutar(String numeroSolicitud, DesembolsaRequest request, String ipOrigen) {
@@ -87,6 +90,12 @@ public class DesembolsaCreditoUseCase {
 
         log.info("Crédito desembolsado: {} - Monto: {} - Comision: {} - IP: {}",
             numeroSolicitud, montoNeto, comisionApertura, ipOrigen);
+
+        // Issue #268: hook contable — asiento de partida doble del desembolso.
+        // Mismo @Transactional: si falla, rollback completo (plan + solicitud +
+        // asiento parcial). NO best-effort — la contabilidad debe estar
+        // sincronizada con la cartera por exigencia regulatoria SUDECA.
+        contabilidadPort.registrarDesembolso(solicitud, montoNeto, comisionApertura);
 
         // Issue #214 PR-C: notificar al socio del desembolso
         notificacionPublisher.notificarSocioCreditoDesembolsado(

@@ -1,21 +1,22 @@
 ---
-tags: [contabilidad, creditos, hooks, integracion, planificacion]
+tags: [contabilidad, creditos, hooks, integracion]
 sub-issue: "#268"
-pr: pending
-estado: en-diseño
+pr: en-curso
+estado: implementado
 created: 2026-05-20
+actualizado: 2026-05-20 (implementación completa, 32 tests verdes)
 ---
 
-# 🔌 Hooks contables — módulo Créditos (PLAN, no implementado todavía)
+# 🔌 Hooks contables — módulo Créditos
 
-> [!summary] Sub-issue [[Home|#268]] (en diseño)
-> Cada desembolso de crédito y cada pago de cuota debe generar
-> automáticamente su [[02-asientos-contables|asiento contable]] de partida
-> doble, en la misma transacción que mueve los datos operativos.
+> [!summary] Sub-issue [[Home|#268]] — IMPLEMENTADO
+> Cada desembolso de crédito y cada pago de cuota genera **automáticamente**
+> su [[02-asientos-contables|asiento contable]] de partida doble, en la misma
+> transacción que mueve los datos operativos.
 >
-> Mapping **aprobado** por [[_contador-fatrans|contador-fatrans]] con
-> observaciones documentadas en [[_decisiones-contables#D-003|D-003]] y
-> [[_decisiones-contables#D-004|D-004]].
+> Mapping aprobado por [[_contador-fatrans|contador-fatrans]] —
+> [[_decisiones-contables#D-003|D-003]] (desembolso) y
+> [[_decisiones-contables#D-004|D-004]] (pago cuota).
 
 ## Mapping operación → asiento
 
@@ -115,7 +116,7 @@ public interface CreditosContabilidadPort {
 }
 ```
 
-## Cambios al codebase planificados
+## Cambios al codebase (implementado)
 
 ```
 backend/src/main/java/com/tufondo/creditos/
@@ -123,40 +124,51 @@ backend/src/main/java/com/tufondo/creditos/
 │   ├── port/output/
 │   │   └── CreditosContabilidadPort.java            [NUEVO]
 │   └── usecase/
-│       ├── DesembolsaCreditoUseCase.java             [+inject port +call hook]
-│       └── RegistrarPagoCuotaUseCase.java            [+inject port +call hook]
+│       ├── DesembolsaCreditoUseCase.java             [+inject port, +llamada al hook]
+│       └── RegistrarPagoCuotaUseCase.java            [+inject port, +cargar solicitud, +llamada al hook]
 └── infrastructure/contabilidad/
     └── CreditosContabilidadAdapter.java              [NUEVO — mapea códigos]
 
 backend/src/test/java/com/tufondo/creditos/
 ├── application/usecase/
-│   ├── DesembolsaCreditoUseCaseTest.java             [NUEVO]
-│   └── RegistrarPagoCuotaUseCaseTest.java            [NUEVO]
+│   ├── DesembolsaCreditoUseCaseHookTest.java         [NUEVO — 7 tests]
+│   └── RegistrarPagoCuotaUseCaseHookTest.java        [NUEVO — 6 tests]
 └── infrastructure/contabilidad/
-    ├── CreditosContabilidadAdapterTest.java          [NUEVO — Mockito unit]
-    └── CreditosContabilidadAdapterIntegrationTest    [NUEVO — H2 E2E]
+    ├── CreditosContabilidadAdapterTest.java          [NUEVO — 13 Mockito unit]
+    └── CreditosContabilidadAdapterIntegrationTest    [NUEVO — 6 H2 E2E]
 ```
 
-## Tests planificados
+## Tests implementados (32 tests verdes)
 
-| Test class | Casos esperados | Estrategia |
+| Test class | Casos | Estrategia |
 |---|---|---|
-| `CreditosContabilidadAdapterTest` | ~12 unit | Mockito — verifica `RegistrarAsientoCommand` para desembolso con/sin comisión, pago con/sin mora |
-| `CreditosContabilidadAdapterIntegrationTest` | ~6 E2E | `@DataJpaTest` con H2 — asiento real persistido con partidas correctas |
-| `DesembolsaCreditoUseCaseTest` | ~6 unit | Mockito — verifica que el hook se invoque tras estado DESEMBOLSADO, propagación de errores |
-| `RegistrarPagoCuotaUseCaseTest` | ~7 unit | Mockito — verifica hook tras estado PAGADA, idempotencia por `referenciaPago` |
+| `CreditosContabilidadAdapterTest` | **13** (Mockito) | Unit — verifica `RegistrarAsientoCommand` para desembolso con/sin comisión, pago con/sin mora, validaciones locales de cuadre |
+| `CreditosContabilidadAdapterIntegrationTest` | **6** (H2 E2E) | `@DataJpaTest` — asiento real persistido con partidas correctas, decimales NUMERIC(18,4) preservados |
+| `DesembolsaCreditoUseCaseHookTest` | **7** (Mockito) | Hook se invoca con monto neto + comisión correctos, IDOR/estado cortan antes, error contable propaga sin notificar |
+| `RegistrarPagoCuotaUseCaseHookTest` | **6** (Mockito) | Hook recibe (solicitud, cuota, monto, referencia), validaciones tempranas cortan antes, error propaga |
 
-### Casos específicos a cubrir
+### Casos cubiertos
 
-- ✅ Desembolso sin comisión → 2 partidas (DEBE 1.3.01, HABER 1.1.03).
-- ✅ Desembolso con comisión > 0 → 3 partidas (la 3ra HABER 4.1.02).
-- ✅ Pago cuota sin mora → 3 partidas (DEBE 1.1.03, HABER 1.3.01, HABER 4.1.01).
-- ✅ Pago cuota con mora > 0 → 4 partidas (la 4ta HABER 4.1.03).
-- ✅ Cuadre exacto: `Σdebe == Σhaber` con decimales (forzar cuotas decimales raras).
-- ✅ Si AsientoContableService lanza, el use case propaga y hace rollback.
-- ✅ Si el plan de cuentas no tiene `1.3.01` o `1.1.03` → falla clara.
-- ✅ Doble pago de la misma `referenciaPago` se rechaza (idempotencia).
-- ✅ Crédito con moneda USD → excepción clara (no implementado, evitar bug silencioso).
+> [!check] Garantías de los tests
+> - ✅ Desembolso sin comisión → 2 partidas (DEBE 1.3.01, HABER 1.1.03)
+> - ✅ Desembolso con comisión > 0 → 3 partidas (la 3ra HABER 4.1.02)
+> - ✅ Pago cuota sin mora → 3 partidas (DEBE 1.1.03, HABER 1.3.01, HABER 4.1.01)
+> - ✅ Pago cuota con mora > 0 → 4 partidas (la 4ta HABER 4.1.03)
+> - ✅ Cuadre exacto: `Σdebe == Σhaber` (validado por dominio + verificación local del adapter)
+> - ✅ Si `AsientoContableService` lanza, el use case propaga y hace rollback
+> - ✅ Si el plan de cuentas no tiene `1.3.01` o `1.1.03` → `AsientoContableException` clara
+> - ✅ Doble pago de la misma `referenciaPago` se rechaza con `PagoDuplicadoException` antes del hook
+> - ✅ Cuota con seguros/comisiones intra-cuota (campos no usados hoy) → rechazo local con mensaje explicativo
+> - ✅ Decimales NUMERIC(18,4) preservados sin truncado
+> - ✅ Orden: hook contable ANTES de notificación al socio (rollback evita notificar)
+> - ✅ Referencia null/vacía → fallback `CUOTA-{id}` para auditoría
+> - ✅ Comisión apertura override en request tiene precedencia sobre TipoCredito.comisionApertura
+
+### Pendiente (no incluido en #268)
+
+- ⏳ **Crédito con moneda USD**: la validación de moneda no existe en el modelo `SolicitudCredito` actualmente (no hay campo `moneda`). Cuando se agregue, hay que decidir si crear `1.3.04` Créditos USD separados o convertir a Bs. Ver [[_pendientes-criticos#Cartera-y-operaciones-USD-separadas|P2]].
+- ⏳ **Ejecución de colateral**: cuando una cuota se ejecuta sobre garantía, el asiento es distinto (no es cobro normal). El use case `EjecutarColateralUseCase` existe pero NO tiene hook todavía. Sub-issue dedicado futuro.
+- ⏳ **Pago parcial**: el flujo actual exige `monto >= montoRequerido`. Si se permite parcial en el futuro, el asiento de capital + interés debe prorratearse — sub-issue.
 
 ## Dependencias
 
