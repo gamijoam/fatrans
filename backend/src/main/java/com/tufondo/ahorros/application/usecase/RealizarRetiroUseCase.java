@@ -4,6 +4,7 @@ package com.tufondo.ahorros.application.usecase;
 import com.tufondo.ahorros.application.dto.RetiroRequest;
 import com.tufondo.ahorros.application.dto.MovimientoResponse;
 import com.tufondo.ahorros.application.mapper.AhorrosDTOMapper;
+import com.tufondo.ahorros.application.port.output.AhorrosContabilidadPort;
 import com.tufondo.ahorros.domain.exception.*;
 import com.tufondo.ahorros.domain.model.CuentaAhorro;
 import com.tufondo.ahorros.domain.model.Movimiento;
@@ -38,6 +39,7 @@ public class RealizarRetiroUseCase {
     private final MovimientoRepository movimientoRepository;
     private final AhorrosDTOMapper mapper;
     private final LocdoftOperacionService locdoftService;
+    private final AhorrosContabilidadPort contabilidadPort;
 
     @Transactional
     public MovimientoResponse ejecutar(String numeroCuenta, RetiroRequest request,
@@ -119,6 +121,11 @@ public class RealizarRetiroUseCase {
         if (consentimiento != null) {
             locdoftService.asociarConMovimiento(consentimiento.getId(), movimiento.getId());
         }
+
+        // Hook contable (#267): asiento de partida doble del retiro. Mismo
+        // @Transactional → rollback completo si falla. Ver doc en
+        // AhorrosContabilidadPort.
+        contabilidadPort.registrarRetiro(cuenta, movimiento);
 
         log.info("Retiro realizado: {} de cuenta {}", request.getMonto(), numeroCuenta);
         return mapper.toResponse(movimiento);
