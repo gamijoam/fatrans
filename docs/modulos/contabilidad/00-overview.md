@@ -28,11 +28,11 @@ contable de partida doble. Eso significa:
 El EPIC #263 cierra esa brecha desde la base (plan de cuentas) hasta los
 reportes finales.
 
-## Estado actual (2026-05-20, post #269)
+## Estado actual (2026-05-20, post #270)
 
 ```
-Plan de cuentas (#264) ──► Asientos (#265+#266) ──► Hooks Ahorros (#267) ──► Hooks Créditos (#268) ──► Libro Diario (#269) ──► Resto reportes (#270-#271) ──► Cierre (#272+#273)
-       ✅                       ✅                        ✅                        ✅                     🚧 PR #317              ⏳                           ⏳
+Plan de cuentas (#264) ──► Asientos (#265+#266) ──► Hooks Ahorros (#267) ──► Hooks Créditos (#268) ──► Libro Diario (#269) ──► Libro Mayor (#270) ──► Balance General (#271) ──► Cierre (#272+#273)
+       ✅                       ✅                        ✅                        ✅                     🚧 PR #317              🚧 PR #318              ⏳                          ⏳
 ```
 
 ## Timeline cronológico de decisiones y entregas
@@ -154,11 +154,40 @@ y `/pdf` (descarga). Solo ADMIN/SUPER_ADMIN/SISTEMA por ahora.
 - Crear rol `CONTADOR` dedicado (P2)
 - Firma digital del PDF (sub-issue futuro)
 
-## Lo que viene después de #269
+### 2026-05-20 — #270 Libro Mayor (PR — saldos por cuenta)
+
+**[[06-libro-mayor|#270 — Libro Mayor]]** (PR en revisión)
+
+Segundo reporte SUDECA. Agrupa movimientos por cuenta (no por asiento como
+el Diario), con saldo inicial real al comienzo del período, contracuenta
+resuelta por movimiento, saldo acumulado por línea, y saldo final.
+
+**Decisiones tomadas** ([[_decisiones-contables#D-007|D-007]]):
+- Saldo inicial REAL: `SUM` agregado de partidas previas a `desde-1`.
+- Solo cuentas hoja por default (totalizadoras para Balance General).
+- Cuentas sin movimientos excluidas por default (`incluirSinMovimientos=true` opt).
+- Asientos ANULADOS **excluidos** del Mayor (diferencia clave con Diario).
+- Saldos formato absoluto + tag `D/A/—` (convención SUDECA).
+- Contracuenta visible por movimiento (cuenta principal del lado opuesto).
+- Adapter PDF unificado en `LibroDiarioPdfAdapter` (renombre a futuro).
+
+**2 queries nuevas al port**:
+- `calcularSaldoCuentaHasta(cuentaId, fechaCorte)` — native SQL `SUM` agregado.
+- `listarAsientosDeCuentaEnRango(cuentaId, desde, hasta)` — JOIN + hidratación batch.
+
+**31 tests nuevos, todos verde**:
+- `LibroMayorFilterTest` (8) — validaciones rango y flags
+- `GenerarLibroMayorUseCaseTest` (11) — Mockito, saldo inicial, contracuenta, etiquetas
+- `LibroMayorPdfAdapterTest` (5) — verificación bytes PDF, casos borde
+- `AsientoContableRepositoryLibroMayorTest` (7) — `@DataJpaTest` H2: SUM, filtros, exclusión ANULADOS
+
+**Pendientes nuevos**:
+- Cachear saldos cerrados al cierre mensual (parte de #272) para performance.
+
+## Lo que viene después de #270
 
 | # | Tema | Comentario |
 |---|---|---|
-| #270 | Libro Mayor | Saldos acumulados por cuenta a una fecha de corte |
 | #271 | Balance General + Estado de Resultados | Reportes finales VEN-NIF |
 | #272 | Cierre mensual/anual | Bloqueo de período + asientos de cierre |
 | #273 | Reversión de asientos | Generación automática de asiento inverso para anulación |

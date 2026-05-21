@@ -1,12 +1,14 @@
 package com.tufondo.contabilidad.application.port.output;
 
 import com.tufondo.contabilidad.application.dto.LibroDiarioResponse;
+import com.tufondo.contabilidad.application.dto.LibroMayorResponse;
 
 /**
  * Puerto de salida para generación de reportes contables en PDF.
  *
- * <p>Sub-issue #269. Se crea propio del módulo contabilidad en lugar de
- * reutilizar el {@code PdfGeneratorPort} de {@code documentospdf} porque:</p>
+ * <p>Sub-issue #269 (Libro Diario) y #270 (Libro Mayor). Se crea propio del
+ * módulo contabilidad en lugar de reutilizar el {@code PdfGeneratorPort} de
+ * {@code documentospdf} porque:</p>
  * <ul>
  *   <li>Aquel está acoplado a {@code TipoDocumento} enum del otro módulo.</li>
  *   <li>Los reportes contables tienen contrato distinto (DTO tipado vs Map).</li>
@@ -26,4 +28,14 @@ public interface ContabilidadPdfPort {
      * @return bytes del PDF listo para descarga
      */
     byte[] generarLibroDiarioPdf(LibroDiarioResponse libroDiario);
+
+    /**
+     * Genera el PDF del Libro Mayor: una sección por cuenta con saldo
+     * inicial, movimientos del período con contracuenta, saldo acumulado
+     * por línea, y saldo final. Totales generales al pie.
+     *
+     * @param libroMayor datos completos del reporte (sub-issue #270)
+     * @return bytes del PDF listo para descarga
+     */
+    byte[] generarLibroMayorPdf(LibroMayorResponse libroMayor);
 }
