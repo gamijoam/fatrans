@@ -2,6 +2,8 @@ package com.tufondo.contabilidad.infrastructure.pdf;
 
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
+import com.tufondo.contabilidad.application.dto.BalanceGeneralResponse;
+import com.tufondo.contabilidad.application.dto.EstadoResultadosResponse;
 import com.tufondo.contabilidad.application.dto.LibroDiarioResponse;
 import com.tufondo.contabilidad.application.dto.LibroMayorResponse;
 import com.tufondo.contabilidad.application.port.output.ContabilidadPdfPort;
@@ -376,6 +378,323 @@ public class LibroDiarioPdfAdapter implements ContabilidadPdfPort {
                         doc.right(), doc.bottom() - 15, 0);
             } catch (Exception e) {
                 log.warn("Error escribiendo footer del Libro Mayor", e);
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BALANCE GENERAL (sub-issue #271)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    @Override
+    public byte[] generarBalanceGeneralPdf(BalanceGeneralResponse balance) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            Document doc = new Document(PageSize.A4, 30, 30, 40, 40);  // vertical
+            PdfWriter writer = PdfWriter.getInstance(doc, baos);
+            writer.setPageEvent(new FolioFooterBalance());
+            doc.open();
+
+            agregarEncabezadoBalance(doc, balance.encabezado());
+
+            // 2 columnas paralelas: ACTIVO | PASIVO + PATRIMONIO
+            PdfPTable layout = new PdfPTable(new float[]{1f, 1f});
+            layout.setWidthPercentage(100);
+
+            PdfPCell celdaActivo = new PdfPCell(construirColumnaSeccion(balance.activo()));
+            celdaActivo.setBorder(Rectangle.NO_BORDER);
+            celdaActivo.setPadding(4);
+            layout.addCell(celdaActivo);
+
+            PdfPCell celdaPasivoPat = new PdfPCell(construirColumnaPasivoPatrimonio(
+                    balance.pasivo(), balance.patrimonio(),
+                    balance.excedenteEjercicio(), balance.excedenteEtiqueta()));
+            celdaPasivoPat.setBorder(Rectangle.NO_BORDER);
+            celdaPasivoPat.setPadding(4);
+            layout.addCell(celdaPasivoPat);
+
+            doc.add(layout);
+
+            agregarTotalesBalance(doc, balance.totales());
+
+            doc.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            log.error("Error generando PDF Balance General", e);
+            throw new RuntimeException("No se pudo generar el Balance General: " + e.getMessage(), e);
+        }
+    }
+
+    private void agregarEncabezadoBalance(Document doc, BalanceGeneralResponse.Encabezado enc)
+            throws DocumentException {
+        Paragraph razon = new Paragraph(enc.razonSocial(), TITLE_FONT);
+        razon.setAlignment(Element.ALIGN_CENTER);
+        doc.add(razon);
+
+        Paragraph rif = new Paragraph("RIF: " + enc.rif(), SUBTITLE_FONT);
+        rif.setAlignment(Element.ALIGN_CENTER);
+        doc.add(rif);
+
+        Paragraph titulo = new Paragraph("BALANCE GENERAL", TITLE_FONT);
+        titulo.setAlignment(Element.ALIGN_CENTER);
+        titulo.setSpacingBefore(8);
+        doc.add(titulo);
+
+        Paragraph fecha = new Paragraph("Al " + enc.fechaCorte().format(FECHA_FMT), SUBTITLE_FONT);
+        fecha.setAlignment(Element.ALIGN_CENTER);
+        fecha.setSpacingAfter(10);
+        doc.add(fecha);
+    }
+
+    /** Construye un mini-documento con el árbol de una sección (lo embebemos en una celda de layout). */
+    private PdfPTable construirColumnaSeccion(BalanceGeneralResponse.Seccion seccion) {
+        PdfPTable t = new PdfPTable(new float[]{4f, 2f});
+        t.setWidthPercentage(100);
+
+        // Título de la sección
+        PdfPCell titulo = new PdfPCell(new Phrase(seccion.titulo(), TABLE_HEADER));
+        titulo.setColspan(2);
+        titulo.setBackgroundColor(HEADER_BG);
+        titulo.setPadding(4);
+        titulo.setHorizontalAlignment(Element.ALIGN_CENTER);
+        t.addCell(titulo);
+
+        // Renderizar árbol recursivamente
+        for (BalanceGeneralResponse.NodoCuenta rubro : seccion.rubros()) {
+            agregarNodoBalance(t, rubro, 0);
+        }
+
+        // Total de la sección
+        agregarCelda(t, "TOTAL " + seccion.titulo(), ROW_FONT_BOLD,
+                new Color(220, 230, 240), Element.ALIGN_LEFT);
+        agregarCelda(t, formatoMonto(seccion.total()), ROW_FONT_BOLD,
+                new Color(220, 230, 240), Element.ALIGN_RIGHT);
+        return t;
+    }
+
+    /** Columna derecha: Pasivo + Patrimonio + Excedente del Ejercicio. */
+    private PdfPTable construirColumnaPasivoPatrimonio(
+            BalanceGeneralResponse.Seccion pasivo, BalanceGeneralResponse.Seccion patrimonio,
+            BigDecimal excedente, String etiquetaExc) {
+        PdfPTable t = new PdfPTable(new float[]{4f, 2f});
+        t.setWidthPercentage(100);
+
+        // PASIVO
+        PdfPCell tPas = new PdfPCell(new Phrase(pasivo.titulo(), TABLE_HEADER));
+        tPas.setColspan(2);
+        tPas.setBackgroundColor(HEADER_BG);
+        tPas.setPadding(4);
+        tPas.setHorizontalAlignment(Element.ALIGN_CENTER);
+        t.addCell(tPas);
+        for (BalanceGeneralResponse.NodoCuenta rubro : pasivo.rubros()) {
+            agregarNodoBalance(t, rubro, 0);
+        }
+        agregarCelda(t, "Subtotal " + pasivo.titulo(), ROW_FONT_BOLD,
+                new Color(240, 240, 240), Element.ALIGN_LEFT);
+        agregarCelda(t, formatoMonto(pasivo.total()), ROW_FONT_BOLD,
+                new Color(240, 240, 240), Element.ALIGN_RIGHT);
+
+        // PATRIMONIO
+        PdfPCell tPat = new PdfPCell(new Phrase(patrimonio.titulo(), TABLE_HEADER));
+        tPat.setColspan(2);
+        tPat.setBackgroundColor(HEADER_BG);
+        tPat.setPadding(4);
+        tPat.setHorizontalAlignment(Element.ALIGN_CENTER);
+        t.addCell(tPat);
+        for (BalanceGeneralResponse.NodoCuenta rubro : patrimonio.rubros()) {
+            agregarNodoBalance(t, rubro, 0);
+        }
+
+        // Excedente del Ejercicio (línea especial, calculado del ER del año)
+        agregarCelda(t, "  " + etiquetaExc + " del Ejercicio", ROW_FONT,
+                new Color(255, 250, 220), Element.ALIGN_LEFT);
+        agregarCelda(t, formatoMonto(excedente), ROW_FONT,
+                new Color(255, 250, 220), Element.ALIGN_RIGHT);
+
+        BigDecimal totalPasPat = pasivo.total().add(patrimonio.total())
+                .add("DÉFICIT".equals(etiquetaExc) ? excedente.negate() : excedente);
+        agregarCelda(t, "TOTAL PASIVO + PATRIMONIO", ROW_FONT_BOLD,
+                new Color(220, 230, 240), Element.ALIGN_LEFT);
+        agregarCelda(t, formatoMonto(totalPasPat), ROW_FONT_BOLD,
+                new Color(220, 230, 240), Element.ALIGN_RIGHT);
+        return t;
+    }
+
+    /**
+     * Agrega una fila al árbol del balance. Indentación visual según el nivel.
+     * Cuentas correctoras se renderizan con paréntesis negativos.
+     */
+    private void agregarNodoBalance(PdfPTable t, BalanceGeneralResponse.NodoCuenta nodo, int indent) {
+        String prefijo = "  ".repeat(indent);
+        String nombre = prefijo + nodo.codigo() + " " + nodo.nombre();
+        if (nodo.esCorrectora()) nombre = prefijo + "(−) " + nodo.codigo() + " " + nodo.nombre();
+
+        Font font = nodo.nivel() == 1 ? ROW_FONT_BOLD : ROW_FONT;
+        Color bg = nodo.nivel() == 1 ? new Color(245, 248, 252) : Color.WHITE;
+
+        String monto = formatoMonto(nodo.saldoPresentacion());
+        if (nodo.esCorrectora() && nodo.saldoNeto().signum() != 0) monto = "(" + monto + ")";
+
+        agregarCelda(t, nombre, font, bg, Element.ALIGN_LEFT);
+        agregarCelda(t, monto, font, bg, Element.ALIGN_RIGHT);
+
+        for (BalanceGeneralResponse.NodoCuenta hija : nodo.hijos()) {
+            agregarNodoBalance(t, hija, indent + 1);
+        }
+    }
+
+    private void agregarTotalesBalance(Document doc, BalanceGeneralResponse.Totales t)
+            throws DocumentException {
+        Paragraph espacio = new Paragraph(" ");
+        espacio.setSpacingBefore(8);
+        doc.add(espacio);
+
+        String resumen;
+        Font totalFont;
+        if (t.balanceado()) {
+            resumen = "✓ BALANCEADO — Total Activo = Total Pasivo + Patrimonio + Excedente";
+            totalFont = ROW_FONT_BOLD;
+        } else {
+            resumen = String.format("⚠ DESBALANCEADO — diferencia: %s", formatoMonto(t.diferencia()));
+            totalFont = new Font(Font.HELVETICA, 10, Font.BOLD, Color.RED);
+        }
+        Paragraph p = new Paragraph(resumen, totalFont);
+        p.setAlignment(Element.ALIGN_CENTER);
+        doc.add(p);
+    }
+
+    private static class FolioFooterBalance extends PdfPageEventHelper {
+        @Override
+        public void onEndPage(PdfWriter writer, Document doc) {
+            try {
+                PdfContentByte cb = writer.getDirectContent();
+                Phrase pie = new Phrase("Balance General — Fatrans", FOOTER_FONT);
+                ColumnText.showTextAligned(cb, Element.ALIGN_LEFT, pie,
+                        doc.left(), doc.bottom() - 15, 0);
+                Phrase pag = new Phrase("Página " + writer.getPageNumber(), FOOTER_FONT);
+                ColumnText.showTextAligned(cb, Element.ALIGN_RIGHT, pag,
+                        doc.right(), doc.bottom() - 15, 0);
+            } catch (Exception e) {
+                log.warn("Error footer Balance General", e);
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ESTADO DE RESULTADOS (sub-issue #271)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    @Override
+    public byte[] generarEstadoResultadosPdf(EstadoResultadosResponse er) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            Document doc = new Document(PageSize.A4, 30, 30, 40, 40);
+            PdfWriter writer = PdfWriter.getInstance(doc, baos);
+            writer.setPageEvent(new FolioFooterER());
+            doc.open();
+
+            agregarEncabezadoER(doc, er.encabezado());
+
+            // Sección INGRESOS
+            PdfPTable ingresos = construirSeccionER(er.ingresos());
+            doc.add(ingresos);
+
+            // Sección EGRESOS
+            Paragraph esp = new Paragraph(" ");
+            esp.setSpacingBefore(8);
+            doc.add(esp);
+            PdfPTable egresos = construirSeccionER(er.egresos());
+            doc.add(egresos);
+
+            // Excedente / Déficit del período
+            Paragraph esp2 = new Paragraph(" ");
+            esp2.setSpacingBefore(12);
+            doc.add(esp2);
+            PdfPTable resultado = new PdfPTable(new float[]{4f, 2f});
+            resultado.setWidthPercentage(100);
+            Font font = new Font(Font.HELVETICA, 11, Font.BOLD, Color.BLACK);
+            Color bg = "DÉFICIT".equals(er.excedenteEtiqueta())
+                    ? new Color(255, 230, 230)
+                    : new Color(225, 245, 225);
+            agregarCelda(resultado, er.excedenteEtiqueta() + " DEL EJERCICIO", font, bg, Element.ALIGN_LEFT);
+            agregarCelda(resultado, formatoMonto(er.excedente()), font, bg, Element.ALIGN_RIGHT);
+            doc.add(resultado);
+
+            doc.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            log.error("Error generando PDF Estado de Resultados", e);
+            throw new RuntimeException("No se pudo generar el Estado de Resultados: " + e.getMessage(), e);
+        }
+    }
+
+    private void agregarEncabezadoER(Document doc, EstadoResultadosResponse.Encabezado enc)
+            throws DocumentException {
+        Paragraph razon = new Paragraph(enc.razonSocial(), TITLE_FONT);
+        razon.setAlignment(Element.ALIGN_CENTER);
+        doc.add(razon);
+        Paragraph rif = new Paragraph("RIF: " + enc.rif(), SUBTITLE_FONT);
+        rif.setAlignment(Element.ALIGN_CENTER);
+        doc.add(rif);
+        Paragraph titulo = new Paragraph("ESTADO DE RESULTADOS", TITLE_FONT);
+        titulo.setAlignment(Element.ALIGN_CENTER);
+        titulo.setSpacingBefore(8);
+        doc.add(titulo);
+        Paragraph periodo = new Paragraph(
+                "Del " + enc.desde().format(FECHA_FMT) + " al " + enc.hasta().format(FECHA_FMT),
+                SUBTITLE_FONT);
+        periodo.setAlignment(Element.ALIGN_CENTER);
+        periodo.setSpacingAfter(10);
+        doc.add(periodo);
+    }
+
+    private PdfPTable construirSeccionER(EstadoResultadosResponse.Seccion seccion) {
+        PdfPTable t = new PdfPTable(new float[]{4f, 2f});
+        t.setWidthPercentage(100);
+
+        PdfPCell tit = new PdfPCell(new Phrase(seccion.titulo(), TABLE_HEADER));
+        tit.setColspan(2);
+        tit.setBackgroundColor(HEADER_BG);
+        tit.setPadding(4);
+        tit.setHorizontalAlignment(Element.ALIGN_CENTER);
+        t.addCell(tit);
+
+        for (EstadoResultadosResponse.NodoCuenta rubro : seccion.rubros()) {
+            agregarNodoER(t, rubro, 0);
+        }
+
+        agregarCelda(t, "TOTAL " + seccion.titulo(), ROW_FONT_BOLD,
+                new Color(220, 230, 240), Element.ALIGN_LEFT);
+        agregarCelda(t, formatoMonto(seccion.total()), ROW_FONT_BOLD,
+                new Color(220, 230, 240), Element.ALIGN_RIGHT);
+        return t;
+    }
+
+    private void agregarNodoER(PdfPTable t, EstadoResultadosResponse.NodoCuenta nodo, int indent) {
+        String prefijo = "  ".repeat(indent);
+        String nombre = prefijo + nodo.codigo() + " " + nodo.nombre();
+        Font font = nodo.nivel() == 1 ? ROW_FONT_BOLD : ROW_FONT;
+        Color bg = nodo.nivel() == 1 ? new Color(245, 248, 252) : Color.WHITE;
+        agregarCelda(t, nombre, font, bg, Element.ALIGN_LEFT);
+        agregarCelda(t, formatoMonto(nodo.saldoPresentacion()), font, bg, Element.ALIGN_RIGHT);
+        for (EstadoResultadosResponse.NodoCuenta hija : nodo.hijos()) {
+            agregarNodoER(t, hija, indent + 1);
+        }
+    }
+
+    private static class FolioFooterER extends PdfPageEventHelper {
+        @Override
+        public void onEndPage(PdfWriter writer, Document doc) {
+            try {
+                PdfContentByte cb = writer.getDirectContent();
+                Phrase pie = new Phrase("Estado de Resultados — Fatrans", FOOTER_FONT);
+                ColumnText.showTextAligned(cb, Element.ALIGN_LEFT, pie,
+                        doc.left(), doc.bottom() - 15, 0);
+                Phrase pag = new Phrase("Página " + writer.getPageNumber(), FOOTER_FONT);
+                ColumnText.showTextAligned(cb, Element.ALIGN_RIGHT, pag,
+                        doc.right(), doc.bottom() - 15, 0);
+            } catch (Exception e) {
+                log.warn("Error footer Estado de Resultados", e);
             }
         }
     }

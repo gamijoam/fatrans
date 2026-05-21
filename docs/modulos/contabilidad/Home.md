@@ -31,6 +31,8 @@ estado: en-construccion
 - 🔌 [[04-hooks-creditos]] — #268 — Hooks Créditos: desembolso/cobro → asiento auto
 - 📖 [[05-libro-diario]] — #269 — Reporte Libro Diario JSON + PDF SUDECA
 - 📚 [[06-libro-mayor]] — #270 — Reporte Libro Mayor (saldos y movimientos por cuenta)
+- 🏛️ [[07-balance-general]] — #271 — Balance General (situación patrimonial)
+- 💰 [[08-estado-resultados]] — #271 — Estado de Resultados (excedente del período)
 
 ## Mapa del módulo (código)
 
@@ -71,8 +73,9 @@ backend/src/main/java/com/tufondo/ahorros/
 | [[03-hooks-ahorros\|#267]] | ✅ Merged (PR #315) | Hooks de Ahorros: depósito/retiro → asiento auto | [[_decisiones-contables#D-002\|D-002]] usar `1.1.03` no `1.1.01` |
 | [[04-hooks-creditos\|#268]] | ✅ Merged (PR #316) | Hooks de Créditos: desembolso/cobro → asiento auto | [[_decisiones-contables#D-003\|D-003]] [[_decisiones-contables#D-004\|D-004]] |
 | [[05-libro-diario\|#269]] | 🚧 PR #317 abierto | Libro Diario JSON + PDF SUDECA | [[_decisiones-contables#D-006\|D-006]] incluir anulados |
-| [[06-libro-mayor\|#270]] | 🚧 PR #318 abierto | Libro Mayor JSON + PDF (saldos por cuenta) | [[_decisiones-contables#D-007\|D-007]] saldo real, solo hojas |
-| #271 | ⏳ Pending | Balance General + Estado de Resultados | |
+| [[06-libro-mayor\|#270]] | ✅ Merged (PR #318) | Libro Mayor JSON + PDF (saldos por cuenta) | [[_decisiones-contables#D-007\|D-007]] saldo real, solo hojas |
+| [[07-balance-general\|#271 (1/2)]] | 🚧 En PR | Balance General JSON + PDF | [[_decisiones-contables#D-008\|D-008]] roll-up, correctoras, Excedente |
+| [[08-estado-resultados\|#271 (2/2)]] | 🚧 En PR | Estado de Resultados JSON + PDF | [[_decisiones-contables#D-008\|D-008]] cálculo diferencial |
 | #272 | ⏳ Pending | Cierre mensual / anual con bloqueo de período | |
 | #273 | ⏳ Pending | Reversión de asientos (asiento inverso, sin DELETE) | |
 | #274 | ⚠️ **BLOCKER LEGAL** | Confirmar naturaleza jurídica Fatrans (caja ahorro / cooperativa / fideicomiso) | Ver [[_pendientes-criticos#Confirmar-naturaleza-jurídica-Fatrans\|aquí]] |

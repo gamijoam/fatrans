@@ -347,6 +347,83 @@ se toma la de mayor monto + tag `(múltiple)`. Mejora UX masivamente.
 
 ---
 
+## D-008 — Balance General y Estado de Resultados: roll-up, correctoras, Excedente integrado
+
+**Fecha:** 2026-05-21
+**Sub-issue:** [[07-balance-general|#271]] (parte 1) y [[08-estado-resultados|#271]] (parte 2)
+**Estado:** ✅ Aprobada e implementada
+**Revisor:** [[_contador-fatrans|contador-fatrans]] (rol asumido en sesión)
+
+### Contexto
+Los dos reportes finales del bloque inicial del EPIC. Balance General es
+foto a una fecha (Activo = Pasivo + Patrimonio); Estado de Resultados es
+ingresos vs egresos del período. Ambos requieren roll-up jerárquico del
+plan de cuentas y manejo cuidadoso de cuentas correctoras.
+
+### Decisiones tomadas
+
+**D-008.1 — Roll-up por jerarquía**
+Cada cuenta hoja aporta su saldo al grupo padre; cada grupo al rubro. Use
+case construye árbol en memoria recorriendo el plan + un saldo por hoja
+vía `calcularSaldoCuentaHasta`. Costo: ~2N queries (N = cuentas hoja).
+Aceptable; optimización futura con saldos cacheados en #272.
+
+**D-008.2 — Cuentas correctoras restan del padre (¡bug crítico inicial!)**
+Implementación inicial usaba `c.getNaturaleza()` para firmar el saldo.
+Para `1.3.99` Provisión Cartera (ACTIVO + naturaleza ACREEDORA): saldo
+HABER 500 → firmado por ACREEDORA = +500 → sumaba al padre ACTIVO en
+lugar de restar.
+
+**Fix**: usar `c.getTipo().naturalezaNatural()` al firmar el saldo. Para
+1.3.99 (tipo ACTIVO): firmado por DEUDORA = `debe - haber = 0 - 500 = -500`.
+Negativo → resta correctamente del padre.
+
+Test que detectó el bug: `correctora_resta` esperaba 9500 y obtuvo 10500.
+Sin este test el bug habría llegado a producción y los Balances reales
+estarían incorrectos por 2× la provisión.
+
+**D-008.3 — Asientos ANULADOS excluidos**
+Consistente con D-007 (Mayor): saldos vigentes, no historial. Exclusión a
+nivel repository por `calcularSaldoCuentaHasta`.
+
+**D-008.4 — Excedente del Ejercicio integrado on-the-fly**
+El Balance invoca al use case del Estado de Resultados para calcular
+excedente y agregarlo virtualmente al patrimonio. Cuando #272 (cierre)
+persista el excedente en `3.3.02`, este cálculo se reemplaza por lectura
+directa.
+
+**D-008.5 — Ejercicio fiscal calendario por default**
+`inicioEjercicio` default = 1-enero del año de `fechaCorte`. Si Fatrans
+operara con ejercicio fiscal no calendario, contador pasa explícito.
+
+**D-008.6 — Poda de cuentas en cero por default**
+`incluirCeros=false`: reporte limpio. `=true`: vista completa para auditoría.
+
+**D-008.7 — Validación de cuadre defensiva**
+Si `Σ Activo ≠ Σ Pasivo + Σ Patrimonio + Excedente`, log ERROR + marca
+visual `⚠ DESBALANCEADO`. NO debería ocurrir si cada asiento individual
+cuadra (invariante dominio).
+
+### Consecuencias
+
+- 2 use cases nuevos en application: `GenerarBalanceGeneralUseCase` y
+  `GenerarEstadoResultadosUseCase`.
+- 4 DTOs (filter + response × 2 reportes).
+- Extensión del port `ContabilidadPdfPort` con 2 métodos.
+- Adapter PDF unificado en `LibroDiarioPdfAdapter` (ya hace 4 reportes).
+- 2 controllers nuevos.
+- 33 tests nuevos cubriendo casos críticos.
+
+### Pendientes que abre
+
+- **#272 Cierre del Excedente**: persistir el excedente en `3.3.02` para
+  que el Balance lea saldo real en lugar de cálculo on-the-fly.
+- **Estados comparativos** (período actual vs anterior).
+- **Notas a los Estados Financieros** (VEN-NIF NIC-1).
+- **Estado de Cambios en el Patrimonio** (3er reporte VEN-NIF).
+
+---
+
 ## D-005 — (PENDIENTE) Criterio de caja vs devengo para intereses de cartera
 
 **Fecha:** 2026-05-20
