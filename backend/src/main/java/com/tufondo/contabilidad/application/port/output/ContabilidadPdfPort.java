@@ -1,5 +1,7 @@
 package com.tufondo.contabilidad.application.port.output;
 
+import com.tufondo.contabilidad.application.dto.BalanceGeneralResponse;
+import com.tufondo.contabilidad.application.dto.EstadoResultadosResponse;
 import com.tufondo.contabilidad.application.dto.LibroDiarioResponse;
 import com.tufondo.contabilidad.application.dto.LibroMayorResponse;
 
@@ -38,4 +40,20 @@ public interface ContabilidadPdfPort {
      * @return bytes del PDF listo para descarga
      */
     byte[] generarLibroMayorPdf(LibroMayorResponse libroMayor);
+
+    /**
+     * Genera el PDF del Balance General (sub-issue #271).
+     * Formato vertical clásico VEN-NIF en dos columnas (Activo |
+     * Pasivo+Patrimonio) con jerarquía Rubro→Grupo→Cuenta. Excedente
+     * del Ejercicio incluido en Patrimonio. Validación visual de cuadre
+     * al pie ("BALANCEADO ✓" / "⚠ DESBALANCEADO").
+     */
+    byte[] generarBalanceGeneralPdf(BalanceGeneralResponse balance);
+
+    /**
+     * Genera el PDF del Estado de Resultados (sub-issue #271).
+     * Formato columnar: secciones INGRESOS y EGRESOS con sus rubros,
+     * grupos y cuentas; al pie el Excedente/Déficit del período.
+     */
+    byte[] generarEstadoResultadosPdf(EstadoResultadosResponse estadoResultados);
 }

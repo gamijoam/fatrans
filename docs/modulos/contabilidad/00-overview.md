@@ -28,11 +28,11 @@ contable de partida doble. Eso significa:
 El EPIC #263 cierra esa brecha desde la base (plan de cuentas) hasta los
 reportes finales.
 
-## Estado actual (2026-05-20, post #270)
+## Estado actual (2026-05-21, post #271)
 
 ```
-Plan de cuentas (#264) ──► Asientos (#265+#266) ──► Hooks Ahorros (#267) ──► Hooks Créditos (#268) ──► Libro Diario (#269) ──► Libro Mayor (#270) ──► Balance General (#271) ──► Cierre (#272+#273)
-       ✅                       ✅                        ✅                        ✅                     🚧 PR #317              🚧 PR #318              ⏳                          ⏳
+Plan de cuentas (#264) ──► Asientos (#265+#266) ──► Hooks Ahorros (#267) ──► Hooks Créditos (#268) ──► Libro Diario (#269) ──► Libro Mayor (#270) ──► Balance + ER (#271) ──► Cierre (#272+#273)
+       ✅                       ✅                        ✅                        ✅                        ✅                       ✅                     🚧 En PR                ⏳
 ```
 
 ## Timeline cronológico de decisiones y entregas
@@ -184,12 +184,41 @@ resuelta por movimiento, saldo acumulado por línea, y saldo final.
 **Pendientes nuevos**:
 - Cachear saldos cerrados al cierre mensual (parte de #272) para performance.
 
-## Lo que viene después de #270
+### 2026-05-21 — #271 Balance General + Estado de Resultados (PR — reportes VEN-NIF finales)
+
+**[[07-balance-general|#271 Balance]]** y **[[08-estado-resultados|#271 ER]]** (PR en revisión)
+
+Los **dos reportes regulatorios obligatorios VEN-NIF** del bloque inicial.
+
+**Decisiones D-008** ([[_decisiones-contables#D-008|completas acá]]):
+- Roll-up jerárquico Rubro → Grupo → Cuenta hoja.
+- 🐛 **Bug detectado y fix crítico**: cuentas correctoras (`1.3.99` Provisión Cartera, `1.5.99` Depreciación) ahora restan correctamente del rubro padre. El bug usaba `c.getNaturaleza()` cuando debe ser `c.getTipo().naturalezaNatural()`. Test `correctora_resta` lo detectó (esperaba 9500, obtuvo 10500).
+- Excedente del Ejercicio integrado on-the-fly desde el ER (hasta #272 implemente persistencia en `3.3.02`).
+- Asientos ANULADOS excluidos (consistente con #270).
+- Saldos en formato absoluto + etiqueta D/A/—.
+- Validación de cuadre defensiva con marca visual.
+
+**Endpoints**:
+- `GET /api/v1/contabilidad/balance-general` (+ `/pdf`) — fecha de corte
+- `GET /api/v1/contabilidad/estado-resultados` (+ `/pdf`) — rango
+
+**33 tests nuevos, todos verde** (205 totales en el módulo contabilidad):
+- `BalanceGeneralFilterTest` (6) + `EstadoResultadosFilterTest` (5) — validaciones rango
+- `GenerarBalanceGeneralUseCaseTest` (10) — Mockito: cuadrado, correctora, excedente, déficit, poda
+- `GenerarEstadoResultadosUseCaseTest` (7) — Mockito: excedente/déficit, exclusión otros tipos, cálculo diferencial
+- `BalanceYEstadoResultadosPdfAdapterTest` (5) — generación bytes válidos
+
+**Pendientes nuevos**:
+- Asiento de cierre del Excedente (parte de #272 — para persistir en `3.3.02`).
+- Estados comparativos (período actual vs anterior).
+- Notas a los Estados Financieros (NIC-1).
+- Estado de Cambios en el Patrimonio (3er reporte VEN-NIF).
+
+## Lo que viene después de #271
 
 | # | Tema | Comentario |
 |---|---|---|
-| #271 | Balance General + Estado de Resultados | Reportes finales VEN-NIF |
-| #272 | Cierre mensual/anual | Bloqueo de período + asientos de cierre |
+| #272 | Cierre mensual/anual | Bloqueo de período + asientos de cierre (persiste Excedente en `3.3.02`) |
 | #273 | Reversión de asientos | Generación automática de asiento inverso para anulación |
 
 ## Red flags identificados durante el EPIC (no resueltos aún)
