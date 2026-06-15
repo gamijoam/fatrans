@@ -93,6 +93,28 @@ public class CuentaAhorro {
         fechaUltimaOperacion = LocalDateTime.now();
     }
 
+    public void retenerSaldo(BigDecimal monto) {
+        if (saldoRetenido == null) {
+            saldoRetenido = BigDecimal.ZERO;
+        }
+        if (!tieneSaldoSuficiente(monto)) {
+            throw new IllegalStateException("Saldo disponible insuficiente para retener");
+        }
+        saldoRetenido = saldoRetenido.add(monto);
+        fechaUltimaOperacion = LocalDateTime.now();
+    }
+
+    public void liberarSaldoRetenido(BigDecimal monto) {
+        if (saldoRetenido == null) {
+            saldoRetenido = BigDecimal.ZERO;
+        }
+        if (saldoRetenido.subtract(monto).compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalStateException("Saldo retenido no puede ser negativo");
+        }
+        saldoRetenido = saldoRetenido.subtract(monto);
+        fechaUltimaOperacion = LocalDateTime.now();
+    }
+
     /**
      * Cierra la cuenta cambiando estado a CERRADA.
      */

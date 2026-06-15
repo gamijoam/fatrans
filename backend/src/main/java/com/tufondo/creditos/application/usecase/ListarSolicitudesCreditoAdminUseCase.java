@@ -99,6 +99,11 @@ public class ListarSolicitudesCreditoAdminUseCase {
                 .colateralCuentaId(entity.getColateralCuentaId() != null ? entity.getColateralCuentaId().toString() : null)
                 .colateralMontoRetenido(entity.getColateralMontoRetenido())
                 .destinoCredito(entity.getDestinoCredito())
+                .productoFinanciableId(entity.getProductoFinanciableId())
+                .productoNombreSnapshot(entity.getProductoNombreSnapshot())
+                .productoPrecioSnapshot(entity.getProductoPrecioSnapshot())
+                .productoMonedaSnapshot(entity.getProductoMonedaSnapshot())
+                .productoColateralRequeridoSnapshot(entity.getProductoColateralRequeridoSnapshot())
                 .createdAt(entity.getCreatedAt())
                 .build();
     }

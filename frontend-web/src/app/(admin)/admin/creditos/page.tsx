@@ -24,6 +24,11 @@ interface SolicitudCredito {
   cuotaMensualEstimada: number;
   estado: string;
   destinoCredito: string;
+  productoFinanciableId?: number | null;
+  productoNombreSnapshot?: string | null;
+  productoPrecioSnapshot?: number | null;
+  productoMonedaSnapshot?: string | null;
+  productoColateralRequeridoSnapshot?: number | null;
   createdAt: string;
   fechaAprobacion: string | null;
   fechaRechazo: string | null;
@@ -84,6 +89,14 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('es-VE', {
     style: 'currency',
     currency: 'VES',
+    minimumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatProductCurrency(value: number, currency?: string | null): string {
+  return new Intl.NumberFormat('es-VE', {
+    style: 'currency',
+    currency: currency === 'USD' ? 'USD' : 'VES',
     minimumFractionDigits: 2,
   }).format(value);
 }
@@ -257,6 +270,7 @@ export default function AdminCreditosPage() {
                     <tr className="border-b bg-gray-50">
                       <th className="text-left p-3 font-medium">Nro. Solicitud</th>
                       <th className="text-left p-3 font-medium">Socio</th>
+                      <th className="text-left p-3 font-medium">Producto</th>
                       <th className="text-left p-3 font-medium">Tipo</th>
                       <th className="text-right p-3 font-medium">Monto</th>
                       <th className="text-center p-3 font-medium">Plazo</th>
@@ -272,6 +286,18 @@ export default function AdminCreditosPage() {
                         <td className="p-3">
                           <div className="font-medium">{solicitud.socioNombre}</div>
                           <div className="text-xs text-gray-500">{solicitud.socioCedula} · {solicitud.socioEmpresa}</div>
+                        </td>
+                        <td className="p-3">
+                          {solicitud.productoNombreSnapshot ? (
+                            <div>
+                              <div className="font-medium text-[#0F2744]">{solicitud.productoNombreSnapshot}</div>
+                              <div className="text-xs text-gray-500">
+                                {formatProductCurrency(Number(solicitud.productoPrecioSnapshot || 0), solicitud.productoMonedaSnapshot)}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">Sin producto</span>
+                          )}
                         </td>
                         <td className="p-3">{solicitud.tipoCreditoNombre}</td>
                         <td className="p-3 text-right font-medium">{formatCurrency(solicitud.montoSolicitado)}</td>
