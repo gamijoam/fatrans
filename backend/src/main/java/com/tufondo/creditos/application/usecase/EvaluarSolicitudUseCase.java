@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 /**
  * Caso de uso para evaluar una solicitud de crédito.
@@ -76,7 +75,6 @@ public class EvaluarSolicitudUseCase {
 
         // Crear evaluación (tasaInteresFinal se calcula después)
         EvaluacionCrediticia evaluacion = EvaluacionCrediticia.builder()
-            .id(UUID.randomUUID())
             .solicitudId(solicitud.getId())
             .socioId(solicitud.getSocioId())
             .puntajeAntiguedad(puntajeAntiguedad)
