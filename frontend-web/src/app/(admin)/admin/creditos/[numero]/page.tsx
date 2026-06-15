@@ -60,6 +60,11 @@ interface Solicitud {
   socioId: string;
   tipoCreditoId: number;
   tipoCreditoNombre: string;
+  productoFinanciableId?: number | null;
+  productoNombreSnapshot?: string | null;
+  productoPrecioSnapshot?: number | null;
+  productoMonedaSnapshot?: string | null;
+  productoColateralRequeridoSnapshot?: number | null;
   montoSolicitado: number;
   plazoMeses: number;
   tasaInteresAplicada: number;
@@ -91,6 +96,14 @@ const RIESGO_COLORS: Record<string, string> = {
 };
 
 import { formatDate, formatCurrency } from '@/lib/utils/format';
+
+function formatProductCurrency(value: number, currency?: string | null): string {
+  return new Intl.NumberFormat('es-VE', {
+    style: 'currency',
+    currency: currency === 'USD' ? 'USD' : 'VES',
+    minimumFractionDigits: 2,
+  }).format(value);
+}
 
 export default function AdminCreditoDetallePage() {
   const params = useParams();
@@ -285,6 +298,26 @@ export default function AdminCreditoDetallePage() {
                   <p className="text-sm text-gray-500">Tasa Interés</p>
                   <p className="font-medium">{(Number(solicitud.tasaInteresAplicada) * 100).toFixed(2)}%</p>
                 </div>
+                {solicitud.productoNombreSnapshot && (
+                  <div className="col-span-2 rounded-md border border-green-100 bg-green-50 p-4">
+                    <p className="text-sm text-green-700">Producto financiado</p>
+                    <p className="font-semibold text-[#0F2744]">{solicitud.productoNombreSnapshot}</p>
+                    <div className="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                      <div>
+                        <span className="text-gray-500">Precio: </span>
+                        <span className="font-medium">
+                          {formatProductCurrency(Number(solicitud.productoPrecioSnapshot || 0), solicitud.productoMonedaSnapshot)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Colateral requerido: </span>
+                        <span className="font-medium">
+                          {formatProductCurrency(Number(solicitud.productoColateralRequeridoSnapshot || 0), solicitud.productoMonedaSnapshot)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-gray-500">Destino</p>
                   <p className="font-medium">{solicitud.destinoCredito}</p>
