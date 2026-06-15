@@ -36,4 +36,10 @@ public class CrearSolicitudCreditoRequest {
     private String cuentaDestino;
     
     private String colateralCuentaId;  // UUID como string
+
+    private Long productoFinanciableId;
+    private String productoNombreSnapshot;
+    private BigDecimal productoPrecioSnapshot;
+    private String productoMonedaSnapshot;
+    private BigDecimal productoColateralRequeridoSnapshot;
 }

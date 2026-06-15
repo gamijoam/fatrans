@@ -89,12 +89,20 @@ public class CrearSolicitudCreditoUseCase {
             .cuotaMensualEstimada(cuotaEstimada)
             .estado(EstadoSolicitud.PENDIENTE)
             .destinoCredito(request.getDestinoCredito())
+            .productoFinanciableId(request.getProductoFinanciableId())
+            .productoNombreSnapshot(request.getProductoNombreSnapshot())
+            .productoPrecioSnapshot(request.getProductoPrecioSnapshot())
+            .productoMonedaSnapshot(request.getProductoMonedaSnapshot())
+            .productoColateralRequeridoSnapshot(request.getProductoColateralRequeridoSnapshot())
             .cuentaDestino(request.getCuentaDestino())
             .createdAt(LocalDateTime.now())
             .build();
 
         if (request.getColateralCuentaId() != null) {
             solicitud.setColateralCuentaId(UUID.fromString(request.getColateralCuentaId()));
+        }
+        if (request.getProductoColateralRequeridoSnapshot() != null) {
+            solicitud.setColateralMontoRetenido(request.getProductoColateralRequeridoSnapshot());
         }
 
         solicitud = solicitudRepository.guardar(solicitud);
