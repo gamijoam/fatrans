@@ -152,6 +152,8 @@ public class SolicitudCreditoRepositoryImpl implements SolicitudCreditoRepositor
             builder.id(domain.getId());
         }
 
-        return builder.build();
+        return builder
+            .version(domain.getId() != null && domain.getVersion() == null ? 0L : domain.getVersion())
+            .build();
     }
 }
