@@ -77,6 +77,11 @@ public class CreditosDTOMapper {
             .colateralCuentaId(solicitud.getColateralCuentaId() != null ? solicitud.getColateralCuentaId().toString() : null)
             .colateralMontoRetenido(solicitud.getColateralMontoRetenido())
             .destinoCredito(solicitud.getDestinoCredito())
+            .productoFinanciableId(solicitud.getProductoFinanciableId())
+            .productoNombreSnapshot(solicitud.getProductoNombreSnapshot())
+            .productoPrecioSnapshot(solicitud.getProductoPrecioSnapshot())
+            .productoMonedaSnapshot(solicitud.getProductoMonedaSnapshot())
+            .productoColateralRequeridoSnapshot(solicitud.getProductoColateralRequeridoSnapshot())
             .createdAt(solicitud.getCreatedAt())
             .build();
     }

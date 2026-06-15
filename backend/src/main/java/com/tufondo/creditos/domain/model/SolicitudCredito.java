@@ -31,6 +31,11 @@ public class SolicitudCredito {
     private UUID colateralCuentaId;  // FK a cuenta de ahorro (nullable)
     private BigDecimal colateralMontoRetenido;
     private String destinoCredito;
+    private Long productoFinanciableId;
+    private String productoNombreSnapshot;
+    private BigDecimal productoPrecioSnapshot;
+    private String productoMonedaSnapshot;
+    private BigDecimal productoColateralRequeridoSnapshot;
     private UUID evaluacionId;
     private UUID planAmortizacionId;
     private String referenciaDesembolso;
