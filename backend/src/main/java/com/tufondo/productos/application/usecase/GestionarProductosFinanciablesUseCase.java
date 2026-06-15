@@ -6,6 +6,8 @@ import com.tufondo.ahorros.infrastructure.persistence.jpa.CuentaAhorroJpaReposit
 import com.tufondo.creditos.application.dto.CrearSolicitudCreditoRequest;
 import com.tufondo.creditos.application.dto.SolicitudCreditoResponse;
 import com.tufondo.creditos.application.usecase.CrearSolicitudCreditoUseCase;
+import com.tufondo.creditos.domain.model.TipoCredito;
+import com.tufondo.creditos.domain.repository.TipoCreditoRepository;
 import com.tufondo.productos.application.dto.PrecalificacionProductoResponse;
 import com.tufondo.productos.application.dto.ProductoFinanciableRequest;
 import com.tufondo.productos.application.dto.ProductoFinanciableResponse;
@@ -36,6 +38,7 @@ public class GestionarProductosFinanciablesUseCase {
 
     private final ProductoFinanciableJpaRepository repository;
     private final CuentaAhorroJpaRepository cuentaRepository;
+    private final TipoCreditoRepository tipoCreditoRepository;
     private final CrearSolicitudCreditoUseCase crearSolicitudCreditoUseCase;
 
     @Transactional(readOnly = true)
@@ -61,7 +64,7 @@ public class GestionarProductosFinanciablesUseCase {
 
     @Transactional
     public ProductoFinanciableResponse crear(ProductoFinanciableRequest request, UUID adminId) {
-        validarRequest(request);
+        TipoCredito tipoCredito = validarRequest(request);
         String codigo = request.getCodigo().trim().toUpperCase(Locale.ROOT);
         if (repository.existsByCodigoIgnoreCase(codigo)) {
             throw new IllegalArgumentException("Ya existe un producto con ese codigo");
@@ -70,7 +73,7 @@ public class GestionarProductosFinanciablesUseCase {
         ProductoFinanciableEntity entity = new ProductoFinanciableEntity();
         entity.setCodigo(codigo);
         entity.setSlug(generarSlugUnico(request.getNombre()));
-        aplicarRequest(entity, request);
+        aplicarRequest(entity, request, tipoCredito);
         entity.setEstado(ESTADO_BORRADOR);
         entity.setCreatedBy(adminId);
         entity.setCreatedAt(LocalDateTime.now());
@@ -80,10 +83,10 @@ public class GestionarProductosFinanciablesUseCase {
 
     @Transactional
     public ProductoFinanciableResponse actualizar(Long id, ProductoFinanciableRequest request) {
-        validarRequest(request);
+        TipoCredito tipoCredito = validarRequest(request);
         ProductoFinanciableEntity entity = repository.findById(id)
             .orElseThrow(() -> new ProductoNoEncontradoException(id.toString()));
-        aplicarRequest(entity, request);
+        aplicarRequest(entity, request, tipoCredito);
         entity.setUpdatedAt(LocalDateTime.now());
         return toResponse(repository.save(entity));
     }
@@ -117,11 +120,13 @@ public class GestionarProductosFinanciablesUseCase {
         if (!precalificacion.isElegible()) {
             throw new IllegalArgumentException(precalificacion.getMensaje());
         }
+        TipoCredito tipoCredito = tipoCreditoRepository.buscarPorId(producto.getTipoCreditoId())
+            .orElseThrow(() -> new IllegalArgumentException("Tipo de credito asociado no existe"));
 
         CrearSolicitudCreditoRequest request = new CrearSolicitudCreditoRequest();
         request.setTipoCreditoId(producto.getTipoCreditoId());
         request.setMontoSolicitado(producto.getPrecio());
-        request.setPlazoMeses(producto.getPlazoMaximoMeses());
+        request.setPlazoMeses(calcularPlazoSolicitud(producto, tipoCredito));
         request.setDestinoCredito("Financiamiento de producto: " + producto.getNombre());
         request.setColateralCuentaId(precalificacion.getCuentaColateralId().toString());
         request.setProductoFinanciableId(producto.getId());
@@ -159,7 +164,7 @@ public class GestionarProductosFinanciablesUseCase {
         return response;
     }
 
-    private void aplicarRequest(ProductoFinanciableEntity entity, ProductoFinanciableRequest request) {
+    private void aplicarRequest(ProductoFinanciableEntity entity, ProductoFinanciableRequest request, TipoCredito tipoCredito) {
         entity.setNombre(request.getNombre().trim());
         entity.setDescripcion(request.getDescripcion());
         entity.setCategoria(request.getCategoria().trim().toUpperCase(Locale.ROOT));
@@ -169,15 +174,44 @@ public class GestionarProductosFinanciablesUseCase {
         entity.setImagenUrl(request.getImagenUrl());
         entity.setTipoCreditoId(request.getTipoCreditoId());
         entity.setPlazoMinimoMeses(request.getPlazoMinimoMeses());
-        entity.setPlazoMaximoMeses(request.getPlazoMaximoMeses());
+        entity.setPlazoMaximoMeses(calcularPlazoMaximoPermitido(request.getPlazoMaximoMeses(), tipoCredito));
         entity.setPorcentajeColateral(request.getPorcentajeColateral());
         entity.setRequiereAprobacionManual(Boolean.TRUE.equals(request.getRequiereAprobacionManual()));
     }
 
-    private void validarRequest(ProductoFinanciableRequest request) {
+    private TipoCredito validarRequest(ProductoFinanciableRequest request) {
         if (request.getPlazoMaximoMeses() < request.getPlazoMinimoMeses()) {
             throw new IllegalArgumentException("El plazo maximo debe ser mayor o igual al plazo minimo");
         }
+        TipoCredito tipoCredito = tipoCreditoRepository.buscarPorId(request.getTipoCreditoId())
+            .orElseThrow(() -> new IllegalArgumentException("Tipo de credito asociado no existe"));
+        Integer tipoPlazoMinimo = tipoCredito.getPlazoMinimoMeses();
+        Integer tipoPlazoMaximo = tipoCredito.getPlazoMaximoMeses();
+        if (tipoPlazoMinimo != null && request.getPlazoMinimoMeses() < tipoPlazoMinimo) {
+            throw new IllegalArgumentException("El plazo minimo del producto no puede ser menor al tipo de credito");
+        }
+        if (tipoPlazoMaximo != null && request.getPlazoMaximoMeses() > tipoPlazoMaximo) {
+            throw new IllegalArgumentException("El plazo maximo del producto no puede superar el tipo de credito");
+        }
+        return tipoCredito;
+    }
+
+    private Integer calcularPlazoSolicitud(ProductoFinanciableEntity producto, TipoCredito tipoCredito) {
+        Integer plazo = calcularPlazoMaximoPermitido(producto.getPlazoMaximoMeses(), tipoCredito);
+        if (tipoCredito.getPlazoMinimoMeses() != null && plazo < tipoCredito.getPlazoMinimoMeses()) {
+            plazo = tipoCredito.getPlazoMinimoMeses();
+        }
+        if (plazo < producto.getPlazoMinimoMeses()) {
+            throw new IllegalArgumentException("El producto tiene una configuracion de plazo incompatible con su tipo de credito");
+        }
+        return plazo;
+    }
+
+    private Integer calcularPlazoMaximoPermitido(Integer plazoProducto, TipoCredito tipoCredito) {
+        if (tipoCredito.getPlazoMaximoMeses() == null) {
+            return plazoProducto;
+        }
+        return Math.min(plazoProducto, tipoCredito.getPlazoMaximoMeses());
     }
 
     private ProductoFinanciableResponse toResponse(ProductoFinanciableEntity entity) {
