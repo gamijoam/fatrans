@@ -195,7 +195,7 @@ public class CreditoController {
      * Roles: ADMIN, SISTEMA
      */
     @PostMapping("/creditos/solicitudes/{numeroSolicitud}/evaluar")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SISTEMA')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'SISTEMA')")
     @Operation(summary = "Evaluar solicitud de crédito")
     public ResponseEntity<EvaluacionResponse> evaluarSolicitud(
             @PathVariable String numeroSolicitud,
@@ -262,7 +262,7 @@ public class CreditoController {
      * Roles: ADMIN, SISTEMA
      */
     @PostMapping("/creditos/solicitudes/{numeroSolicitud}/desembolso")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SISTEMA')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'SISTEMA')")
     @Operation(summary = "Desembolsar crédito")
     public ResponseEntity<Map<String, Object>> desembolsarCredito(
             @PathVariable String numeroSolicitud,
@@ -373,6 +373,7 @@ public class CreditoController {
     private boolean esAdmin(Authentication authentication) {
         return authentication.getAuthorities().stream()
                 .anyMatch(a -> a.equals(new SimpleGrantedAuthority("ROLE_ADMIN")) ||
+                              a.equals(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN")) ||
                               a.equals(new SimpleGrantedAuthority("ROLE_SISTEMA")));
     }
 
