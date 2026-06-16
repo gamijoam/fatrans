@@ -7,6 +7,7 @@ import {
   Loader2, Wallet, CreditCard, Plus, ArrowUpRight, ArrowDownRight,
   Shield, FileText, Users, Calculator, Eye, EyeOff,
   AlertTriangle, Info, XOctagon, ChevronRight,
+  type LucideIcon,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useTipoCambio } from '@/hooks/useTipoCambio';
@@ -144,6 +145,31 @@ function QuickActionButton({
     <button onClick={onClick} className={baseClass}>
       {content}
     </button>
+  );
+}
+
+function OperationLink({
+  icon: Icon,
+  title,
+  href,
+}: {
+  icon: LucideIcon;
+  title: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex min-h-[72px] items-center gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 transition-all hover:border-[#16A34A]/40 hover:shadow-sm active:scale-[0.99]"
+    >
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#0F2744] transition-colors group-hover:bg-emerald-50 group-hover:text-[#16A34A]">
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-[#0F2744]">{title}</span>
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-[#16A34A]" />
+    </Link>
   );
 }
 
@@ -363,6 +389,9 @@ export default function SocioDashboardPage() {
   // disponible — la mayoría de socios tiene 1-2 cuentas; los demás pueden ir
   // a "Ver todo" para ver los de otras cuentas).
   const cuentaParaMovimientos = cuentas[0];
+  const movimientosHref = cuentaParaMovimientos
+    ? `/dashboard/cuentas/${cuentaParaMovimientos.numeroCuenta}`
+    : '/dashboard/cuentas';
   const cargarMovimientos = useCallback(async () => {
     if (!cuentaParaMovimientos) {
       // Sin cuentas → no hay movimientos posibles (ya no es loading)
@@ -590,25 +619,40 @@ export default function SocioDashboardPage() {
             </p>
           )}
 
-          {/* Quick Actions */}
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/dashboard/cuentas"
-              className="flex items-center gap-2 px-5 py-3 bg-white text-[#0F2744] font-semibold rounded-xl hover:bg-slate-100 transition-colors shadow-lg"
-            >
-              <Plus className="w-5 h-5" />
-              Aportar
-            </Link>
-            <Link
-              href="/dashboard/creditos/solicitar"
-              className="flex items-center gap-2 px-5 py-3 bg-[#16A34A] text-white font-semibold rounded-xl hover:bg-[#15803D] transition-colors shadow-lg"
-            >
-              <CreditCard className="w-5 h-5" />
-              Solicitar Crédito
-            </Link>
-          </div>
+          <Link
+            href={movimientosHref}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-white/80 transition-colors hover:text-white"
+          >
+            Ver movimientos
+            <ChevronRight className="h-4 w-4" />
+          </Link>
         </div>
       </div>
+
+      <section aria-labelledby="operaciones-frecuentes">
+        <div className="mb-4">
+          <h2 id="operaciones-frecuentes" className="text-lg font-bold text-[#0F2744]">
+            Operaciones frecuentes
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <OperationLink
+            icon={Wallet}
+            title="Registrar aporte"
+            href="/dashboard/cuentas"
+          />
+          <OperationLink
+            icon={CreditCard}
+            title="Ver opciones de crédito"
+            href="/dashboard/creditos"
+          />
+          <OperationLink
+            icon={FileText}
+            title="Documentos y constancias"
+            href="/dashboard/documentos"
+          />
+        </div>
+      </section>
 
       {/* Account Cards */}
       <div>

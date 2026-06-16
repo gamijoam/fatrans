@@ -36,6 +36,11 @@ public class SolicitudCreditoAdminResponse {
     private String colateralCuentaId;
     private BigDecimal colateralMontoRetenido;
     private String destinoCredito;
+    private Long productoFinanciableId;
+    private String productoNombreSnapshot;
+    private BigDecimal productoPrecioSnapshot;
+    private String productoMonedaSnapshot;
+    private BigDecimal productoColateralRequeridoSnapshot;
     private LocalDateTime createdAt;
     private LocalDateTime fechaAprobacion;
     private LocalDateTime fechaRechazo;

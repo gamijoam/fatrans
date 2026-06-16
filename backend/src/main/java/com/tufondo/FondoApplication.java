@@ -1,13 +1,14 @@
 package com.tufondo;
 
 import com.tufondo.auth.infrastructure.configuration.JwtProperties;
+import com.tufondo.contabilidad.application.config.EntidadProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, EntidadProperties.class})
 @EnableScheduling  // Issue #231: necesario para BcvScraperJob
 public class FondoApplication {
 

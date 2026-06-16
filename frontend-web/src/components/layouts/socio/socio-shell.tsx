@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Wallet,
   CreditCard,
+  ShoppingBag,
   FileText,
   User,
   Users,
@@ -29,6 +30,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: 'Inicio', href: '/dashboard' },
   { icon: Wallet, label: 'Cuentas', href: '/dashboard/cuentas' },
   { icon: CreditCard, label: 'Créditos', href: '/dashboard/creditos' },
+  { icon: ShoppingBag, label: 'Productos', href: '/dashboard/productos' },
   { icon: Users, label: 'Beneficiarios', href: '/dashboard/beneficiarios' },
   { icon: Shield, label: 'KYC', href: '/dashboard/kyc' },
   { icon: FileText, label: 'Documentos', href: '/dashboard/documentos' },
@@ -236,6 +238,7 @@ export function SocioShell({ children }: { children: React.ReactNode }) {
                     {pathname === '/dashboard' ? 'Inicio' :
                      pathname === '/dashboard/cuentas' ? 'Mis Cuentas' :
                      pathname === '/dashboard/creditos' ? 'Créditos' :
+                     pathname === '/dashboard/productos' ? 'Productos' :
                      pathname === '/dashboard/unidad' ? 'Mi Unidad' :
                      pathname === '/dashboard/beneficiarios' ? 'Beneficiarios' :
                      pathname === '/dashboard/documentos' ? 'Documentos' :

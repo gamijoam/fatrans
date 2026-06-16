@@ -44,7 +44,7 @@ public class CuentaGarantiaRepositoryImpl implements CuentaGarantiaRepository {
     public void retenerSaldo(UUID cuentaId, BigDecimal monto) {
         cuentaAhorroRepository.buscarPorId(cuentaId)
             .ifPresent(cuenta -> {
-                cuenta.restarSaldo(monto);
+                cuenta.retenerSaldo(monto);
                 cuentaAhorroRepository.guardar(cuenta);
                 log.info("Retenido saldo {} de cuenta {} para colateral de crédito", monto, cuentaId);
             });
@@ -54,7 +54,12 @@ public class CuentaGarantiaRepositoryImpl implements CuentaGarantiaRepository {
     public void liberarSaldo(UUID cuentaId, BigDecimal monto) {
         cuentaAhorroRepository.buscarPorId(cuentaId)
             .ifPresent(cuenta -> {
-                cuenta.agregarSaldo(monto);
+                if (cuenta.getSaldoRetenido() != null && cuenta.getSaldoRetenido().compareTo(monto) >= 0) {
+                    cuenta.liberarSaldoRetenido(monto);
+                } else {
+                    cuenta.agregarSaldo(monto);
+                    log.warn("Liberando colateral legacy {} de cuenta {} sin saldo retenido suficiente", monto, cuentaId);
+                }
                 cuentaAhorroRepository.guardar(cuenta);
                 log.info("Liberado saldo {} de cuenta {} (colateral de crédito)", monto, cuentaId);
             });

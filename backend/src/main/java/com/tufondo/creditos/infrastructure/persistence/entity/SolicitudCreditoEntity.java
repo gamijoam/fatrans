@@ -67,6 +67,21 @@ public class SolicitudCreditoEntity {
     @Column(name = "destino_credito", length = 500)
     private String destinoCredito;
 
+    @Column(name = "producto_financiable_id")
+    private Long productoFinanciableId;
+
+    @Column(name = "producto_nombre_snapshot", length = 120)
+    private String productoNombreSnapshot;
+
+    @Column(name = "producto_precio_snapshot", precision = 19, scale = 4)
+    private BigDecimal productoPrecioSnapshot;
+
+    @Column(name = "producto_moneda_snapshot", length = 10)
+    private String productoMonedaSnapshot;
+
+    @Column(name = "producto_colateral_requerido_snapshot", precision = 19, scale = 4)
+    private BigDecimal productoColateralRequeridoSnapshot;
+
     @Column(name = "evaluacion_id")
     private UUID evaluacionId;
 
@@ -130,6 +145,16 @@ public class SolicitudCreditoEntity {
     public void setColateralMontoRetenido(BigDecimal v) { this.colateralMontoRetenido = v; }
     public String getDestinoCredito() { return destinoCredito; }
     public void setDestinoCredito(String v) { this.destinoCredito = v; }
+    public Long getProductoFinanciableId() { return productoFinanciableId; }
+    public void setProductoFinanciableId(Long v) { this.productoFinanciableId = v; }
+    public String getProductoNombreSnapshot() { return productoNombreSnapshot; }
+    public void setProductoNombreSnapshot(String v) { this.productoNombreSnapshot = v; }
+    public BigDecimal getProductoPrecioSnapshot() { return productoPrecioSnapshot; }
+    public void setProductoPrecioSnapshot(BigDecimal v) { this.productoPrecioSnapshot = v; }
+    public String getProductoMonedaSnapshot() { return productoMonedaSnapshot; }
+    public void setProductoMonedaSnapshot(String v) { this.productoMonedaSnapshot = v; }
+    public BigDecimal getProductoColateralRequeridoSnapshot() { return productoColateralRequeridoSnapshot; }
+    public void setProductoColateralRequeridoSnapshot(BigDecimal v) { this.productoColateralRequeridoSnapshot = v; }
     public UUID getEvaluacionId() { return evaluacionId; }
     public void setEvaluacionId(UUID v) { this.evaluacionId = v; }
     public UUID getPlanAmortizacionId() { return planAmortizacionId; }
@@ -171,6 +196,11 @@ public class SolicitudCreditoEntity {
         public SolicitudCreditoEntityBuilder colateralCuentaId(UUID v) { e.colateralCuentaId = v; return this; }
         public SolicitudCreditoEntityBuilder colateralMontoRetenido(BigDecimal v) { e.colateralMontoRetenido = v; return this; }
         public SolicitudCreditoEntityBuilder destinoCredito(String v) { e.destinoCredito = v; return this; }
+        public SolicitudCreditoEntityBuilder productoFinanciableId(Long v) { e.productoFinanciableId = v; return this; }
+        public SolicitudCreditoEntityBuilder productoNombreSnapshot(String v) { e.productoNombreSnapshot = v; return this; }
+        public SolicitudCreditoEntityBuilder productoPrecioSnapshot(BigDecimal v) { e.productoPrecioSnapshot = v; return this; }
+        public SolicitudCreditoEntityBuilder productoMonedaSnapshot(String v) { e.productoMonedaSnapshot = v; return this; }
+        public SolicitudCreditoEntityBuilder productoColateralRequeridoSnapshot(BigDecimal v) { e.productoColateralRequeridoSnapshot = v; return this; }
         public SolicitudCreditoEntityBuilder evaluacionId(UUID v) { e.evaluacionId = v; return this; }
         public SolicitudCreditoEntityBuilder planAmortizacionId(UUID v) { e.planAmortizacionId = v; return this; }
         public SolicitudCreditoEntityBuilder referenciaDesembolso(String v) { e.referenciaDesembolso = v; return this; }

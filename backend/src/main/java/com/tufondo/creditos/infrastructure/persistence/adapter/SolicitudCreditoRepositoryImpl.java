@@ -106,6 +106,11 @@ public class SolicitudCreditoRepositoryImpl implements SolicitudCreditoRepositor
             .colateralCuentaId(entity.getColateralCuentaId())
             .colateralMontoRetenido(entity.getColateralMontoRetenido())
             .destinoCredito(entity.getDestinoCredito())
+            .productoFinanciableId(entity.getProductoFinanciableId())
+            .productoNombreSnapshot(entity.getProductoNombreSnapshot())
+            .productoPrecioSnapshot(entity.getProductoPrecioSnapshot())
+            .productoMonedaSnapshot(entity.getProductoMonedaSnapshot())
+            .productoColateralRequeridoSnapshot(entity.getProductoColateralRequeridoSnapshot())
             .evaluacionId(entity.getEvaluacionId())
             .planAmortizacionId(entity.getPlanAmortizacionId())
             .referenciaDesembolso(entity.getReferenciaDesembolso())
@@ -130,6 +135,11 @@ public class SolicitudCreditoRepositoryImpl implements SolicitudCreditoRepositor
             .colateralCuentaId(domain.getColateralCuentaId())
             .colateralMontoRetenido(domain.getColateralMontoRetenido())
             .destinoCredito(domain.getDestinoCredito())
+            .productoFinanciableId(domain.getProductoFinanciableId())
+            .productoNombreSnapshot(domain.getProductoNombreSnapshot())
+            .productoPrecioSnapshot(domain.getProductoPrecioSnapshot())
+            .productoMonedaSnapshot(domain.getProductoMonedaSnapshot())
+            .productoColateralRequeridoSnapshot(domain.getProductoColateralRequeridoSnapshot())
             .evaluacionId(domain.getEvaluacionId())
             .planAmortizacionId(domain.getPlanAmortizacionId())
             .referenciaDesembolso(domain.getReferenciaDesembolso())
@@ -142,6 +152,13 @@ public class SolicitudCreditoRepositoryImpl implements SolicitudCreditoRepositor
             builder.id(domain.getId());
         }
 
-        return builder.build();
+        Long version = domain.getVersion();
+        if (domain.getId() != null && version == null) {
+            version = 0L;
+        }
+
+        return builder
+            .version(version)
+            .build();
     }
 }

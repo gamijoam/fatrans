@@ -4,6 +4,7 @@ package com.tufondo.ahorros.application.usecase;
 import com.tufondo.ahorros.application.dto.DepositoRequest;
 import com.tufondo.ahorros.application.dto.MovimientoResponse;
 import com.tufondo.ahorros.application.mapper.AhorrosDTOMapper;
+import com.tufondo.ahorros.application.port.output.AhorrosContabilidadPort;
 import com.tufondo.ahorros.domain.exception.AccesoCuentaAjenaException;
 import com.tufondo.ahorros.domain.exception.CuentaAhorroNoEncontradaException;
 import com.tufondo.ahorros.domain.exception.CuentaNoPermiteOperacionesException;
@@ -39,6 +40,7 @@ public class RealizarDepositoUseCase {
     private final MovimientoRepository movimientoRepository;
     private final AhorrosDTOMapper mapper;
     private final LocdoftOperacionService locdoftService;
+    private final AhorrosContabilidadPort contabilidadPort;
 
     @Transactional
     public MovimientoResponse ejecutar(String numeroCuenta, DepositoRequest request,
@@ -113,6 +115,12 @@ public class RealizarDepositoUseCase {
         if (consentimiento != null) {
             locdoftService.asociarConMovimiento(consentimiento.getId(), movimiento.getId());
         }
+
+        // Hook contable (#267): genera el asiento partida doble. Corre en el
+        // mismo @Transactional — si falla, rollback completo (saldo + movimiento
+        // + asiento revierten juntos). NO es best-effort: la contabilidad debe
+        // estar sincronizada con la caja por exigencia regulatoria SUDECA.
+        contabilidadPort.registrarDeposito(cuenta, movimiento);
 
         log.info("Depósito realizado: {} en cuenta {}", request.getMonto(), numeroCuenta);
         return mapper.toResponse(movimiento);

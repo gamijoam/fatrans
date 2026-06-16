@@ -116,6 +116,19 @@ export const creditosApi = {
   simular: (data: unknown) => apiClient.post('/v1/simulador', data),
 };
 
+export const productosApi = {
+  getPublicados: () => apiClient.get('/v1/productos'),
+  getProducto: (slug: string) => apiClient.get(`/v1/productos/${slug}`),
+  precalificar: (id: number) => apiClient.post(`/v1/productos/${id}/precalificar`),
+  solicitarFinanciamiento: (id: number) => apiClient.post(`/v1/productos/${id}/solicitar-financiamiento`),
+  getAdmin: () => apiClient.get('/v1/admin/productos'),
+  crear: (data: unknown) => apiClient.post('/v1/admin/productos', data),
+  actualizar: (id: number, data: unknown) => apiClient.put(`/v1/admin/productos/${id}`, data),
+  publicar: (id: number) => apiClient.post(`/v1/admin/productos/${id}/publicar`),
+  pausar: (id: number) => apiClient.post(`/v1/admin/productos/${id}/pausar`),
+  archivar: (id: number) => apiClient.post(`/v1/admin/productos/${id}/archivar`),
+};
+
 export const adminApi = {
   getStats: () => apiClient.get('/v1/admin/dashboard/estadisticas'),
   getActividad: (limit: number = 15) => apiClient.get(`/v1/admin/actividad?limit=${limit}`),

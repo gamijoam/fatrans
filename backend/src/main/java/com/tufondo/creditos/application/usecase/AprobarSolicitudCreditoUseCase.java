@@ -54,12 +54,10 @@ public class AprobarSolicitudCreditoUseCase {
             .orElseThrow(() -> new CreditoNoEncontradoException(solicitud.getTipoCreditoId()));
 
         // Calcular colateral requerido
-        BigDecimal colateralRequerido = solicitud.getMontoSolicitado()
-            .multiply(tipoCredito.getPorcentajeRequerimientoColateral());
+        BigDecimal colateralRequerido = calcularColateralRequerido(solicitud, tipoCredito);
 
         // HALLLAGO 2 FIX: Si el tipo de crédito requiere colateral pero no hay cuenta asignada, rechazar
-        boolean requiereColateral = tipoCredito.getPorcentajeRequerimientoColateral()
-            .compareTo(BigDecimal.ZERO) > 0;
+        boolean requiereColateral = colateralRequerido.compareTo(BigDecimal.ZERO) > 0;
         
         if (requiereColateral && solicitud.getColateralCuentaId() == null) {
             log.warn("Aprobación denegada: tipo de crédito {} requiere colateral {}% pero no hay cuenta de garantía asignada",
@@ -115,5 +113,20 @@ public class AprobarSolicitudCreditoUseCase {
         response.put("mensaje", "Crédito aprobado. Colateral retenido de cuenta de ahorro.");
         response.put("fechaAprobacion", LocalDateTime.now().toString());
         return response;
+    }
+
+    private BigDecimal calcularColateralRequerido(SolicitudCredito solicitud, TipoCredito tipoCredito) {
+        if (solicitud.getProductoColateralRequeridoSnapshot() != null) {
+            return solicitud.getProductoColateralRequeridoSnapshot();
+        }
+        if (solicitud.getColateralMontoRetenido() != null
+                && solicitud.getColateralMontoRetenido().compareTo(BigDecimal.ZERO) > 0) {
+            return solicitud.getColateralMontoRetenido();
+        }
+        if (tipoCredito.getPorcentajeRequerimientoColateral() == null) {
+            return BigDecimal.ZERO;
+        }
+        return solicitud.getMontoSolicitado()
+            .multiply(tipoCredito.getPorcentajeRequerimientoColateral());
     }
 }

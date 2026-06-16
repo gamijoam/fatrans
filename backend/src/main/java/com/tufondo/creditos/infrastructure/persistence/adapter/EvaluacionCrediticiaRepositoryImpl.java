@@ -71,7 +71,7 @@ public class EvaluacionCrediticiaRepositoryImpl implements EvaluacionCrediticiaR
 
     private EvaluacionCrediticiaEntity toEntity(EvaluacionCrediticia domain) {
         return EvaluacionCrediticiaEntity.builder()
-            .id(domain.getId())
+            .id(domain.getVersion() == null ? null : domain.getId())
             .solicitudId(domain.getSolicitudId())
             .socioId(domain.getSocioId())
             .puntajeAntiguedad(domain.getPuntajeAntiguedad())
