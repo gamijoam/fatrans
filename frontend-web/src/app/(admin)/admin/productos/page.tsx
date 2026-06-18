@@ -18,8 +18,17 @@ import {
   Pause,
   Plus,
   Send,
+  Star,
+  Trash2,
   Upload,
 } from "lucide-react";
+
+interface ProductoImagen {
+  id: number;
+  imagenUrl: string;
+  esPrincipal: boolean;
+  orden: number;
+}
 
 interface Producto {
   id: number;
@@ -36,6 +45,7 @@ interface Producto {
   porcentajeColateral: number;
   colateralRequerido: number;
   imagenUrl?: string;
+  imagenes?: ProductoImagen[];
   estado: string;
 }
 
@@ -127,7 +137,7 @@ export default function AdminProductosPage() {
     if (!file) return;
     setUploadingId(producto.id);
     try {
-      const response = await productosApi.subirImagen(producto.id, file);
+      const response = await productosApi.agregarImagen(producto.id, file);
       setProductos((current) =>
         current.map((item) =>
           item.id === producto.id ? { ...item, ...response.data } : item,
@@ -136,6 +146,30 @@ export default function AdminProductosPage() {
     } finally {
       setUploadingId(null);
     }
+  };
+
+  const marcarPrincipal = async (
+    producto: Producto,
+    imagen: ProductoImagen,
+  ) => {
+    const response = await productosApi.marcarImagenPrincipal(
+      producto.id,
+      imagen.id,
+    );
+    setProductos((current) =>
+      current.map((item) =>
+        item.id === producto.id ? { ...item, ...response.data } : item,
+      ),
+    );
+  };
+
+  const eliminarImagen = async (producto: Producto, imagen: ProductoImagen) => {
+    const response = await productosApi.eliminarImagen(producto.id, imagen.id);
+    setProductos((current) =>
+      current.map((item) =>
+        item.id === producto.id ? { ...item, ...response.data } : item,
+      ),
+    );
   };
 
   return (
@@ -369,7 +403,7 @@ export default function AdminProductosPage() {
                           {uploadingId === producto.id
                             ? "Subiendo..."
                             : producto.imagenUrl
-                              ? "Cambiar foto"
+                              ? "Agregar foto"
                               : "Subir foto"}
                           <input
                             type="file"
@@ -384,8 +418,54 @@ export default function AdminProductosPage() {
                           />
                         </label>
                         <p className="mt-1 text-xs text-slate-500">
-                          JPG o PNG, máximo 2 MB.
+                          JPG o PNG, máximo 2 MB. Hasta 5 fotos por producto.
                         </p>
+                        {producto.imagenes && producto.imagenes.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {producto.imagenes.map((imagen) => (
+                              <div
+                                key={imagen.id}
+                                className="group relative h-16 w-20 overflow-hidden rounded-md border border-slate-200 bg-slate-50"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={resolveApiAssetUrl(imagen.imagenUrl)}
+                                  alt={`${producto.nombre} ${imagen.orden + 1}`}
+                                  className="h-full w-full object-cover"
+                                />
+                                {imagen.esPrincipal && (
+                                  <span className="absolute left-1 top-1 rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#0F2744] shadow-sm">
+                                    Principal
+                                  </span>
+                                )}
+                                <div className="absolute inset-x-1 bottom-1 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                                  {!imagen.esPrincipal && (
+                                    <button
+                                      type="button"
+                                      aria-label="Marcar como principal"
+                                      className="rounded bg-white p-1 text-[#0F2744] shadow-sm hover:bg-slate-100"
+                                      onClick={() =>
+                                        void marcarPrincipal(producto, imagen)
+                                      }
+                                    >
+                                      <Star className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    aria-label="Eliminar imagen"
+                                    className="rounded bg-white p-1 text-red-600 shadow-sm hover:bg-red-50"
+                                    onClick={() =>
+                                      void eliminarImagen(producto, imagen)
+                                    }
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex shrink-0 gap-2">
