@@ -47,6 +47,11 @@ spring:
             enable: false
         debug: ${MAIL_DEBUG:false}
 
+  servlet:
+    multipart:
+      max-file-size: ${PRODUCT_IMAGE_MAX_FILE_SIZE:2MB}
+      max-request-size: ${PRODUCT_IMAGE_MAX_REQUEST_SIZE:3MB}
+
 springdoc:
   api-docs:
     path: /v3/api-docs
