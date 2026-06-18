@@ -6,15 +6,20 @@ import com.tufondo.productos.application.dto.PrecalificacionProductoResponse;
 import com.tufondo.productos.application.dto.ProductoFinanciableRequest;
 import com.tufondo.productos.application.dto.ProductoFinanciableResponse;
 import com.tufondo.productos.application.usecase.GestionarProductosFinanciablesUseCase;
+import com.tufondo.productos.infrastructure.storage.ProductoImagenStorageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.concurrent.TimeUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -25,6 +30,7 @@ import java.util.UUID;
 public class ProductoFinanciableController {
 
     private final GestionarProductosFinanciablesUseCase useCase;
+    private final ProductoImagenStorageService imagenStorageService;
 
     @GetMapping("/productos")
     @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
@@ -103,9 +109,34 @@ public class ProductoFinanciableController {
         return ResponseEntity.ok(useCase.cambiarEstado(id, "ARCHIVADO"));
     }
 
+    @PostMapping(value = "/admin/productos/{id}/imagen", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ProductoFinanciableResponse> subirImagen(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+        useCase.validarExiste(id);
+        String imagenUrl = imagenStorageService.subirImagen(id, file);
+        return ResponseEntity.ok(useCase.actualizarImagen(id, imagenUrl));
+    }
+
+    @GetMapping("/productos/imagenes/{fecha}/{fileName}")
+    @PreAuthorize("hasAnyRole('SOCIO', 'ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<byte[]> obtenerImagen(@PathVariable String fecha, @PathVariable String fileName) {
+        ProductoImagenStorageService.ImagenProducto imagen = imagenStorageService.descargar(fecha, fileName);
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(imagen.contentType()))
+            .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePrivate())
+            .body(imagen.data());
+    }
+
     @ExceptionHandler(GestionarProductosFinanciablesUseCase.ProductoNoEncontradoException.class)
     public ResponseEntity<Map<String, String>> noEncontrado(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(ProductoImagenStorageService.ImagenNoEncontradaException.class)
+    public ResponseEntity<Map<String, String>> imagenNoEncontrada() {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Imagen de producto no encontrada"));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

@@ -56,6 +56,13 @@ public class GestionarProductosFinanciablesUseCase {
     }
 
     @Transactional(readOnly = true)
+    public void validarExiste(Long id) {
+        if (!repository.existsById(id)) {
+            throw new ProductoNoEncontradoException(id.toString());
+        }
+    }
+
+    @Transactional(readOnly = true)
     public ProductoFinanciableResponse obtenerPublicado(String slug) {
         return repository.findBySlugAndEstado(slug, ESTADO_PUBLICADO)
             .map(this::toResponse)
@@ -99,6 +106,15 @@ public class GestionarProductosFinanciablesUseCase {
         ProductoFinanciableEntity entity = repository.findById(id)
             .orElseThrow(() -> new ProductoNoEncontradoException(id.toString()));
         entity.setEstado(estado);
+        entity.setUpdatedAt(LocalDateTime.now());
+        return toResponse(repository.save(entity));
+    }
+
+    @Transactional
+    public ProductoFinanciableResponse actualizarImagen(Long id, String imagenUrl) {
+        ProductoFinanciableEntity entity = repository.findById(id)
+            .orElseThrow(() -> new ProductoNoEncontradoException(id.toString()));
+        entity.setImagenUrl(imagenUrl);
         entity.setUpdatedAt(LocalDateTime.now());
         return toResponse(repository.save(entity));
     }
