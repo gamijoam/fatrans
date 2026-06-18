@@ -9,6 +9,7 @@ import { LogoutButton } from '@/components/shared/logout-button';
 import { IdleTimeoutWatcher } from '@/components/shared/idle-timeout-watcher';
 import { NotificationBell } from '@/components/shared/notification-bell';
 import { ChangePasswordModal } from '@/components/shared/change-password-modal';
+import { Logo } from '@/components/branding/logo';
 import {
   LayoutDashboard,
   Wallet,
@@ -106,8 +107,8 @@ export function SocioShell({ children }: { children: React.ReactNode }) {
           {/* Logo */}
           <div className="p-6 border-b border-slate-100">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0F2744] to-[#1a4a7a] flex items-center justify-center shadow-md">
-                <span className="text-white font-bold text-sm">FA</span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+                <Logo size={30} soloImagen priority />
               </div>
               <div>
                 <h1 className="text-lg font-bold text-[#0F2744] tracking-tight">FATRANS</h1>
@@ -164,8 +165,8 @@ export function SocioShell({ children }: { children: React.ReactNode }) {
             <aside className="fixed left-0 top-0 bottom-0 w-80 bg-white p-4 flex flex-col">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0F2744] to-[#1a4a7a] flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">FA</span>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+                    <Logo size={30} soloImagen priority />
                   </div>
                   <div>
                     <h1 className="text-lg font-bold text-[#0F2744]">FATRANS</h1>
@@ -267,7 +268,9 @@ export function SocioShell({ children }: { children: React.ReactNode }) {
                     {user && (
                       <div className="p-4 border-b border-slate-100">
                         <div className="flex items-center gap-3">
-                          <AvatarSocio name={user.nombreCompleto || 'U'} size="md" />
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+                            <Logo size={30} soloImagen />
+                          </div>
                           <div>
                             <p className="font-semibold text-slate-900">{user.nombreCompleto}</p>
                             <p className="text-xs text-slate-500">{user.correoElectronico}</p>

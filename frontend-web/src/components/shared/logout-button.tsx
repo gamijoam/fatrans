@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, AlertTriangle } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
+import { Logo } from '@/components/branding/logo';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -59,9 +60,14 @@ export function LogoutButton({ variant = 'default', className }: LogoutButtonPro
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]" aria-labelledby="logout-dialog-title">
         <DialogHeader>
-          <div className="flex items-center gap-2 text-red-600">
-            <AlertTriangle className="h-5 w-5" />
-            <DialogTitle id="logout-dialog-title">¿Cerrar Sesión?</DialogTitle>
+          <div className="mb-1 flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
+              <Logo size={34} soloImagen />
+            </div>
+            <div className="flex min-w-0 items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+              <DialogTitle id="logout-dialog-title">¿Cerrar Sesión?</DialogTitle>
+            </div>
           </div>
           <DialogDescription>
             Tu sesión será cerrada y tendrás que volver a iniciar sesión para acceder a tu cuenta.

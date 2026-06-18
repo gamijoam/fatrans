@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { ProtectedRoute } from '@/components/shared/protected-route';
 import { LogoutButton } from '@/components/shared/logout-button';
 import { ChangePasswordModal } from '@/components/shared/change-password-modal';
+import { Logo } from '@/components/branding/logo';
 import {
   LayoutDashboard,
   Users,
@@ -109,8 +110,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           {/* Logo */}
           <div className="p-5 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#16A34A] to-[#15803D] flex items-center justify-center shadow-lg shadow-[#16A34A]/30">
-                <span className="text-white font-bold text-sm">FA</span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-lg shadow-black/10 ring-1 ring-white/20">
+                <Logo size={30} soloImagen priority />
               </div>
               <div>
                 <h1 className="text-lg font-bold tracking-tight">FATRANS</h1>
@@ -172,8 +173,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <aside className="fixed left-0 top-0 bottom-0 w-72 bg-[#0F2744] text-white p-4 flex flex-col">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#16A34A] to-[#15803D] flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">FA</span>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-white/20">
+                    <Logo size={30} soloImagen priority />
                   </div>
                   <h1 className="text-lg font-bold">FATRANS</h1>
                 </div>
@@ -318,8 +319,15 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
                       {user && (
                         <div className="px-4 py-3 border-b border-slate-100">
-                          <p className="font-medium text-sm text-slate-900">{user.nombreCompleto}</p>
-                          <p className="text-xs text-slate-500">{user.correoElectronico}</p>
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+                              <Logo size={30} soloImagen />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-slate-900">{user.nombreCompleto}</p>
+                              <p className="truncate text-xs text-slate-500">{user.correoElectronico}</p>
+                            </div>
+                          </div>
                         </div>
                       )}
                       <div className="py-1">
