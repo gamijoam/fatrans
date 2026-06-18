@@ -185,6 +185,17 @@ export const productosApi = {
       timeout: 30_000,
     });
   },
+  agregarImagen: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiClient.post(`/v1/admin/productos/${id}/imagenes`, formData, {
+      timeout: 30_000,
+    });
+  },
+  marcarImagenPrincipal: (id: number, imagenId: number) =>
+    apiClient.post(`/v1/admin/productos/${id}/imagenes/${imagenId}/principal`),
+  eliminarImagen: (id: number, imagenId: number) =>
+    apiClient.delete(`/v1/admin/productos/${id}/imagenes/${imagenId}`),
   publicar: (id: number) =>
     apiClient.post(`/v1/admin/productos/${id}/publicar`),
   pausar: (id: number) => apiClient.post(`/v1/admin/productos/${id}/pausar`),

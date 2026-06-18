@@ -113,10 +113,38 @@ public class ProductoFinanciableController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ProductoFinanciableResponse> subirImagen(
             @PathVariable Long id,
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
         useCase.validarExiste(id);
-        String imagenUrl = imagenStorageService.subirImagen(id, file);
-        return ResponseEntity.ok(useCase.actualizarImagen(id, imagenUrl));
+        ProductoImagenStorageService.UploadProductoImagenResult imagen = imagenStorageService.subirImagen(id, file);
+        return ResponseEntity.ok(useCase.actualizarImagen(id, imagen, extraerUserId(authentication)));
+    }
+
+    @PostMapping(value = "/admin/productos/{id}/imagenes", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ProductoFinanciableResponse> agregarImagen(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+        useCase.validarExiste(id);
+        ProductoImagenStorageService.UploadProductoImagenResult imagen = imagenStorageService.subirImagen(id, file);
+        return ResponseEntity.ok(useCase.agregarImagen(id, imagen, false, extraerUserId(authentication)));
+    }
+
+    @PostMapping("/admin/productos/{id}/imagenes/{imagenId}/principal")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ProductoFinanciableResponse> marcarImagenPrincipal(
+            @PathVariable Long id,
+            @PathVariable Long imagenId) {
+        return ResponseEntity.ok(useCase.marcarImagenPrincipal(id, imagenId));
+    }
+
+    @DeleteMapping("/admin/productos/{id}/imagenes/{imagenId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ProductoFinanciableResponse> eliminarImagen(
+            @PathVariable Long id,
+            @PathVariable Long imagenId) {
+        return ResponseEntity.ok(useCase.desactivarImagen(id, imagenId));
     }
 
     @GetMapping("/productos/imagenes/{fecha}/{fileName}")

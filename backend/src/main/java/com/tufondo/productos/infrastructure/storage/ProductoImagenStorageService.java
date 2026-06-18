@@ -40,7 +40,7 @@ public class ProductoImagenStorageService {
     @Value("${fatrans.productos.imagenes.max-size-bytes:2097152}")
     private long maxSizeBytes;
 
-    public String subirImagen(Long productoId, MultipartFile file) {
+    public UploadProductoImagenResult subirImagen(Long productoId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("La imagen del producto es requerida");
         }
@@ -78,7 +78,14 @@ public class ProductoImagenStorageService {
                 );
             }
 
-            return "/api/v1/productos/imagenes/" + fecha + "/" + fileName;
+            return new UploadProductoImagenResult(
+                "/api/v1/productos/imagenes/" + fecha + "/" + fileName,
+                objectPath,
+                "image/jpeg",
+                (long) normalizada.length,
+                original.getWidth(),
+                original.getHeight()
+            );
         } catch (IllegalArgumentException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -160,6 +167,15 @@ public class ProductoImagenStorageService {
     }
 
     public record ImagenProducto(byte[] data, String contentType) {}
+
+    public record UploadProductoImagenResult(
+        String imagenUrl,
+        String storageKey,
+        String mimeType,
+        Long sizeBytes,
+        Integer width,
+        Integer height
+    ) {}
 
     public static class ImagenNoEncontradaException extends RuntimeException {}
 }

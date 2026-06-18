@@ -8,6 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PackageOpen, ShieldCheck, WalletCards } from "lucide-react";
 
+interface ProductoImagen {
+  id: number;
+  imagenUrl: string;
+  esPrincipal: boolean;
+  orden: number;
+}
+
 interface Producto {
   id: number;
   slug: string;
@@ -18,6 +25,7 @@ interface Producto {
   precio: number;
   moneda: string;
   imagenUrl?: string;
+  imagenes?: ProductoImagen[];
   plazoMinimoMeses: number;
   plazoMaximoMeses: number;
   porcentajeColateral: number;
@@ -129,16 +137,20 @@ export default function ProductosSocioPage() {
           productos.map((producto) => {
             const precalificacion = precalificaciones[producto.id];
             const elegible = precalificacion?.elegible;
+            const imagenPrincipal =
+              producto.imagenes?.find((imagen) => imagen.esPrincipal) ||
+              producto.imagenes?.[0];
+            const heroUrl = imagenPrincipal?.imagenUrl || producto.imagenUrl;
             return (
               <Card
                 key={producto.id}
                 className="overflow-hidden border-slate-200"
               >
                 <div className="relative h-36 bg-[#0F2744]">
-                  {producto.imagenUrl ? (
+                  {heroUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={resolveApiAssetUrl(producto.imagenUrl)}
+                      src={resolveApiAssetUrl(heroUrl)}
                       alt={producto.nombre}
                       className="h-full w-full object-cover"
                     />
@@ -150,6 +162,18 @@ export default function ProductosSocioPage() {
                   <Badge className="absolute left-3 top-3 bg-white text-[#0F2744] hover:bg-white">
                     {producto.categoria}
                   </Badge>
+                  {producto.imagenes && producto.imagenes.length > 1 && (
+                    <div className="absolute bottom-3 right-3 flex gap-1">
+                      {producto.imagenes.slice(0, 4).map((imagen) => (
+                        <span
+                          key={imagen.id}
+                          className={`h-1.5 w-5 rounded-full ${
+                            imagen.esPrincipal ? "bg-white" : "bg-white/45"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <CardContent className="p-5 space-y-4">
                   <div>

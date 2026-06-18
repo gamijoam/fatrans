@@ -11,8 +11,12 @@ import com.tufondo.creditos.domain.repository.TipoCreditoRepository;
 import com.tufondo.productos.application.dto.PrecalificacionProductoResponse;
 import com.tufondo.productos.application.dto.ProductoFinanciableRequest;
 import com.tufondo.productos.application.dto.ProductoFinanciableResponse;
+import com.tufondo.productos.application.dto.ProductoImagenResponse;
 import com.tufondo.productos.infrastructure.persistence.entity.ProductoFinanciableEntity;
+import com.tufondo.productos.infrastructure.persistence.entity.ProductoImagenEntity;
 import com.tufondo.productos.infrastructure.persistence.jpa.ProductoFinanciableJpaRepository;
+import com.tufondo.productos.infrastructure.persistence.jpa.ProductoImagenJpaRepository;
+import com.tufondo.productos.infrastructure.storage.ProductoImagenStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -35,8 +39,10 @@ public class GestionarProductosFinanciablesUseCase {
     private static final String ESTADO_PUBLICADO = "PUBLICADO";
     private static final String ESTADO_PAUSADO = "PAUSADO";
     private static final String ESTADO_ARCHIVADO = "ARCHIVADO";
+    private static final int MAX_IMAGENES_PRODUCTO = 5;
 
     private final ProductoFinanciableJpaRepository repository;
+    private final ProductoImagenJpaRepository imagenRepository;
     private final CuentaAhorroJpaRepository cuentaRepository;
     private final TipoCreditoRepository tipoCreditoRepository;
     private final CrearSolicitudCreditoUseCase crearSolicitudCreditoUseCase;
@@ -111,10 +117,88 @@ public class GestionarProductosFinanciablesUseCase {
     }
 
     @Transactional
-    public ProductoFinanciableResponse actualizarImagen(Long id, String imagenUrl) {
+    public ProductoFinanciableResponse actualizarImagen(Long id, ProductoImagenStorageService.UploadProductoImagenResult imagen, UUID adminId) {
+        return agregarImagen(id, imagen, true, adminId);
+    }
+
+    @Transactional
+    public ProductoFinanciableResponse agregarImagen(Long id, ProductoImagenStorageService.UploadProductoImagenResult imagen, boolean principal, UUID adminId) {
         ProductoFinanciableEntity entity = repository.findById(id)
             .orElseThrow(() -> new ProductoNoEncontradoException(id.toString()));
-        entity.setImagenUrl(imagenUrl);
+        long activas = imagenRepository.countByProductoIdAndActivaTrue(id);
+        if (activas >= MAX_IMAGENES_PRODUCTO) {
+            throw new IllegalArgumentException("El producto ya tiene el maximo de 5 imagenes activas");
+        }
+
+        boolean seraPrincipal = principal || activas == 0 || entity.getImagenUrl() == null || entity.getImagenUrl().isBlank();
+        if (seraPrincipal) {
+            quitarPrincipal(id);
+            entity.setImagenUrl(imagen.imagenUrl());
+        }
+
+        ProductoImagenEntity imageEntity = new ProductoImagenEntity();
+        imageEntity.setProductoId(id);
+        imageEntity.setImagenUrl(imagen.imagenUrl());
+        imageEntity.setStorageKey(imagen.storageKey());
+        imageEntity.setMimeType(imagen.mimeType());
+        imageEntity.setSizeBytes(imagen.sizeBytes());
+        imageEntity.setWidth(imagen.width());
+        imageEntity.setHeight(imagen.height());
+        imageEntity.setEsPrincipal(seraPrincipal);
+        imageEntity.setActiva(true);
+        imageEntity.setOrden((int) activas);
+        imageEntity.setCreatedBy(adminId);
+        imageEntity.setCreatedAt(LocalDateTime.now());
+        imageEntity.setUpdatedAt(LocalDateTime.now());
+        imagenRepository.save(imageEntity);
+
+        entity.setUpdatedAt(LocalDateTime.now());
+        return toResponse(repository.save(entity));
+    }
+
+    @Transactional
+    public ProductoFinanciableResponse marcarImagenPrincipal(Long productoId, Long imagenId) {
+        ProductoFinanciableEntity entity = repository.findById(productoId)
+            .orElseThrow(() -> new ProductoNoEncontradoException(productoId.toString()));
+        ProductoImagenEntity imagen = imagenRepository.findByIdAndProductoIdAndActivaTrue(imagenId, productoId)
+            .orElseThrow(() -> new ProductoNoEncontradoException(imagenId.toString()));
+        quitarPrincipal(productoId);
+        imagen.setEsPrincipal(true);
+        imagen.setOrden(0);
+        imagen.setUpdatedAt(LocalDateTime.now());
+        imagenRepository.save(imagen);
+        entity.setImagenUrl(imagen.getImagenUrl());
+        entity.setUpdatedAt(LocalDateTime.now());
+        return toResponse(repository.save(entity));
+    }
+
+    @Transactional
+    public ProductoFinanciableResponse desactivarImagen(Long productoId, Long imagenId) {
+        ProductoFinanciableEntity entity = repository.findById(productoId)
+            .orElseThrow(() -> new ProductoNoEncontradoException(productoId.toString()));
+        ProductoImagenEntity imagen = imagenRepository.findByIdAndProductoIdAndActivaTrue(imagenId, productoId)
+            .orElseThrow(() -> new ProductoNoEncontradoException(imagenId.toString()));
+        boolean eraPrincipal = Boolean.TRUE.equals(imagen.getEsPrincipal());
+        imagen.setActiva(false);
+        imagen.setEsPrincipal(false);
+        imagen.setUpdatedAt(LocalDateTime.now());
+        imagenRepository.save(imagen);
+
+        if (eraPrincipal) {
+            ProductoImagenEntity siguiente = imagenRepository.findByProductoIdAndActivaTrueOrderByOrdenAscIdAsc(productoId)
+                .stream()
+                .findFirst()
+                .orElse(null);
+            if (siguiente != null) {
+                quitarPrincipal(productoId);
+                siguiente.setEsPrincipal(true);
+                siguiente.setUpdatedAt(LocalDateTime.now());
+                imagenRepository.save(siguiente);
+                entity.setImagenUrl(siguiente.getImagenUrl());
+            } else {
+                entity.setImagenUrl(null);
+            }
+        }
         entity.setUpdatedAt(LocalDateTime.now());
         return toResponse(repository.save(entity));
     }
@@ -187,7 +271,7 @@ public class GestionarProductosFinanciablesUseCase {
         entity.setProveedor(request.getProveedor());
         entity.setPrecio(request.getPrecio());
         entity.setMoneda(request.getMoneda().trim().toUpperCase(Locale.ROOT));
-        entity.setImagenUrl(request.getImagenUrl());
+        entity.setImagenUrl(normalizarImagenUrlInterna(request.getImagenUrl()));
         entity.setTipoCreditoId(request.getTipoCreditoId());
         entity.setPlazoMinimoMeses(request.getPlazoMinimoMeses());
         entity.setPlazoMaximoMeses(calcularPlazoMaximoPermitido(request.getPlazoMaximoMeses(), tipoCredito));
@@ -242,6 +326,9 @@ public class GestionarProductosFinanciablesUseCase {
         response.setPrecio(entity.getPrecio());
         response.setMoneda(entity.getMoneda());
         response.setImagenUrl(entity.getImagenUrl());
+        response.setImagenes(imagenRepository.findByProductoIdAndActivaTrueOrderByOrdenAscIdAsc(entity.getId()).stream()
+            .map(this::toImagenResponse)
+            .toList());
         response.setTipoCreditoId(entity.getTipoCreditoId());
         response.setPlazoMinimoMeses(entity.getPlazoMinimoMeses());
         response.setPlazoMaximoMeses(entity.getPlazoMaximoMeses());
@@ -251,6 +338,40 @@ public class GestionarProductosFinanciablesUseCase {
         response.setEstado(entity.getEstado());
         response.setUpdatedAt(entity.getUpdatedAt());
         return response;
+    }
+
+    private ProductoImagenResponse toImagenResponse(ProductoImagenEntity entity) {
+        ProductoImagenResponse response = new ProductoImagenResponse();
+        response.setId(entity.getId());
+        response.setImagenUrl(entity.getImagenUrl());
+        response.setEsPrincipal(entity.getEsPrincipal());
+        response.setOrden(entity.getOrden());
+        response.setWidth(entity.getWidth());
+        response.setHeight(entity.getHeight());
+        response.setSizeBytes(entity.getSizeBytes());
+        response.setCreatedAt(entity.getCreatedAt());
+        return response;
+    }
+
+    private void quitarPrincipal(Long productoId) {
+        imagenRepository.findByProductoIdAndActivaTrue(productoId).forEach(imagen -> {
+            if (Boolean.TRUE.equals(imagen.getEsPrincipal())) {
+                imagen.setEsPrincipal(false);
+                imagen.setUpdatedAt(LocalDateTime.now());
+                imagenRepository.save(imagen);
+            }
+        });
+    }
+
+    private String normalizarImagenUrlInterna(String imagenUrl) {
+        if (imagenUrl == null || imagenUrl.isBlank()) {
+            return null;
+        }
+        String trimmed = imagenUrl.trim();
+        if (!trimmed.startsWith("/api/v1/productos/imagenes/")) {
+            throw new IllegalArgumentException("La imagen del producto debe subirse desde el panel administrador");
+        }
+        return trimmed;
     }
 
     private BigDecimal calcularColateral(ProductoFinanciableEntity producto) {

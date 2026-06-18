@@ -2,6 +2,7 @@ package com.tufondo.productos.application.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class ProductoFinanciableResponse {
     private Long id;
@@ -14,6 +15,7 @@ public class ProductoFinanciableResponse {
     private BigDecimal precio;
     private String moneda;
     private String imagenUrl;
+    private List<ProductoImagenResponse> imagenes;
     private Long tipoCreditoId;
     private Integer plazoMinimoMeses;
     private Integer plazoMaximoMeses;
@@ -43,6 +45,8 @@ public class ProductoFinanciableResponse {
     public void setMoneda(String moneda) { this.moneda = moneda; }
     public String getImagenUrl() { return imagenUrl; }
     public void setImagenUrl(String imagenUrl) { this.imagenUrl = imagenUrl; }
+    public List<ProductoImagenResponse> getImagenes() { return imagenes; }
+    public void setImagenes(List<ProductoImagenResponse> imagenes) { this.imagenes = imagenes; }
     public Long getTipoCreditoId() { return tipoCreditoId; }
     public void setTipoCreditoId(Long tipoCreditoId) { this.tipoCreditoId = tipoCreditoId; }
     public Integer getPlazoMinimoMeses() { return plazoMinimoMeses; }
