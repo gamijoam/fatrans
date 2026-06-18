@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { productosApi, resolveApiAssetUrl } from "@/lib/api/client";
 import { Badge } from "@/components/ui/badge";
@@ -225,15 +226,22 @@ export default function ProductosSocioPage() {
                     </div>
                   </div>
 
-                  <Button
-                    className="w-full bg-[#16A34A] hover:bg-[#15803D]"
-                    disabled={!elegible || solicitandoId === producto.id}
-                    onClick={() => solicitar(producto.id)}
-                  >
-                    {solicitandoId === producto.id
-                      ? "Enviando solicitud..."
-                      : "Solicitar financiamiento"}
-                  </Button>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Button asChild variant="outline">
+                      <Link href={`/dashboard/productos/${producto.slug}`}>
+                        Ver detalle
+                      </Link>
+                    </Button>
+                    <Button
+                      className="bg-[#16A34A] hover:bg-[#15803D]"
+                      disabled={!elegible || solicitandoId === producto.id}
+                      onClick={() => solicitar(producto.id)}
+                    >
+                      {solicitandoId === producto.id
+                        ? "Enviando..."
+                        : "Solicitar"}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             );
