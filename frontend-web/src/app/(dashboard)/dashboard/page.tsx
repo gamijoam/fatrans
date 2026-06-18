@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
+import { sociosApi } from '@/lib/api/client';
 import {
   Loader2, Wallet, CreditCard, Plus, ArrowUpRight, ArrowDownRight,
   Shield, FileText, Users, Calculator, Eye, EyeOff,
@@ -37,6 +38,17 @@ interface CuentaAhorro {
   moneda: string;
   saldoActual: number;
   estado: string;
+}
+
+interface PerfilSocioBasico {
+  primerNombre?: string;
+}
+
+function obtenerNombreSaludo(userName?: string | null, primerNombrePerfil?: string | null) {
+  const primerNombre = primerNombrePerfil?.trim() || userName?.trim().split(/\s+/)[0] || '';
+  return primerNombre && !['socio', 'usuario'].includes(primerNombre.toLowerCase())
+    ? primerNombre
+    : null;
 }
 
 function formatCurrency(amount: number, currency: string = 'VES') {
@@ -294,6 +306,7 @@ function ProgressBar({ percentage, color }: { percentage: number; color: string 
 export default function SocioDashboardPage() {
   const user = useAuthStore((state) => state.user);
   const isLoading = useAuthStore((state) => state.isLoading);
+  const [primerNombrePerfil, setPrimerNombrePerfil] = useState<string | null>(null);
 
   const [cuentas, setCuentas] = useState<CuentaAhorro[]>([]);
   const [loadingCuentas, setLoadingCuentas] = useState(true);
@@ -358,6 +371,24 @@ export default function SocioDashboardPage() {
       cargarCuentas();
     }
   }, [isLoading, user?.socioId, cargarCuentas]);
+
+  const cargarPerfilSocio = useCallback(async () => {
+    if (!user?.socioId) return;
+    try {
+      const response = await sociosApi.getById(user.socioId);
+      const data = response.data as PerfilSocioBasico;
+      setPrimerNombrePerfil(data.primerNombre?.trim() || null);
+    } catch (err) {
+      console.error('Error cargando perfil del socio:', err);
+      setPrimerNombrePerfil(null);
+    }
+  }, [user?.socioId]);
+
+  useEffect(() => {
+    if (!isLoading && user?.socioId) {
+      cargarPerfilSocio();
+    }
+  }, [isLoading, user?.socioId, cargarPerfilSocio]);
 
   // Issue #212: cargar beneficiarios REALES del socio
   const cargarBeneficiarios = useCallback(async () => {
@@ -476,6 +507,7 @@ export default function SocioDashboardPage() {
   // Derivados de los beneficiarios reales para la UI
   const beneficiariosOrdenados = beneficiariosActivosOrdenados(beneficiarios);
   const totalPorcentajeAsignado = sumaPorcentajes(beneficiarios);
+  const nombreSaludo = obtenerNombreSaludo(user?.nombreCompleto, primerNombrePerfil);
 
   if (isLoading) {
     return (
@@ -491,7 +523,7 @@ export default function SocioDashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#0F2744]">
-            Hola, {user?.nombreCompleto?.split(' ')[0] || ' Socio'}
+            {nombreSaludo ? `Hola, ${nombreSaludo}` : 'Hola'}
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">Aquí está el resumen de tu cuenta</p>
         </div>

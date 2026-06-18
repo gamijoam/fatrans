@@ -276,16 +276,6 @@ export function SocioShell({ children }: { children: React.ReactNode }) {
                       </div>
                     )}
                     <div className="py-2">
-                      <Link href="/perfil" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50">
-                        <User className="w-4 h-4" />
-                        Mi Perfil
-                      </Link>
-                      <Link href="/dashboard/documentos" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50">
-                        <FileText className="w-4 h-4" />
-                        Documentos
-                      </Link>
-                    </div>
-                    <div className="py-2 border-t border-slate-100">
                       <LogoutButton />
                     </div>
                   </div>
