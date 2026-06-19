@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ImageIcon,
+  Pencil,
   PackageOpen,
   Pause,
   Plus,
@@ -21,6 +22,7 @@ import {
   Star,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 
 interface ProductoImagen {
@@ -46,6 +48,7 @@ interface Producto {
   colateralRequerido: number;
   imagenUrl?: string;
   imagenes?: ProductoImagen[];
+  requiereAprobacionManual?: boolean;
   estado: string;
 }
 
@@ -82,6 +85,7 @@ export default function AdminProductosPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Producto | null>(null);
 
   useEffect(() => {
     cargarDatos();
@@ -107,18 +111,58 @@ export default function AdminProductosPage() {
     }
   };
 
+  const resetForm = () => {
+    setForm({
+      ...initialForm,
+      tipoCreditoId: tiposCredito[0]?.id ? String(tiposCredito[0].id) : "",
+    });
+    setEditingProduct(null);
+  };
+
+  const cargarProductoEnFormulario = (producto: Producto) => {
+    setEditingProduct(producto);
+    setForm({
+      codigo: producto.codigo,
+      nombre: producto.nombre || "",
+      descripcion: producto.descripcion || "",
+      categoria: producto.categoria || "REPUESTOS",
+      proveedor: producto.proveedor || "",
+      precio: String(producto.precio ?? ""),
+      moneda: producto.moneda || "VES",
+      tipoCreditoId: String(producto.tipoCreditoId || ""),
+      plazoMinimoMeses: String(producto.plazoMinimoMeses || "1"),
+      plazoMaximoMeses: String(producto.plazoMaximoMeses || "12"),
+      porcentajeColateral: String(producto.porcentajeColateral ?? "30"),
+      imagenUrl: producto.imagenUrl || "",
+      requiereAprobacionManual:
+        producto.requiereAprobacionManual === undefined
+          ? true
+          : Boolean(producto.requiereAprobacionManual),
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const buildPayload = () => ({
+    ...form,
+    imagenUrl: form.imagenUrl.startsWith("/api/v1/productos/imagenes/")
+      ? form.imagenUrl
+      : "",
+    precio: Number(form.precio),
+    tipoCreditoId: Number(form.tipoCreditoId),
+    plazoMinimoMeses: Number(form.plazoMinimoMeses),
+    plazoMaximoMeses: Number(form.plazoMaximoMeses),
+    porcentajeColateral: Number(form.porcentajeColateral),
+  });
+
   const submit = async () => {
     setSaving(true);
     try {
-      await productosApi.crear({
-        ...form,
-        precio: Number(form.precio),
-        tipoCreditoId: Number(form.tipoCreditoId),
-        plazoMinimoMeses: Number(form.plazoMinimoMeses),
-        plazoMaximoMeses: Number(form.plazoMaximoMeses),
-        porcentajeColateral: Number(form.porcentajeColateral),
-      });
-      setForm(initialForm);
+      if (editingProduct) {
+        await productosApi.actualizar(editingProduct.id, buildPayload());
+      } else {
+        await productosApi.crear(buildPayload());
+      }
+      resetForm();
       await cargarDatos();
     } finally {
       setSaving(false);
@@ -191,9 +235,21 @@ export default function AdminProductosPage() {
         <Card className="border-slate-200">
           <CardContent className="p-5 space-y-4">
             <div className="flex items-center gap-2">
-              <Plus className="h-5 w-5 text-[#16A34A]" />
-              <h2 className="font-semibold text-slate-950">Nuevo producto</h2>
+              {editingProduct ? (
+                <Pencil className="h-5 w-5 text-[#16A34A]" />
+              ) : (
+                <Plus className="h-5 w-5 text-[#16A34A]" />
+              )}
+              <h2 className="font-semibold text-slate-950">
+                {editingProduct ? "Editar producto" : "Nuevo producto"}
+              </h2>
             </div>
+            {editingProduct?.estado === "PUBLICADO" && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+                Los cambios aplican al catálogo y a nuevas solicitudes. Las
+                solicitudes ya creadas conservan sus datos históricos.
+              </div>
+            )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
@@ -202,6 +258,7 @@ export default function AdminProductosPage() {
                   value={form.codigo}
                   onChange={(e) => setForm({ ...form, codigo: e.target.value })}
                   placeholder="CAUCHO-001"
+                  disabled={Boolean(editingProduct)}
                 />
               </div>
               <div>
@@ -307,6 +364,26 @@ export default function AdminProductosPage() {
               </div>
             </div>
 
+            <label className="flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={form.requiereAprobacionManual}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    requiereAprobacionManual: event.target.checked,
+                  })
+                }
+                className="mt-1"
+              />
+              <span>
+                Requiere aprobación manual
+                <span className="block text-xs text-slate-500">
+                  Mantiene revisión administrativa antes del desembolso.
+                </span>
+              </span>
+            </label>
+
             <Button
               className="w-full bg-[#16A34A] hover:bg-[#15803D]"
               onClick={submit}
@@ -318,8 +395,24 @@ export default function AdminProductosPage() {
                 !form.tipoCreditoId
               }
             >
-              {saving ? "Guardando..." : "Crear como borrador"}
+              {saving
+                ? "Guardando..."
+                : editingProduct
+                  ? "Guardar cambios"
+                  : "Crear como borrador"}
             </Button>
+            {editingProduct && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={resetForm}
+                disabled={saving}
+              >
+                <X className="mr-2 h-4 w-4" />
+                Cancelar edición
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -468,7 +561,15 @@ export default function AdminProductosPage() {
                         )}
                       </div>
                     </div>
-                    <div className="flex shrink-0 gap-2">
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => cargarProductoEnFormulario(producto)}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Editar
+                      </Button>
                       {producto.estado !== "PUBLICADO" ? (
                         <Button
                           size="sm"
