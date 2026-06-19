@@ -11,10 +11,13 @@ import com.tufondo.creditos.domain.repository.TipoCreditoRepository;
 import com.tufondo.productos.application.dto.PrecalificacionProductoResponse;
 import com.tufondo.productos.application.dto.ProductoFinanciableRequest;
 import com.tufondo.productos.application.dto.ProductoFinanciableResponse;
+import com.tufondo.productos.application.dto.ProductoHistorialCambioResponse;
 import com.tufondo.productos.application.dto.ProductoImagenResponse;
 import com.tufondo.productos.infrastructure.persistence.entity.ProductoFinanciableEntity;
+import com.tufondo.productos.infrastructure.persistence.entity.ProductoHistorialCambioEntity;
 import com.tufondo.productos.infrastructure.persistence.entity.ProductoImagenEntity;
 import com.tufondo.productos.infrastructure.persistence.jpa.ProductoFinanciableJpaRepository;
+import com.tufondo.productos.infrastructure.persistence.jpa.ProductoHistorialCambioJpaRepository;
 import com.tufondo.productos.infrastructure.persistence.jpa.ProductoImagenJpaRepository;
 import com.tufondo.productos.infrastructure.storage.ProductoImagenStorageService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +32,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -43,6 +47,7 @@ public class GestionarProductosFinanciablesUseCase {
 
     private final ProductoFinanciableJpaRepository repository;
     private final ProductoImagenJpaRepository imagenRepository;
+    private final ProductoHistorialCambioJpaRepository historialRepository;
     private final CuentaAhorroJpaRepository cuentaRepository;
     private final TipoCreditoRepository tipoCreditoRepository;
     private final CrearSolicitudCreditoUseCase crearSolicitudCreditoUseCase;
@@ -69,6 +74,14 @@ public class GestionarProductosFinanciablesUseCase {
     }
 
     @Transactional(readOnly = true)
+    public List<ProductoHistorialCambioResponse> listarHistorial(Long productoId) {
+        validarExiste(productoId);
+        return historialRepository.findByProductoIdOrderByCreatedAtDesc(productoId).stream()
+            .map(this::toHistorialResponse)
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
     public ProductoFinanciableResponse obtenerPublicado(String slug) {
         return repository.findBySlugAndEstado(slug, ESTADO_PUBLICADO)
             .map(this::toResponse)
@@ -91,29 +104,37 @@ public class GestionarProductosFinanciablesUseCase {
         entity.setCreatedBy(adminId);
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
-        return toResponse(repository.save(entity));
+        ProductoFinanciableEntity saved = repository.save(entity);
+        registrarCambio(saved.getId(), "CREACION", null, null, "Producto creado", saved.getEstado(), adminId);
+        return toResponse(saved);
     }
 
     @Transactional
-    public ProductoFinanciableResponse actualizar(Long id, ProductoFinanciableRequest request) {
+    public ProductoFinanciableResponse actualizar(Long id, ProductoFinanciableRequest request, UUID adminId) {
         TipoCredito tipoCredito = validarRequest(request);
         ProductoFinanciableEntity entity = repository.findById(id)
             .orElseThrow(() -> new ProductoNoEncontradoException(id.toString()));
+        ProductoSnapshot anterior = ProductoSnapshot.from(entity);
         aplicarRequest(entity, request, tipoCredito);
         entity.setUpdatedAt(LocalDateTime.now());
-        return toResponse(repository.save(entity));
+        ProductoFinanciableEntity saved = repository.save(entity);
+        registrarCambiosActualizacion(id, anterior, saved, adminId);
+        return toResponse(saved);
     }
 
     @Transactional
-    public ProductoFinanciableResponse cambiarEstado(Long id, String estado) {
+    public ProductoFinanciableResponse cambiarEstado(Long id, String estado, UUID adminId) {
         if (!List.of(ESTADO_BORRADOR, ESTADO_PUBLICADO, ESTADO_PAUSADO, ESTADO_ARCHIVADO).contains(estado)) {
             throw new IllegalArgumentException("Estado no permitido");
         }
         ProductoFinanciableEntity entity = repository.findById(id)
             .orElseThrow(() -> new ProductoNoEncontradoException(id.toString()));
+        String estadoAnterior = entity.getEstado();
         entity.setEstado(estado);
         entity.setUpdatedAt(LocalDateTime.now());
-        return toResponse(repository.save(entity));
+        ProductoFinanciableEntity saved = repository.save(entity);
+        registrarCambioSiCambio(id, "CAMBIO_ESTADO", "estado", estadoAnterior, estado, saved.getEstado(), adminId);
+        return toResponse(saved);
     }
 
     @Transactional
@@ -131,6 +152,7 @@ public class GestionarProductosFinanciablesUseCase {
         }
 
         boolean seraPrincipal = principal || activas == 0 || entity.getImagenUrl() == null || entity.getImagenUrl().isBlank();
+        String imagenPrincipalAnterior = entity.getImagenUrl();
         if (seraPrincipal) {
             quitarPrincipal(id);
             entity.setImagenUrl(imagen.imagenUrl());
@@ -153,15 +175,19 @@ public class GestionarProductosFinanciablesUseCase {
         imagenRepository.save(imageEntity);
 
         entity.setUpdatedAt(LocalDateTime.now());
-        return toResponse(repository.save(entity));
+        ProductoFinanciableEntity saved = repository.save(entity);
+        registrarCambio(id, "IMAGEN_AGREGADA", "imagen", null, imagen.imagenUrl(), saved.getEstado(), adminId);
+        registrarCambioSiCambio(id, "IMAGEN_PRINCIPAL", "imagenUrl", imagenPrincipalAnterior, saved.getImagenUrl(), saved.getEstado(), adminId);
+        return toResponse(saved);
     }
 
     @Transactional
-    public ProductoFinanciableResponse marcarImagenPrincipal(Long productoId, Long imagenId) {
+    public ProductoFinanciableResponse marcarImagenPrincipal(Long productoId, Long imagenId, UUID adminId) {
         ProductoFinanciableEntity entity = repository.findById(productoId)
             .orElseThrow(() -> new ProductoNoEncontradoException(productoId.toString()));
         ProductoImagenEntity imagen = imagenRepository.findByIdAndProductoIdAndActivaTrue(imagenId, productoId)
             .orElseThrow(() -> new ProductoNoEncontradoException(imagenId.toString()));
+        String imagenPrincipalAnterior = entity.getImagenUrl();
         quitarPrincipal(productoId);
         imagen.setEsPrincipal(true);
         imagen.setOrden(0);
@@ -169,16 +195,20 @@ public class GestionarProductosFinanciablesUseCase {
         imagenRepository.save(imagen);
         entity.setImagenUrl(imagen.getImagenUrl());
         entity.setUpdatedAt(LocalDateTime.now());
-        return toResponse(repository.save(entity));
+        ProductoFinanciableEntity saved = repository.save(entity);
+        registrarCambioSiCambio(productoId, "IMAGEN_PRINCIPAL", "imagenUrl", imagenPrincipalAnterior, saved.getImagenUrl(), saved.getEstado(), adminId);
+        return toResponse(saved);
     }
 
     @Transactional
-    public ProductoFinanciableResponse desactivarImagen(Long productoId, Long imagenId) {
+    public ProductoFinanciableResponse desactivarImagen(Long productoId, Long imagenId, UUID adminId) {
         ProductoFinanciableEntity entity = repository.findById(productoId)
             .orElseThrow(() -> new ProductoNoEncontradoException(productoId.toString()));
         ProductoImagenEntity imagen = imagenRepository.findByIdAndProductoIdAndActivaTrue(imagenId, productoId)
             .orElseThrow(() -> new ProductoNoEncontradoException(imagenId.toString()));
         boolean eraPrincipal = Boolean.TRUE.equals(imagen.getEsPrincipal());
+        String imagenUrlEliminada = imagen.getImagenUrl();
+        String imagenPrincipalAnterior = entity.getImagenUrl();
         imagen.setActiva(false);
         imagen.setEsPrincipal(false);
         imagen.setUpdatedAt(LocalDateTime.now());
@@ -200,7 +230,10 @@ public class GestionarProductosFinanciablesUseCase {
             }
         }
         entity.setUpdatedAt(LocalDateTime.now());
-        return toResponse(repository.save(entity));
+        ProductoFinanciableEntity saved = repository.save(entity);
+        registrarCambio(productoId, "IMAGEN_ELIMINADA", "imagen", imagenUrlEliminada, null, saved.getEstado(), adminId);
+        registrarCambioSiCambio(productoId, "IMAGEN_PRINCIPAL", "imagenUrl", imagenPrincipalAnterior, saved.getImagenUrl(), saved.getEstado(), adminId);
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -353,6 +386,85 @@ public class GestionarProductosFinanciablesUseCase {
         return response;
     }
 
+    private ProductoHistorialCambioResponse toHistorialResponse(ProductoHistorialCambioEntity entity) {
+        ProductoHistorialCambioResponse response = new ProductoHistorialCambioResponse();
+        response.setId(entity.getId());
+        response.setProductoId(entity.getProductoId());
+        response.setTipoEvento(entity.getTipoEvento());
+        response.setCampo(entity.getCampo());
+        response.setValorAnterior(entity.getValorAnterior());
+        response.setValorNuevo(entity.getValorNuevo());
+        response.setEstadoProducto(entity.getEstadoProducto());
+        response.setActorId(entity.getActorId());
+        response.setCreatedAt(entity.getCreatedAt());
+        return response;
+    }
+
+    private void registrarCambiosActualizacion(
+            Long productoId,
+            ProductoSnapshot anterior,
+            ProductoFinanciableEntity actual,
+            UUID adminId) {
+        registrarCambioSiCambio(productoId, "ACTUALIZACION", "nombre", anterior.nombre(), actual.getNombre(), actual.getEstado(), adminId);
+        registrarCambioSiCambio(productoId, "ACTUALIZACION", "descripcion", anterior.descripcion(), actual.getDescripcion(), actual.getEstado(), adminId);
+        registrarCambioSiCambio(productoId, "ACTUALIZACION", "categoria", anterior.categoria(), actual.getCategoria(), actual.getEstado(), adminId);
+        registrarCambioSiCambio(productoId, "ACTUALIZACION", "proveedor", anterior.proveedor(), actual.getProveedor(), actual.getEstado(), adminId);
+        registrarCambioSiCambio(productoId, "ACTUALIZACION", "precio", anterior.precio(), actual.getPrecio(), actual.getEstado(), adminId);
+        registrarCambioSiCambio(productoId, "ACTUALIZACION", "moneda", anterior.moneda(), actual.getMoneda(), actual.getEstado(), adminId);
+        registrarCambioSiCambio(productoId, "ACTUALIZACION", "imagenUrl", anterior.imagenUrl(), actual.getImagenUrl(), actual.getEstado(), adminId);
+        registrarCambioSiCambio(productoId, "ACTUALIZACION", "tipoCreditoId", anterior.tipoCreditoId(), actual.getTipoCreditoId(), actual.getEstado(), adminId);
+        registrarCambioSiCambio(productoId, "ACTUALIZACION", "plazoMinimoMeses", anterior.plazoMinimoMeses(), actual.getPlazoMinimoMeses(), actual.getEstado(), adminId);
+        registrarCambioSiCambio(productoId, "ACTUALIZACION", "plazoMaximoMeses", anterior.plazoMaximoMeses(), actual.getPlazoMaximoMeses(), actual.getEstado(), adminId);
+        registrarCambioSiCambio(productoId, "ACTUALIZACION", "porcentajeColateral", anterior.porcentajeColateral(), actual.getPorcentajeColateral(), actual.getEstado(), adminId);
+        registrarCambioSiCambio(productoId, "ACTUALIZACION", "requiereAprobacionManual", anterior.requiereAprobacionManual(), actual.getRequiereAprobacionManual(), actual.getEstado(), adminId);
+    }
+
+    private void registrarCambioSiCambio(
+            Long productoId,
+            String tipoEvento,
+            String campo,
+            Object valorAnterior,
+            Object valorNuevo,
+            String estado,
+            UUID actorId) {
+        String anterior = normalizarValorHistorial(valorAnterior);
+        String nuevo = normalizarValorHistorial(valorNuevo);
+        if (!Objects.equals(anterior, nuevo)) {
+            registrarCambio(productoId, tipoEvento, campo, anterior, nuevo, estado, actorId);
+        }
+    }
+
+    private void registrarCambio(
+            Long productoId,
+            String tipoEvento,
+            String campo,
+            Object valorAnterior,
+            Object valorNuevo,
+            String estado,
+            UUID actorId) {
+        ProductoHistorialCambioEntity entity = new ProductoHistorialCambioEntity();
+        entity.setProductoId(productoId);
+        entity.setTipoEvento(tipoEvento);
+        entity.setCampo(campo);
+        entity.setValorAnterior(normalizarValorHistorial(valorAnterior));
+        entity.setValorNuevo(normalizarValorHistorial(valorNuevo));
+        entity.setEstadoProducto(estado);
+        entity.setActorId(actorId);
+        entity.setCreatedAt(LocalDateTime.now());
+        historialRepository.save(entity);
+    }
+
+    private String normalizarValorHistorial(Object valor) {
+        if (valor == null) {
+            return null;
+        }
+        if (valor instanceof BigDecimal decimal) {
+            return decimal.stripTrailingZeros().toPlainString();
+        }
+        String text = String.valueOf(valor);
+        return text.isBlank() ? null : text;
+    }
+
     private void quitarPrincipal(Long productoId) {
         imagenRepository.findByProductoIdAndActivaTrue(productoId).forEach(imagen -> {
             if (Boolean.TRUE.equals(imagen.getEsPrincipal())) {
@@ -395,6 +507,38 @@ public class GestionarProductosFinanciablesUseCase {
             slug = base + "-" + i++;
         }
         return slug;
+    }
+
+    private record ProductoSnapshot(
+            String nombre,
+            String descripcion,
+            String categoria,
+            String proveedor,
+            BigDecimal precio,
+            String moneda,
+            String imagenUrl,
+            Long tipoCreditoId,
+            Integer plazoMinimoMeses,
+            Integer plazoMaximoMeses,
+            BigDecimal porcentajeColateral,
+            Boolean requiereAprobacionManual) {
+
+        private static ProductoSnapshot from(ProductoFinanciableEntity entity) {
+            return new ProductoSnapshot(
+                entity.getNombre(),
+                entity.getDescripcion(),
+                entity.getCategoria(),
+                entity.getProveedor(),
+                entity.getPrecio(),
+                entity.getMoneda(),
+                entity.getImagenUrl(),
+                entity.getTipoCreditoId(),
+                entity.getPlazoMinimoMeses(),
+                entity.getPlazoMaximoMeses(),
+                entity.getPorcentajeColateral(),
+                entity.getRequiereAprobacionManual()
+            );
+        }
     }
 
     public static class ProductoNoEncontradoException extends RuntimeException {

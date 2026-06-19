@@ -5,6 +5,7 @@ import com.tufondo.creditos.application.dto.SolicitudCreditoResponse;
 import com.tufondo.productos.application.dto.PrecalificacionProductoResponse;
 import com.tufondo.productos.application.dto.ProductoFinanciableRequest;
 import com.tufondo.productos.application.dto.ProductoFinanciableResponse;
+import com.tufondo.productos.application.dto.ProductoHistorialCambioResponse;
 import com.tufondo.productos.application.usecase.GestionarProductosFinanciablesUseCase;
 import com.tufondo.productos.infrastructure.storage.ProductoImagenStorageService;
 import jakarta.validation.Valid;
@@ -87,26 +88,43 @@ public class ProductoFinanciableController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ProductoFinanciableResponse> actualizar(
             @PathVariable Long id,
-            @Valid @RequestBody ProductoFinanciableRequest request) {
-        return ResponseEntity.ok(useCase.actualizar(id, request));
+            @Valid @RequestBody ProductoFinanciableRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(useCase.actualizar(id, request, extraerUserId(authentication)));
+    }
+
+    @GetMapping("/admin/productos/{id}/historial")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<Map<String, Object>> listarHistorial(@PathVariable Long id) {
+        List<ProductoHistorialCambioResponse> historial = useCase.listarHistorial(id);
+        return ResponseEntity.ok(Map.of(
+            "historial", historial,
+            "total", historial.size()
+        ));
     }
 
     @PostMapping("/admin/productos/{id}/publicar")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ProductoFinanciableResponse> publicar(@PathVariable Long id) {
-        return ResponseEntity.ok(useCase.cambiarEstado(id, "PUBLICADO"));
+    public ResponseEntity<ProductoFinanciableResponse> publicar(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(useCase.cambiarEstado(id, "PUBLICADO", extraerUserId(authentication)));
     }
 
     @PostMapping("/admin/productos/{id}/pausar")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ProductoFinanciableResponse> pausar(@PathVariable Long id) {
-        return ResponseEntity.ok(useCase.cambiarEstado(id, "PAUSADO"));
+    public ResponseEntity<ProductoFinanciableResponse> pausar(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(useCase.cambiarEstado(id, "PAUSADO", extraerUserId(authentication)));
     }
 
     @PostMapping("/admin/productos/{id}/archivar")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ProductoFinanciableResponse> archivar(@PathVariable Long id) {
-        return ResponseEntity.ok(useCase.cambiarEstado(id, "ARCHIVADO"));
+    public ResponseEntity<ProductoFinanciableResponse> archivar(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(useCase.cambiarEstado(id, "ARCHIVADO", extraerUserId(authentication)));
     }
 
     @PostMapping(value = "/admin/productos/{id}/imagen", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -135,16 +153,18 @@ public class ProductoFinanciableController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ProductoFinanciableResponse> marcarImagenPrincipal(
             @PathVariable Long id,
-            @PathVariable Long imagenId) {
-        return ResponseEntity.ok(useCase.marcarImagenPrincipal(id, imagenId));
+            @PathVariable Long imagenId,
+            Authentication authentication) {
+        return ResponseEntity.ok(useCase.marcarImagenPrincipal(id, imagenId, extraerUserId(authentication)));
     }
 
     @DeleteMapping("/admin/productos/{id}/imagenes/{imagenId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ProductoFinanciableResponse> eliminarImagen(
             @PathVariable Long id,
-            @PathVariable Long imagenId) {
-        return ResponseEntity.ok(useCase.desactivarImagen(id, imagenId));
+            @PathVariable Long imagenId,
+            Authentication authentication) {
+        return ResponseEntity.ok(useCase.desactivarImagen(id, imagenId, extraerUserId(authentication)));
     }
 
     @GetMapping("/productos/imagenes/{fecha}/{fileName}")

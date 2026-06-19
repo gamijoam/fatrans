@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  History,
   ImageIcon,
   Pencil,
   PackageOpen,
@@ -52,6 +53,17 @@ interface Producto {
   estado: string;
 }
 
+interface ProductoHistorialCambio {
+  id: number;
+  tipoEvento: string;
+  campo?: string | null;
+  valorAnterior?: string | null;
+  valorNuevo?: string | null;
+  estadoProducto?: string | null;
+  actorId?: string | null;
+  createdAt: string;
+}
+
 interface TipoCredito {
   id: number;
   nombre: string;
@@ -78,6 +90,18 @@ function formatMoney(value: number, currency: string) {
   return `${prefix} ${Number(value || 0).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function formatHistorialLabel(item: ProductoHistorialCambio) {
+  const labels: Record<string, string> = {
+    ACTUALIZACION: "Actualizacion",
+    CAMBIO_ESTADO: "Cambio de estado",
+    CREACION: "Creacion",
+    IMAGEN_AGREGADA: "Imagen agregada",
+    IMAGEN_ELIMINADA: "Imagen eliminada",
+    IMAGEN_PRINCIPAL: "Imagen principal",
+  };
+  return labels[item.tipoEvento] || item.tipoEvento;
+}
+
 export default function AdminProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [tiposCredito, setTiposCredito] = useState<TipoCredito[]>([]);
@@ -86,6 +110,9 @@ export default function AdminProductosPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
   const [editingProduct, setEditingProduct] = useState<Producto | null>(null);
+  const [historyProductId, setHistoryProductId] = useState<number | null>(null);
+  const [historial, setHistorial] = useState<ProductoHistorialCambio[]>([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
 
   useEffect(() => {
     cargarDatos();
@@ -164,6 +191,9 @@ export default function AdminProductosPage() {
       }
       resetForm();
       await cargarDatos();
+      if (editingProduct && historyProductId === editingProduct.id) {
+        await cargarHistorial(editingProduct.id);
+      }
     } finally {
       setSaving(false);
     }
@@ -175,6 +205,29 @@ export default function AdminProductosPage() {
   ) => {
     await productosApi[action](producto.id);
     await cargarDatos();
+    if (historyProductId === producto.id) {
+      await cargarHistorial(producto.id);
+    }
+  };
+
+  const cargarHistorial = async (productoId: number) => {
+    setHistoryProductId(productoId);
+    setLoadingHistorial(true);
+    try {
+      const response = await productosApi.getHistorial(productoId);
+      setHistorial(response.data.historial || []);
+    } finally {
+      setLoadingHistorial(false);
+    }
+  };
+
+  const toggleHistorial = async (productoId: number) => {
+    if (historyProductId === productoId) {
+      setHistoryProductId(null);
+      setHistorial([]);
+      return;
+    }
+    await cargarHistorial(productoId);
   };
 
   const subirImagen = async (producto: Producto, file?: File) => {
@@ -187,6 +240,9 @@ export default function AdminProductosPage() {
           item.id === producto.id ? { ...item, ...response.data } : item,
         ),
       );
+      if (historyProductId === producto.id) {
+        await cargarHistorial(producto.id);
+      }
     } finally {
       setUploadingId(null);
     }
@@ -205,6 +261,9 @@ export default function AdminProductosPage() {
         item.id === producto.id ? { ...item, ...response.data } : item,
       ),
     );
+    if (historyProductId === producto.id) {
+      await cargarHistorial(producto.id);
+    }
   };
 
   const eliminarImagen = async (producto: Producto, imagen: ProductoImagen) => {
@@ -214,6 +273,9 @@ export default function AdminProductosPage() {
         item.id === producto.id ? { ...item, ...response.data } : item,
       ),
     );
+    if (historyProductId === producto.id) {
+      await cargarHistorial(producto.id);
+    }
   };
 
   return (
@@ -570,6 +632,14 @@ export default function AdminProductosPage() {
                         <Pencil className="mr-2 h-4 w-4" />
                         Editar
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void toggleHistorial(producto.id)}
+                      >
+                        <History className="mr-2 h-4 w-4" />
+                        Historial
+                      </Button>
                       {producto.estado !== "PUBLICADO" ? (
                         <Button
                           size="sm"
@@ -591,6 +661,93 @@ export default function AdminProductosPage() {
                       )}
                     </div>
                   </div>
+                  {historyProductId === producto.id && (
+                    <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-sm font-semibold text-slate-950">
+                            Historial de cambios
+                          </h3>
+                          <p className="text-xs text-slate-500">
+                            Registro operativo del catalogo y sus imagenes.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setHistoryProductId(null);
+                            setHistorial([]);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {loadingHistorial ? (
+                        <div className="py-6 text-sm text-slate-500">
+                          Cargando historial...
+                        </div>
+                      ) : historial.length === 0 ? (
+                        <div className="py-6 text-sm text-slate-500">
+                          Este producto aun no tiene cambios registrados.
+                        </div>
+                      ) : (
+                        <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                          {historial.map((item) => (
+                            <div
+                              key={item.id}
+                              className="rounded-md border border-slate-200 bg-white p-3"
+                            >
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge variant="outline">
+                                  {formatHistorialLabel(item)}
+                                </Badge>
+                                {item.campo && (
+                                  <span className="text-xs font-medium text-slate-600">
+                                    {item.campo}
+                                  </span>
+                                )}
+                                {item.estadoProducto && (
+                                  <span className="text-xs text-slate-500">
+                                    Estado: {item.estadoProducto}
+                                  </span>
+                                )}
+                                <span className="ml-auto text-xs text-slate-500">
+                                  {new Date(item.createdAt).toLocaleString(
+                                    "es-VE",
+                                  )}
+                                </span>
+                              </div>
+                              {(item.valorAnterior || item.valorNuevo) && (
+                                <div className="mt-2 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
+                                  <div className="min-w-0 rounded bg-slate-100 px-2 py-1">
+                                    <span className="font-medium">
+                                      Anterior:
+                                    </span>{" "}
+                                    <span className="break-words">
+                                      {item.valorAnterior || "Sin valor"}
+                                    </span>
+                                  </div>
+                                  <div className="min-w-0 rounded bg-emerald-50 px-2 py-1 text-emerald-900">
+                                    <span className="font-medium">Nuevo:</span>{" "}
+                                    <span className="break-words">
+                                      {item.valorNuevo || "Sin valor"}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                              {item.actorId && (
+                                <p className="mt-2 truncate text-xs text-slate-400">
+                                  Admin: {item.actorId}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))
