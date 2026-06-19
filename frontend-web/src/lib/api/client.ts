@@ -175,6 +175,8 @@ export const productosApi = {
   solicitarFinanciamiento: (id: number) =>
     apiClient.post(`/v1/productos/${id}/solicitar-financiamiento`),
   getAdmin: () => apiClient.get("/v1/admin/productos"),
+  getHistorial: (id: number) =>
+    apiClient.get(`/v1/admin/productos/${id}/historial`),
   crear: (data: unknown) => apiClient.post("/v1/admin/productos", data),
   actualizar: (id: number, data: unknown) =>
     apiClient.put(`/v1/admin/productos/${id}`, data),
